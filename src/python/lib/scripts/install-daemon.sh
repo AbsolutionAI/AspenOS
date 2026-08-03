@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Starship OS — Systemd Daemon Installer
-# Installs all components to /opt/agnetic, creates users, enables services.
+# Installs all components to /opt/starship (canonical), creates users, enables services.
+# Legacy /opt/starship etc. aliases are symlinked to the canonical root.
 # Must run as root.
 set -euo pipefail
 
@@ -51,22 +52,22 @@ fi
 log "Creating directory structure..."
 
 DIRS=(
-    /opt/agnetic/bin
-    /opt/agnetic/lib/agnetic
-    /opt/agnetic/lib/agnetic/agents
-    /opt/agnetic/lib/agnetic/agents/skills
-    /opt/agnetic/lib/agnetic/dashboard
-    /opt/agnetic/lib/agnetic/tray
-    /opt/agnetic/lib/agnetic/scripts
-    /opt/agnetic/lib/agnetic/skills
-    /opt/agnetic/lib/agnetic/souls
-    /opt/agnetic/venv
-    /etc/agnetic
-    /etc/agnetic/nats
-    /var/lib/agnetic
-    /var/lib/agnetic/nats
-    /var/lib/agnetic/message-history
-    /var/log/agnetic
+    /opt/starship/bin
+    /opt/starship/lib/starship
+    /opt/starship/lib/starship/agents
+    /opt/starship/lib/starship/agents/skills
+    /opt/starship/lib/starship/dashboard
+    /opt/starship/lib/starship/tray
+    /opt/starship/lib/starship/scripts
+    /opt/starship/lib/starship/skills
+    /opt/starship/lib/starship/souls
+    /opt/starship/venv
+    /etc/starship
+    /etc/starship/nats
+    /var/lib/starship
+    /var/lib/starship/nats
+    /var/lib/starship/message-history
+    /var/log/starship
 )
 
 for d in "${DIRS[@]}"; do
@@ -74,14 +75,27 @@ for d in "${DIRS[@]}"; do
 done
 log "Directories created"
 
+# ─── 2b. Legacy aliases (canonical /opt/starship <- /opt/agnetic) ─────
+# Mirrors deb postinst / starship-firstboot so systemd units that reference
+# /opt/starship work even without firstboot.
+ln -sfn /opt/starship /opt/agnetic
+ln -sfn /etc/starship /etc/agnetic
+ln -sfn /var/lib/starship /var/lib/agnetic
+ln -sfn /var/log/starship /var/log/agnetic
+# active.conf default if missing
+if [[ ! -e /etc/starship/nats/active.conf ]]; then
+    ln -sfn /etc/starship/nats/agent-bus.conf /etc/starship/nats/active.conf
+fi
+log "Legacy aliases created (/opt/agnetic -> /opt/starship, ...)"
+
 # ─── 3. Install binaries ───────────────────────────────────────────
 log "Installing binaries..."
 
 # agneticctl CLI
 if [[ -f "$REPO_DIR/agneticctl/agneticctl" ]]; then
-    cp "$REPO_DIR/agneticctl/agneticctl" /opt/agnetic/bin/
-    chmod 755 /opt/agnetic/bin/agneticctl
-    ln -sf /opt/agnetic/bin/agneticctl /usr/local/bin/agneticctl
+    cp "$REPO_DIR/agneticctl/agneticctl" /opt/starship/bin/
+    chmod 755 /opt/starship/bin/agneticctl
+    ln -sf /opt/starship/bin/agneticctl /usr/local/bin/agneticctl
     log "Installed: agneticctl"
 else
     warn "agneticctl binary not found — build it first"
@@ -89,8 +103,8 @@ fi
 
 # StarAgent
 if [[ -f "$REPO_DIR/agent/target/release/staragent" ]]; then
-    cp "$REPO_DIR/agent/target/release/staragent" /opt/agnetic/bin/
-    chmod 755 /opt/agnetic/bin/staragent
+    cp "$REPO_DIR/agent/target/release/staragent" /opt/starship/bin/
+    chmod 755 /opt/starship/bin/staragent
     log "Installed: staragent"
 else
     warn "staragent binary not found — build it first"
@@ -100,70 +114,70 @@ fi
 log "Installing Python application code..."
 
 # Agent daemon
-cp "$REPO_DIR/agents/agent_daemon.py" /opt/agnetic/lib/agnetic/agents/
-cp "$REPO_DIR/agents/run_agent.sh" /opt/agnetic/lib/agnetic/agents/ 2>/dev/null || true
-cp "$REPO_DIR/agents/scheduler.py" /opt/agnetic/lib/agnetic/agents/ 2>/dev/null || true
-cp "$REPO_DIR/agents/workflows.py" /opt/agnetic/lib/agnetic/agents/ 2>/dev/null || true
-chmod +x /opt/agnetic/lib/agnetic/agents/agent_daemon.py
-chmod +x /opt/agnetic/lib/agnetic/agents/run_agent.sh 2>/dev/null || true
+cp "$REPO_DIR/agents/agent_daemon.py" /opt/starship/lib/starship/agents/
+cp "$REPO_DIR/agents/run_agent.sh" /opt/starship/lib/starship/agents/ 2>/dev/null || true
+cp "$REPO_DIR/agents/scheduler.py" /opt/starship/lib/starship/agents/ 2>/dev/null || true
+cp "$REPO_DIR/agents/workflows.py" /opt/starship/lib/starship/agents/ 2>/dev/null || true
+chmod +x /opt/starship/lib/starship/agents/agent_daemon.py
+chmod +x /opt/starship/lib/starship/agents/run_agent.sh 2>/dev/null || true
 
 # Dashboard
-cp "$REPO_DIR/dashboard/server.py" /opt/agnetic/lib/agnetic/dashboard/
-cp "$REPO_DIR/dashboard/index.html" /opt/agnetic/lib/agnetic/dashboard/
-chmod +x /opt/agnetic/lib/agnetic/dashboard/server.py
+cp "$REPO_DIR/dashboard/server.py" /opt/starship/lib/starship/dashboard/
+cp "$REPO_DIR/dashboard/index.html" /opt/starship/lib/starship/dashboard/
+chmod +x /opt/starship/lib/starship/dashboard/server.py
 
 # Status bridge
-cp "$REPO_DIR/tray/agnetic-status.py" /opt/agnetic/lib/agnetic/tray/
-chmod +x /opt/agnetic/lib/agnetic/tray/agnetic-status.py
+cp "$REPO_DIR/tray/agnetic-status.py" /opt/starship/lib/starship/tray/
+chmod +x /opt/starship/lib/starship/tray/agnetic-status.py
 
 # Scripts
-cp "$REPO_DIR/scripts/message_history.py" /opt/agnetic/lib/agnetic/scripts/
-chmod +x /opt/agnetic/lib/agnetic/scripts/message_history.py
+cp "$REPO_DIR/scripts/message_history.py" /opt/starship/lib/starship/scripts/
+chmod +x /opt/starship/lib/starship/scripts/message_history.py
 
 # Skills
-cp -r "$REPO_DIR/skills/"* /opt/agnetic/lib/agnetic/skills/ 2>/dev/null || true
+cp -r "$REPO_DIR/skills/"* /opt/starship/lib/starship/skills/ 2>/dev/null || true
 
 # Souls
-cp -r "$REPO_DIR/souls/"* /opt/agnetic/lib/agnetic/souls/ 2>/dev/null || true
+cp -r "$REPO_DIR/souls/"* /opt/starship/lib/starship/souls/ 2>/dev/null || true
 
 # Skills (agents subdir)
-cp -r "$REPO_DIR/agents/skills/"* /opt/agnetic/lib/agnetic/agents/skills/ 2>/dev/null || true
+cp -r "$REPO_DIR/agents/skills/"* /opt/starship/lib/starship/agents/skills/ 2>/dev/null || true
 
 # GPU detection
-cp "$REPO_DIR/scripts/detect-gpu.sh" /opt/agnetic/bin/
-chmod +x /opt/agnetic/bin/detect-gpu.sh
+cp "$REPO_DIR/scripts/detect-gpu.sh" /opt/starship/bin/
+chmod +x /opt/starship/bin/detect-gpu.sh
 
 log "Application code installed"
 
 # ─── 5. Install YAML configs ───────────────────────────────────────
 log "Installing YAML configs..."
 
-cp "$REPO_DIR/agents/config.yaml" /etc/agnetic/ 2>/dev/null || true
-cp "$REPO_DIR/agents/proxy.yaml" /etc/agnetic/ 2>/dev/null || true
-cp "$REPO_DIR/agents/romi.yaml" /etc/agnetic/ 2>/dev/null || true
-cp "$REPO_DIR/agents/ergo.yaml" /etc/agnetic/ 2>/dev/null || true
-cp "$REPO_DIR/agents/orchestrator.yaml" /etc/agnetic/ 2>/dev/null || true
+cp "$REPO_DIR/agents/config.yaml" /etc/starship/ 2>/dev/null || true
+cp "$REPO_DIR/agents/proxy.yaml" /etc/starship/ 2>/dev/null || true
+cp "$REPO_DIR/agents/romi.yaml" /etc/starship/ 2>/dev/null || true
+cp "$REPO_DIR/agents/ergo.yaml" /etc/starship/ 2>/dev/null || true
+cp "$REPO_DIR/agents/orchestrator.yaml" /etc/starship/ 2>/dev/null || true
 
-log "Configs installed to /etc/agnetic/"
+log "Configs installed to /etc/starship/"
 
 # ─── 6. Install NATS config ────────────────────────────────────────
 log "Installing NATS configuration..."
 
-cp "$REPO_DIR/nats/agent-bus.conf" /etc/agnetic/nats/
-cp "$REPO_DIR/nats/server.conf" /etc/agnetic/nats/ 2>/dev/null || true
-cp "$REPO_DIR/nats/subjects.yaml" /etc/agnetic/nats/ 2>/dev/null || true
+cp "$REPO_DIR/nats/agent-bus.conf" /etc/starship/nats/
+cp "$REPO_DIR/nats/server.conf" /etc/starship/nats/ 2>/dev/null || true
+cp "$REPO_DIR/nats/subjects.yaml" /etc/starship/nats/ 2>/dev/null || true
 
 # Update NATS config to use correct paths
-sed -i 's|/home/tech/agnetic-os/nats|/etc/agnetic/nats|g' /etc/agnetic/nats/agent-bus.conf 2>/dev/null || true
+sed -i 's|/home/tech/agnetic-os/nats|/etc/starship/nats|g' /etc/starship/nats/agent-bus.conf 2>/dev/null || true
 
-log "NATS config installed to /etc/agnetic/nats/"
+log "NATS config installed to /etc/starship/nats/"
 
 # ─── 7. Create Python venv ─────────────────────────────────────────
 log "Creating Python venv..."
 
-python3 -m venv /opt/agnetic/venv
-/opt/agnetic/venv/bin/pip install --upgrade pip -q
-/opt/agnetic/venv/bin/pip install nats-py aiohttp httpx PyYAML lancedb ollama -q
+python3 -m venv /opt/starship/venv
+/opt/starship/venv/bin/pip install --upgrade pip -q
+/opt/starship/venv/bin/pip install nats-py aiohttp httpx PyYAML lancedb ollama -q
 log "Python venv created with dependencies"
 
 # ─── 8. Install systemd units ──────────────────────────────────────
@@ -183,11 +197,11 @@ log "Systemd units installed and daemon reloaded"
 # ─── 9. Set ownership ─────────────────────────────────────────────
 log "Setting ownership..."
 
-chown -R agnetic:agnetic /opt/agnetic
-chown -R agnetic:agnetic /etc/agnetic
-chown -R agnetic:agnetic /var/lib/agnetic
-chown -R agnetic:agnetic /var/log/agnetic
-chown -R nats:nats /var/lib/agnetic/nats
+chown -R agnetic:agnetic /opt/starship
+chown -R agnetic:agnetic /etc/starship
+chown -R agnetic:agnetic /var/lib/starship
+chown -R agnetic:agnetic /var/log/starship
+chown -R nats:nats /var/lib/starship/nats
 
 log "Ownership set"
 
