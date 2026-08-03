@@ -66,3 +66,6 @@
 - **Domain Hermes agents** → DeepSeek V4-Flash via OpenRouter
 - **OpenCode / Aider** → DeepSeek V4-Flash
 - Full table + budgets: `docs/MODEL_ROUTING.md`
+
+## Fiscal freeze (2026-08-03)
+Company model budget **$100/mo** until Gumroad revenue is verified. Wake-on-demand only. Prefer free/Flash models; Grok sparingly for aspen gates. Marketing/Gumroad outranks greenfield Aspen OS spend.

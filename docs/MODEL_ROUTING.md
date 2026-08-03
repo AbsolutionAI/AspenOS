@@ -1,5 +1,13 @@
 # Model routing — Aspen OS / Paperclip (2026-08-03)
 
+## FISCAL FREEZE (active)
+**Hard company ceiling: $100/mo** until Gumroad cash flow is verified.
+Priority order: (1) profitable marketing/Gumroad ship (2) sustain ops (3) Aspen OS build only when it unblocks revenue.
+- Prefer **free** OpenCode DeepSeek Flash path and OpenRouter Flash.
+- **Grok 4.5 only** for aspen architecture gates / failed CE — not default volume.
+- **No scheduled heartbeats** — wake-on-demand only (timers disabled).
+- Per-agent caps sum to ~$79; ~$21 company reserve for spikes/marketing agents.
+
 ## GPU policy
 Local Ollama on Quadro P2000 (5 GB) is **not** used for Paperclip heartbeats or coding agent loops.
 Local models remain optional for offline experiments only.
@@ -28,7 +36,7 @@ Local models remain optional for offline experiments only.
 | Summarizer | claude_local | claude-haiku-4-5 | $25 |
 | Reflection Coach | claude_local | (profile default) | $25 |
 
-**Company monthly budget:** $1500
+**Company monthly budget:** $100 (fiscal freeze)
 
 ## Escalate ladder (Compound Engineering)
 1. Run on Flash (or role default).
