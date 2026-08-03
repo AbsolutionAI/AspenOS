@@ -68,3 +68,4 @@ nats/**/creds/
 nats/tls/
 **/fleet-accounts.conf
 !nats/fleet-accounts.conf.tmpl
+.aider*
