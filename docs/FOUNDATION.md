@@ -58,3 +58,11 @@
 - [ ] GitHub auth for push/PR
 - [ ] Google Workspace OAuth
 - [ ] BEL-135+ stack items
+
+
+## Model routing (2026-08-03)
+- Local Ollama **retired** for Paperclip heartbeats (P2000 5GB too slow/small).
+- **aspen (Paperclip)** → Grok 4.5 (`xai-oauth`)
+- **Domain Hermes agents** → DeepSeek V4-Flash via OpenRouter
+- **OpenCode / Aider** → DeepSeek V4-Flash
+- Full table + budgets: `docs/MODEL_ROUTING.md`
