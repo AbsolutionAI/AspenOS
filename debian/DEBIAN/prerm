@@ -2,6 +2,17 @@
 # agnetic-os prerm — called before package files are removed
 set -e
 
+case "$1" in
+    upgrade|failed-upgrade)
+        # Keep services running during an upgrade; postinst restarts them
+        # after the new files are unpacked. Avoids downtime on dpkg -i.
+        echo "Upgrade in progress — leaving services running"
+        exit 0
+        ;;
+    remove|purge|*)
+        ;;
+esac
+
 echo "Stopping Starship OS services..."
 
 if command -v systemctl &>/dev/null; then

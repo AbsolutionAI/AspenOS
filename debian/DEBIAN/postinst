@@ -7,6 +7,21 @@ echo "║  Starship OS — Post-Install Setup   ║"
 echo "╚══════════════════════════════════════════════╝"
 echo ""
 
+# ─── 0. Upgrade detection + config migration ────────────────────────
+# dpkg calls postinst with: postinst configure <old-version> (on upgrade)
+# or postinst configure (on fresh install).
+if [[ "$1" == "configure" && -n "$2" ]]; then
+    OLD_VERSION="$2"
+    NEW_VERSION="$(dpkg-query -W -f='${Version}' starship-os 2>/dev/null || echo unknown)"
+    echo "[UPGRADE] $OLD_VERSION -> $NEW_VERSION"
+
+    # Backup user config so a bad upgrade can be rolled back
+    if [[ -d /etc/starship && ! -e "/etc/starship.pre-upgrade" ]]; then
+        cp -a /etc/starship "/etc/starship.pre-upgrade-$OLD_VERSION" 2>/dev/null || true
+        echo "[OK] Config backed up to /etc/starship.pre-upgrade-$OLD_VERSION"
+    fi
+fi
+
 # ─── 1. Create system users ─────────────────────────────────────────
 if ! id -u agnetic &>/dev/null 2>&1; then
     useradd --system --no-create-home --shell /usr/sbin/nologin \
@@ -73,6 +88,16 @@ if command -v systemctl &>/dev/null; then
     done
     systemctl enable agnetic-mesh.target 2>/dev/null || true
     echo "[OK] Services enabled"
+
+    # On upgrade, restart services with the new files (prerm kept them running)
+    if [[ -n "${OLD_VERSION:-}" ]]; then
+        for unit in agnetic-nats agnetic-staragent \
+                    agnetic-agent@proxy agnetic-agent@romi agnetic-agent@ergo \
+                    agnetic-status-bridge agnetic-message-history agnetic-dashboard; do
+            systemctl restart "$unit.service" 2>/dev/null || true
+        done
+        echo "[OK] Services restarted after upgrade"
+    fi
 fi
 
 # ─── 6. GPU detection (optional) ────────────────────────────────────
