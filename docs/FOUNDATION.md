@@ -54,7 +54,7 @@
 
 ## Known follow-ups
 - [x] Aider process worker online (BEL-134 / ASP-5)
-- [ ] Agent Zero docker image pull + UI config (ASP-6)
+- [x] Agent Zero docker image pull + UI config (ASP-6)
 - [ ] GitHub auth for push/PR
 - [ ] Google Workspace OAuth
 - [ ] BEL-135+ stack items
