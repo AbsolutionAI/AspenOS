@@ -1,6 +1,6 @@
 package main
 
-import "github.com/andromi-hash/starship-os/starshipctl/cmd"
+import "github.com/AbsolutionAI/AspenOS/starshipctl/cmd"
 
 func main() {
 	cmd.Execute()

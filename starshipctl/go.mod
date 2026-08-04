@@ -1,4 +1,4 @@
-module github.com/andromi-hash/starship-os/starshipctl
+module github.com/AbsolutionAI/AspenOS/starshipctl
 
 go 1.22
 

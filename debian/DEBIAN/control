@@ -7,7 +7,7 @@ Depends: python3 (>= 3.10), python3-pip, python3-venv, curl
 Recommends: ollama, nats-server
 Suggests: nvidia-cuda-toolkit | rocm-dev
 Maintainer: Starship OS <ops@starship.os>
-Homepage: https://github.com/andromi-hash/starship-os
+Homepage: https://github.com/AbsolutionAI/AspenOS
  Description: Starship OS
   AI agent-first OS layer for Ubuntu 24.04. Agents on NATS/JetStream with
   local Ollama inference. Includes starshipctl, StarAgent, Proxy/Romi/Ergo,
