@@ -11,6 +11,11 @@ echo "=== Installing $SERVICE_NAME service ==="
 sudo cp "$REPO_DIR/systemd/$SERVICE_NAME.service" "/etc/systemd/system/$SERVICE_NAME.service"
 sudo systemctl daemon-reload
 
+# Install health checker script to canonical scripts dir
+sudo mkdir -p /opt/starship/lib/starship/scripts
+sudo cp "$REPO_DIR/scripts/agent-health-checker.py" /opt/starship/lib/starship/scripts/
+sudo chmod +x /opt/starship/lib/starship/scripts/agent-health-checker.py
+
 # Ensure health status directory exists
 sudo mkdir -p /var/lib/starship
 sudo chmod 755 /var/lib/starship

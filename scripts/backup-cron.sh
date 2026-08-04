@@ -2,7 +2,7 @@
 # Starship OS — Backup Cron Wrapper
 # Runs backup.sh daily, manages retention (7 daily, 4 weekly).
 # Designed to be called from a cron job, e.g.:
-#   0 3 * * * /home/tech/agnetic-os/scripts/backup-cron.sh
+#   0 3 * * * /opt/starship/lib/starship/scripts/backup-cron.sh
 set -euo pipefail
 
 RED='\033[0;31m'

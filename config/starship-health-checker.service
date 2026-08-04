@@ -7,7 +7,7 @@ Wants=ollama.service
 [Service]
 Type=simple
 User=root
-ExecStart=/usr/bin/python3 /opt/starship-os/scripts/agent-health-checker.py
+ExecStart=/opt/starship/venv/bin/python3 /opt/starship/lib/starship/scripts/agent-health-checker.py
 Restart=always
 RestartSec=10
 StartLimitInterval=300
