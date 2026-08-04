@@ -1,12 +1,12 @@
 [Unit]
 Description=Starship OS Agent Health Checker — monitors agent connectivity to Ollama models
 Documentation=https://starshipos.ai/docs/health
-After=network.target ollama.service nats.service
-Wants=ollama.service
+After=network.target agnetic-nats.service
+Wants=agnetic-nats.service
 
 [Service]
 Type=simple
-User=root
+User=agnetic
 ExecStart=/opt/starship/venv/bin/python3 /opt/starship/lib/starship/scripts/agent-health-checker.py
 Restart=always
 RestartSec=10
