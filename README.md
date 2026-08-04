@@ -1,7 +1,7 @@
 # AspenOS
 
 **An AI agent-first operating system built on Ubuntu 24.04 LTS**  
-**Version:** 2.2.0 · **Canonical repo:** [andromi-hash/starship-os](https://github.com/andromi-hash/starship-os)
+**Version:** 2.2.0 · **Canonical repo:** [AbsolutionAI/AspenOS](https://github.com/AbsolutionAI/AspenOS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform: Ubuntu 24.04](https://img.shields.io/badge/Platform-Ubuntu%2024.04-orange.svg)](https://ubuntu.com)
@@ -12,7 +12,7 @@
 
 AspenOS is a local-first, AI-native OS layer where autonomous agents communicate over NATS/JetStream, execute tools in a sandboxed environment, and present a real-time command-and-control dashboard. No cloud required. Everything runs on your hardware.
 
-**Lineage:** Alpha scaffold → Alpha 2.0 ([agnetic-os](https://github.com/andromi-hash/agnetic-os) archive) → **Alpha 2.1 / Beta** (this monorepo).
+**Lineage:** Alpha scaffold → Alpha 2.0 ([agnetic-os](https://github.com/AbsolutionAI/agnetic-os) archive) → **Alpha 2.1 / Beta** (this monorepo).
 
 ### 2.2.0 highlights
 

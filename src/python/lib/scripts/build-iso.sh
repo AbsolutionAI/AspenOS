@@ -50,7 +50,7 @@ lb config \
     --bootloader "grub-efi,bios" \
     --binary-images iso-hybrid \
     --iso-application "Starship OS" \
-    --iso-publisher "Starship OS; https://github.com/andromi-hash/starship-os" \
+    --iso-publisher "Starship OS; https://github.com/AbsolutionAI/AspenOS" \
     --iso-volume "Starship OS ${VERSION}" \
     --apt-recommends true \
     --memtest none \

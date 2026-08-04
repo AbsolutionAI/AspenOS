@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Push CI workflows to all andromi-hash repos that need them."""
+"""Push CI workflows to all AbsolutionAI repos that need them."""
 
 import base64
 import json
@@ -164,7 +164,7 @@ jobs:
 
 
 def push_file(repo, path, content, message):
-    url = f"https://api.github.com/repos/andromi-hash/{repo}/contents/{path}"
+    url = f"https://api.github.com/repos/AbsolutionAI/{repo}/contents/{path}"
     encoded = base64.b64encode(content.encode()).decode()
 
     # Check if file exists to get sha
@@ -217,13 +217,13 @@ for repo, workflow in REPOS.items():
     print(f"\n{repo}:")
     ok = push_file(repo, ".github/workflows/ci.yml", workflow, "chore: add CI workflow with testing and security scanning")
     if ok:
-        print(f"  → https://github.com/andromi-hash/{repo}/actions")
+        print(f"  → https://github.com/AbsolutionAI/{repo}/actions")
 
 print("\nDone. Triggering initial runs...")
 
 # Trigger workflow dispatch for each repo
 for repo in REPOS:
-    url = f"https://api.github.com/repos/andromi-hash/{repo}/actions/workflows/ci.yml/dispatches"
+    url = f"https://api.github.com/repos/AbsolutionAI/{repo}/actions/workflows/ci.yml/dispatches"
     payload = json.dumps({"ref": "master"}).encode()
     req = urllib.request.Request(url, data=payload, headers=HEADERS, method="POST")
     try:

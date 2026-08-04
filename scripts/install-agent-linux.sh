@@ -4,7 +4,7 @@
 # Designed for headless remote "drone" nodes connecting to a hub.
 #
 # Usage:
-#   curl -fsSL https://github.com/andromi-hash/starship-os/raw/master/scripts/install-agent-linux.sh | sudo bash -s -- --nats-url nats://hub:4222 --nats-token YOUR_TOKEN
+#   curl -fsSL https://github.com/AbsolutionAI/AspenOS/raw/master/scripts/install-agent-linux.sh | sudo bash -s -- --nats-url nats://hub:4222 --nats-token YOUR_TOKEN
 #
 # Or download and run locally:
 #   sudo ./install-agent-linux.sh --nats-url nats://10.0.0.1:4222 --nats-token abc123
@@ -85,7 +85,7 @@ else
         DOWNLOAD_URL="${DOWNLOAD_BASE_URL}/${PLATFORM}?token=${NATS_TOKEN}"
         log "Downloading staragent from hub..."
     else
-        DOWNLOAD_URL="https://github.com/andromi-hash/starship-os/releases/latest/download/${BINARY}.tar.gz"
+        DOWNLOAD_URL="https://github.com/AbsolutionAI/AspenOS/releases/latest/download/${BINARY}.tar.gz"
         log "Downloading staragent from GitHub releases..."
     fi
     log "  $DOWNLOAD_URL"
@@ -109,7 +109,7 @@ else
         warn "Could not download release binary."
         warn "Build it manually: cd agent && cargo build --release"
         warn "Then re-run with: --binary ./agent/target/release/staragent"
-        warn "Or download from: https://github.com/andromi-hash/starship-os/releases"
+        warn "Or download from: https://github.com/AbsolutionAI/AspenOS/releases"
         exit 1
     fi
 fi
@@ -155,7 +155,7 @@ if command -v systemctl &>/dev/null && systemctl --version &>/dev/null 2>&1; the
 [Unit]
 Description=Starship OS - StarAgent Telemetry Collector
 After=network.target
-Documentation=https://github.com/andromi-hash/starship-os
+Documentation=https://github.com/AbsolutionAI/AspenOS
 
 [Service]
 Type=simple

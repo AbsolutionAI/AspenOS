@@ -15,7 +15,7 @@
 
 1. **Do not** open a public GitHub issue for exploitable vulnerabilities.
 2. Prefer a private report via GitHub Security Advisories on  
-   [andromi-hash/starship-os](https://github.com/andromi-hash/starship-os/security/advisories/new)
+   [AbsolutionAI/AspenOS](https://github.com/AbsolutionAI/AspenOS/security/advisories/new)
    or contact the maintainers listed in the repo.
 3. Include: affected version, component path, reproduction steps, impact.
 

@@ -102,7 +102,7 @@ cat > "$DEPLOY_DIR/etc/systemd/system/agnetic-staragent.service" <<UNIT
 [Unit]
 Description=Starship OS - StarAgent Telemetry Collector
 After=network.target
-Documentation=https://github.com/andromi-hash/starship-os
+Documentation=https://github.com/AbsolutionAI/AspenOS
 
 [Service]
 Type=simple

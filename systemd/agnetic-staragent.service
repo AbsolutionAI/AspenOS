@@ -2,7 +2,7 @@
 Description=Starship OS - StarAgent Telemetry Collector
 After=network.target agnetic-nats.service
 Requires=agnetic-nats.service
-Documentation=https://github.com/andromi-hash/starship-os
+Documentation=https://github.com/AbsolutionAI/AspenOS
 
 [Service]
 Type=simple
