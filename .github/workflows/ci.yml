@@ -43,8 +43,8 @@ jobs:
         run: |
           export PATH="$(go env GOPATH)/bin:$(pwd)/starshipctl:$PATH"
           # install nats-server for accounts conf -t
-          curl -sL https://github.com/nats-io/nats-server/releases/download/v2.10.24/nats-server-v2.10.24-linux-amd64.tar.gz | tar xz
-          sudo cp nats-server-v2.10.24-linux-amd64/nats-server /usr/local/bin/
+          curl -sL https://github.com/nats-io/nats-server/releases/download/v2.14.3/nats-server-v2.14.3-linux-amd64.tar.gz | tar xz
+          sudo cp nats-server-v2.14.3-linux-amd64/nats-server /usr/local/bin/
           # optional nkeys
           go install github.com/nats-io/nkeys/nk@latest || true
           export PATH="$(go env GOPATH)/bin:$PATH"
