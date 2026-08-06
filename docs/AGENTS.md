@@ -12,7 +12,7 @@ Self-hosted AI agent mesh with 43 tools, 20 toolsets, 7 memory types, running on
 ## Services (`/opt/agnetic/services/`)
 | File | Purpose | Key Classes/Functions |
 |------|---------|----------------------|
-| `memory.py` | 7-type memory manager with LanceDB vector search | MemoryManager, MemoryType (7), ProspectiveMemoryManager, get_memory_manager() |
+| `memory.py` | 7-type memory manager with LanceDB vector search | MemoryManager, MemoryType (7), ingest/retrieve (BEL-154) |
 | `policy.py` | Hierarchical policy, extension-only semantics | PolicyManager (system→service→user tiers), CommandBlocklist (allow/block/deny via shutil.which) |
 | `event_hooks.py` | Deterministic lifecycle hooks | HookEvent (8 events), HookManager, get_hook_manager(), exit-code blocking (0=allow, 2=block) |
 | `droid_shield.py` | ML-augmented secret scanning | DroidShield, ScanResult, 12+ built-in patterns, scan_text/scan_file/scan_git_diff/redact |
@@ -84,3 +84,10 @@ Total pipeline: ~170ms → ~6ms (~28x)
 ## Stress Test Results (most recent)
 67/69 passed. 2 failures are expected (NATS + Dashboard not running).
 All 14 service imports succeed, all instantiate, all tools load (43), all 7 memory types present, all 20 toolsets registered.
+
+## Compound Engineering Gates (BEL-113 / ABS-8)
+- **Protocol:** Discovery → Plan (docs/plans/<id>.md) → Implement → QA → Compound (docs/solutions/)
+- **Gate enforcement:** Fail reviews with `CE-GATE: <criteria>` and reopen — never silent re-code
+- **Reference:** `docs/COMPOUND_ENGINEERING.md` for full specification
+- **Foundation hardening:** `docs/FOUNDATION.md` tracks the foundation-harden checklist (workspace git roots, adapter binaries, budget gates, CE wiring); `docs/ops/FOUNDATION.md` holds the Paperclip proof ticket
+- **Paperclip agent AGENTS.md** files include CE gate wiring per agent

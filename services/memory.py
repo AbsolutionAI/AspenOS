@@ -397,6 +397,27 @@ class MemoryManager:
 
         return mem_id
 
+    # -- ingest (BEL-154 access layer) --------------------------------------
+
+    def ingest(
+        self,
+        agent: str,
+        content: str,
+        mem_type: MemoryType | None = None,
+        summary: str = "",
+        importance: float = 0.5,
+        metadata: dict | None = None,
+    ) -> str:
+        """Ingest a memory, auto-inferring the type when not supplied.
+
+        Wraps :meth:`store`. When *mem_type* is omitted the content is
+        classified with :func:`_is_decision` (DECISION) or EPISODIC.
+        Returns the new memory id.
+        """
+        if mem_type is None:
+            mem_type = MemoryType.DECISION if _is_decision(content) else MemoryType.EPISODIC
+        return self.store(agent, mem_type, content, summary, importance, metadata)
+
     # -- search -------------------------------------------------------------
 
     def search(
@@ -462,6 +483,38 @@ class MemoryManager:
 
         scored.sort(key=lambda t: t[0], reverse=True)
         return [mem for _, mem in scored[:limit]]
+
+    # -- retrieve (BEL-154 access layer) ------------------------------------
+
+    def retrieve(
+        self,
+        query: str,
+        agent: str | None = None,
+        mem_type: MemoryType | None = None,
+        limit: int = 10,
+        min_importance: float = 0.0,
+    ) -> list[dict]:
+        """Retrieve memories as JSON-friendly dicts (BEL-154 access layer).
+
+        Thin wrapper over :meth:`search` returning the same shape as
+        :func:`api_search` for API/access-layer consumers.
+        """
+        memories = self.search(query, agent=agent, mem_type=mem_type, limit=limit, min_importance=min_importance)
+        return [
+            {
+                "id": m.id,
+                "agent": m.agent,
+                "type": m.type.value,
+                "summary": m.summary,
+                "content": m.content,
+                "importance": m.importance,
+                "decay": m.decay,
+                "access_count": m.access_count,
+                "created_at": m.created_at,
+                "metadata": m.metadata,
+            }
+            for m in memories
+        ]
 
     # -- recall -------------------------------------------------------------
 

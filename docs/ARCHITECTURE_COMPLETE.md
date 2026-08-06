@@ -315,6 +315,24 @@ Every file in the repository with its purpose.
 | **Agent Status** | Agent Daemon → NATS `agnetic.agent.<name>.status` → status bridge → `status.json` → all UIs | 1–5s | JetStream AGENTS |
 | **Workflow** | Scheduler/User → NATS `agnetic.workflow.<name>` → Workflow Engine → multi-agent commands → collection → response | 30–300s | JetStream AGENTS |
 | **Message History** | All NATS `agnetic.agent.>` → JetStream AGENTS stream → Message History Consumer → `/tmp/agnetic-history/` | <1s | File + JetStream |
+| **Memory Store** | Agent → `services/memory.py` `MemoryManager.store()`/`ingest()` → SQLite + optional LanceDB vector index | ~5ms | `AGNETIC_MEMORY_DB` + `AGNETIC_MEMORY_VECTORS` |
+| **Memory Search** | Agent/Dashboard → `MemoryManager.search()`/`retrieve()` → semantic (simple_embed / sentence-transformers) + optional ANN (LanceDB) | 5–50ms | SQLite + LanceDB |
+
+### 3.2a Memory Layer
+
+Long-term memory (`services/memory.py`) is a core service providing 7 memory
+types and semantic retrieval for agents:
+
+| Aspect | Detail |
+|---|---|
+| Memory types | `MemoryType` enum — `episodic`, `semantic`, `procedural`, `preference`, `decision`, `temporal`, `knowledge_graph` |
+| Manager | `MemoryManager` — `store`/`ingest`, `search`/`retrieve`, `recall`, `forget`, `decay_all`, `consolidate`, `get_context`, `stats` |
+| Access layer | `ingest()` (auto-typed store) + `retrieve()` (JSON dicts) — BEL-154 entry points |
+| Embeddings | Deterministic `simple_embed` (256-dim, no ML) by default; optional `sentence-transformers` when installed |
+| Vector search | Optional LanceDB `VectorStore` (ANN) wired into `search()` (BEL-153); dimension derived from the active embedding provider |
+| Storage | SQLite at `AGNETIC_MEMORY_DB` (default `/tmp/agnetic-data/memory.db`); vectors at `AGNETIC_MEMORY_VECTORS` |
+| Auto-memory | `auto_memory()` extracts episodic summaries, decisions, and user preferences from conversations |
+| Roadmap (BEL-154) | Conversation cache and AppFlowy bidirectional sync (design in `docs/architecture/MEMORY_LAYER.md`) |
 
 ### 3.3 Network Port Map
 
