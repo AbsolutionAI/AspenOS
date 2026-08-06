@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
-"""Starship OS — OpenCode memory ingestion hook (BEL-154 Component 1).
+"""Starship OS — Aider memory ingestion hook (BEL-154 Component 1).
 
-Agent-side wiring so an OpenCode session/task completion can append a raw
-BEL-154 ingest record (``source="opencode"``) that the promotion pipeline
+Agent-side wiring so an Aider session/task completion can append a raw BEL-154
+ingest record (``source="aider"``) that the promotion pipeline
 (``scripts/memory_promote.py``) consumes. Mirrors the Hermes hook
-(``agents/agent_daemon.py::ingest_memory_record``): best-effort and
-failure-isolated — a memory hiccup can never break the caller.
+(``agents/agent_daemon.py::ingest_memory_record``) and the OpenCode hook
+(``agents/opencode_memory.py``): best-effort and failure-isolated — a memory
+hiccup can never break the caller.
 
-CLI (usable as an OpenCode hook / wrapper / one-off)::
+CLI (usable as an Aider post-edit hook / completion wrapper / one-off)::
 
-    python3 agents/opencode_memory.py --source-id ASP-60 \\
+    python3 agents/aider_memory.py --source-id ASP-61 \\
         --content "Task summary …" --files docs/x,agents/y --tools bash,edit \\
-        --linear-refs BEL-154 --paperclip-refs ASP-60
-    cat summary.txt | python3 agents/opencode_memory.py --source-id ASP-60 --stdin
+        --linear-refs BEL-154 --paperclip-refs ASP-61
+    cat summary.txt | python3 agents/aider_memory.py --source-id ASP-61 --stdin
 
 The CLI never raises and exits 0 on success (2 on a hard error, matching
 ``scripts/memory_ingest.py``); hook callers may wrap with ``|| true``.
@@ -30,11 +31,11 @@ _SCRIPT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 _PROJECT_ROOT = Path(os.getenv(
     "STARSHIP_ROOT", os.getenv("AGNETIC_ROOT", str(_SCRIPT_DIR.parent)),
 ))
-_DEFAULT_AGENT = "opencode"
+_DEFAULT_AGENT = "aider"
 _DEFAULT_CONTENT_CAP = 20000
 
 
-def ingest_opencode_record(
+def ingest_aider_record(
     content: str,
     *,
     source_id: str = "",
@@ -48,7 +49,7 @@ def ingest_opencode_record(
     ingest_dir: Path | None = None,
     max_content_chars: int = _DEFAULT_CONTENT_CAP,
 ) -> Path | None:
-    """Write a BEL-154 raw ingest record (``source="opencode"``).
+    """Write a BEL-154 raw ingest record (``source="aider"``).
 
     Best-effort and failure-isolated: any error (missing import, bad write,
     oversized content) is logged at debug and never propagates to the caller,
@@ -64,7 +65,7 @@ def ingest_opencode_record(
         effective_source_id = source_id or f"{agent}:{datetime.now().isoformat()}"
 
         return ingest_record(
-            "opencode",
+            "aider",
             effective_source_id,
             effective_content,
             agent=agent,
@@ -77,18 +78,18 @@ def ingest_opencode_record(
             ingest_dir=ingest_dir or DEFAULT_INGEST_DIR,
         )
     except Exception as exc:  # failure isolation — never raise
-        print(f"opencode-memory: ingest skipped: {exc}", file=sys.stderr)
+        print(f"aider-memory: ingest skipped: {exc}", file=sys.stderr)
         return None
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="opencode-memory",
-        description="Append a BEL-154 raw ingest record (source='opencode') "
+        prog="aider-memory",
+        description="Append a BEL-154 raw ingest record (source='aider') "
                     "for the promotion pipeline",
     )
     parser.add_argument("--source-id", default="",
-                        help="session-id / task-id / run-id (default: opencode:<ts>)")
+                        help="session-id / task-id / run-id (default: aider:<ts>)")
     parser.add_argument("--content", default="",
                         help="task summary / response content (else read stdin)")
     parser.add_argument("--stdin", action="store_true",
@@ -103,7 +104,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--linear-refs", default=None,
                         help="comma-separated Linear ticket ids (BEL-123)")
     parser.add_argument("--paperclip-refs", default=None,
-                        help="comma-separated Paperclip issue ids (ASP-60)")
+                        help="comma-separated Paperclip issue ids (ASP-61)")
     parser.add_argument("--ingest-dir", type=Path, default=None)
     args = parser.parse_args(argv)
 
@@ -114,7 +115,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.stdin or not content:
         content = sys.stdin.read().strip()
 
-    path = ingest_opencode_record(
+    path = ingest_aider_record(
         content,
         source_id=args.source_id,
         agent=args.agent,
@@ -127,7 +128,7 @@ def main(argv: list[str] | None = None) -> int:
         ingest_dir=args.ingest_dir,
     )
     if path is None:
-        print("error: failed to write opencode ingest record", file=sys.stderr)
+        print("error: failed to write aider ingest record", file=sys.stderr)
         return 2
 
     print(path)
