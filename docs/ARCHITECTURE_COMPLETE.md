@@ -330,6 +330,7 @@ types and semantic retrieval for agents:
 | Access layer | `ingest()` (auto-typed store) + `retrieve()` (JSON dicts) — BEL-154 entry points |
 | Embeddings | Deterministic `simple_embed` (256-dim, no ML) by default; optional `sentence-transformers` when installed |
 | Vector search | Optional LanceDB `VectorStore` (ANN) wired into `search()` (BEL-153); dimension derived from the active embedding provider |
+| Promotion | `scripts/memory_promote.py` (BEL-154) — reads raw ingest JSONL, extracts facts, scores confidence, promotes `>= 0.7` into `MemoryManager`; facts audit log at `/home/tech/.aspen/memory/facts/facts.jsonl` |
 | Storage | SQLite at `AGNETIC_MEMORY_DB` (default `/tmp/agnetic-data/memory.db`); vectors at `AGNETIC_MEMORY_VECTORS` |
 | Auto-memory | `auto_memory()` extracts episodic summaries, decisions, and user preferences from conversations |
 | Roadmap (BEL-154) | Conversation cache and AppFlowy bidirectional sync (design in `docs/architecture/MEMORY_LAYER.md`) |
