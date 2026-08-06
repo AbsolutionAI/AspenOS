@@ -329,6 +329,7 @@ types and semantic retrieval for agents:
 | Manager | `MemoryManager` — `store`/`ingest`, `search`/`retrieve`, `recall`, `forget`, `decay_all`, `consolidate`, `get_context`, `stats` |
 | Access layer | `ingest()` (auto-typed store) + `retrieve()` (JSON dicts) — BEL-154 entry points |
 | Client library | `memory_pkg/aspen_memory` (`MemoryClient`) — search, `get_by_linear`/`get_by_paperclip`/`get_by_tags`, `add_fact`; wraps `MemoryManager` (BEL-154 Component 4.1) |
+| MCP server | `mcp/aspen-memory-mcp` — stdio MCP server exposing `memory_search`, `memory_get_by_linear`, `memory_get_by_paperclip`, `memory_get_by_tags`, `memory_add_fact`; wraps `MemoryClient` (BEL-154 Component 4.2) |
 | Metadata lookup | `MemoryManager.get_by_metadata(key, values, match_all)` — SQLite `json_each` over the JSON `metadata` column, no schema change |
 | Embeddings | Deterministic `simple_embed` (256-dim, no ML) by default; optional `sentence-transformers` when installed |
 | Vector search | Optional LanceDB `VectorStore` (ANN) wired into `search()` (BEL-153); dimension derived from the active embedding provider |
