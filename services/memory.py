@@ -322,6 +322,22 @@ def _row_to_memory(row: tuple) -> Memory:
     )
 
 
+def _memory_to_dict(m: Memory) -> dict:
+    """Serialise a Memory into the JSON-friendly access-layer shape."""
+    return {
+        "id": m.id,
+        "agent": m.agent,
+        "type": m.type.value,
+        "summary": m.summary,
+        "content": m.content,
+        "importance": m.importance,
+        "decay": m.decay,
+        "access_count": m.access_count,
+        "created_at": m.created_at,
+        "metadata": m.metadata,
+    }
+
+
 # ---------------------------------------------------------------------------
 # MemoryManager
 # ---------------------------------------------------------------------------
@@ -500,21 +516,61 @@ class MemoryManager:
         :func:`api_search` for API/access-layer consumers.
         """
         memories = self.search(query, agent=agent, mem_type=mem_type, limit=limit, min_importance=min_importance)
-        return [
-            {
-                "id": m.id,
-                "agent": m.agent,
-                "type": m.type.value,
-                "summary": m.summary,
-                "content": m.content,
-                "importance": m.importance,
-                "decay": m.decay,
-                "access_count": m.access_count,
-                "created_at": m.created_at,
-                "metadata": m.metadata,
-            }
-            for m in memories
-        ]
+        return [_memory_to_dict(m) for m in memories]
+
+    # -- metadata lookup (BEL-154 Component 4.1) ---------------------------
+
+    def get_by_metadata(
+        self,
+        key: str,
+        values: list[str],
+        match_all: bool = False,
+        limit: int = 50,
+    ) -> list[dict]:
+        """Return memories whose ``metadata`` JSON list *key* matches values.
+
+        Uses SQLite ``json_each`` over the ``metadata`` column, so no schema
+        change is needed for tag / Linear / Paperclip lookups.
+
+        - ``match_all=False`` → any value present suffices.
+        - ``match_all=True``  → every value must be present.
+        - Returns the same JSON-friendly shape as :meth:`retrieve`.
+        """
+        if not values:
+            return []
+
+        placeholders = ",".join("?" for _ in values)
+        json_path = f"$.{key}"
+        if match_all:
+            sql = f"""
+                SELECT id FROM (
+                    SELECT m.id, je.value AS matched
+                    FROM memories m, json_each(m.metadata, ?) je
+                    WHERE je.value IN ({placeholders})
+                )
+                GROUP BY id HAVING COUNT(DISTINCT matched) = ?
+                LIMIT ?
+            """
+            params: list = [json_path, *values, len(values), limit]
+        else:
+            sql = f"""
+                SELECT DISTINCT m.id
+                FROM memories m, json_each(m.metadata, ?) je
+                WHERE je.value IN ({placeholders})
+                LIMIT ?
+            """
+            params = [json_path, *values, limit]
+
+        rows = self.db.execute(sql, params).fetchall()
+        ids = [r["id"] for r in rows]
+        if not ids:
+            return []
+
+        in_clause = ",".join("?" for _ in ids)
+        result_rows = self.db.execute(
+            f"SELECT * FROM memories WHERE id IN ({in_clause})", ids
+        ).fetchall()
+        return [_memory_to_dict(_row_to_memory(r)) for r in result_rows]
 
     # -- recall -------------------------------------------------------------
 
@@ -790,23 +846,7 @@ def api_search(params: dict) -> dict:
         mem_type = MemoryType(params["type"]) if params.get("type") else None
         limit = int(params.get("limit", 10))
         results = mgr.search(query, agent=agent, mem_type=mem_type, limit=limit)
-        return {
-            "results": [
-                {
-                    "id": m.id,
-                    "agent": m.agent,
-                    "type": m.type.value,
-                    "summary": m.summary,
-                    "content": m.content,
-                    "importance": m.importance,
-                    "decay": m.decay,
-                    "access_count": m.access_count,
-                    "created_at": m.created_at,
-                    "metadata": m.metadata,
-                }
-                for m in results
-            ]
-        }
+        return {"results": [_memory_to_dict(m) for m in results]}
     finally:
         mgr.close()
 
