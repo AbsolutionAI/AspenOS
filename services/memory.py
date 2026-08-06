@@ -25,11 +25,24 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
-
 # ---------------------------------------------------------------------------
-# Embedding (zero external dependencies)
+# Embedding - now with sentence-transformers + LanceDB support
 # ---------------------------------------------------------------------------
 
+try:
+    from sentence_transformers import SentenceTransformer
+    _ST_AVAILABLE = True
+except ImportError:
+    _ST_AVAILABLE = False
+    SentenceTransformer = None  # type: ignore
+
+try:
+    import lancedb
+    _LANCEDB_AVAILABLE = True
+except ImportError:
+    _LANCEDB_AVAILABLE = False
+
+# Fallback embedding (deterministic, no ML model)
 def simple_embed(text: str, dim: int = 256) -> list[float]:
     """Deterministic embedding based on character n-grams and word hashes.
 
@@ -63,6 +76,43 @@ def simple_embed(text: str, dim: int = 256) -> list[float]:
     return vector
 
 
+class EmbeddingProvider:
+    """Embedding provider with multiple backends."""
+
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
+        self.model_name = model_name
+        self._model = None
+
+    def _load_model(self):
+        if self._model is None and _ST_AVAILABLE and SentenceTransformer is not None:
+            import torch
+            # Force CPU to avoid CUDA issues on unsupported GPUs
+            self._model = SentenceTransformer(self.model_name, device="cpu")
+
+    def embed(self, text: str) -> list[float]:
+        if _ST_AVAILABLE and SentenceTransformer is not None:
+            self._load_model()
+            if self._model is not None:
+                return self._model.encode(text, normalize_embeddings=True).tolist()
+        return simple_embed(text)
+
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        if _ST_AVAILABLE and SentenceTransformer is not None:
+            self._load_model()
+            if self._model is not None:
+                return self._model.encode(texts, normalize_embeddings=True).tolist()
+        return [simple_embed(t) for t in texts]
+
+
+# Default embedding provider
+_embedding_provider = EmbeddingProvider()
+
+
+def get_embedding(text: str) -> list[float]:
+    """Get embedding for text using best available backend."""
+    return _embedding_provider.embed(text)
+
+
 def cosine_similarity(a: list[float], b: list[float]) -> float:
     """Cosine similarity between two vectors."""
     dot = sum(x * y for x, y in zip(a, b))
@@ -71,6 +121,128 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
     if na == 0 or nb == 0:
         return 0.0
     return dot / (na * nb)
+
+
+# ---------------------------------------------------------------------------
+# LanceDB Vector Store (for BEL-153 semantic layer integration)
+# ---------------------------------------------------------------------------
+
+class VectorStore:
+    """LanceDB-backed vector store for semantic search (BEL-153 integration)."""
+
+    def __init__(self, path: str | None = None, table_name: str = "facts"):
+        if path is None:
+            path = os.environ.get("AGNETIC_MEMORY_VECTORS", "/tmp/agnetic-data/vectors")
+        self.path = path
+        self.table_name = table_name
+        self._db = None
+        self._table = None
+        if _LANCEDB_AVAILABLE:
+            self._init_db()
+
+    def _init_db(self):
+        try:
+            os.makedirs(self.path, exist_ok=True)
+            self._db = lancedb.connect(self.path)
+            if self.table_name in self._db.table_names():
+                self._table = self._db.open_table(self.table_name)
+            else:
+                # Create empty table with schema sized to the embedding dim
+                import pyarrow as pa
+                dim = len(get_embedding(""))
+                schema = pa.schema([
+                    pa.field("fact_id", pa.string()),
+                    pa.field("vector", pa.list_(pa.float32(), dim)),
+                    pa.field("content", pa.string()),
+                    pa.field("type", pa.string()),
+                    pa.field("confidence", pa.float32()),
+                    pa.field("tags", pa.string()),  # JSON
+                    pa.field("linear_refs", pa.string()),  # JSON
+                    pa.field("paperclip_refs", pa.string()),  # JSON
+                    pa.field("created_at", pa.string()),
+                ])
+                self._table = self._db.create_table(self.table_name, schema=schema)
+        except Exception:
+            # Fail gracefully if LanceDB has issues
+            self._db = None
+            self._table = None
+
+    def add(self, fact_id: str, vector: list[float], content: str, fact_type: str,
+            confidence: float, tags: list[str], linear_refs: list[str],
+            paperclip_refs: list[str], created_at: str) -> bool:
+        if not _LANCEDB_AVAILABLE or self._table is None:
+            return False
+        try:
+            import pandas as pd
+            df = pd.DataFrame([{
+                "fact_id": fact_id,
+                "vector": vector,
+                "content": content,
+                "type": fact_type,
+                "confidence": confidence,
+                "tags": json.dumps(tags),
+                "linear_refs": json.dumps(linear_refs),
+                "paperclip_refs": json.dumps(paperclip_refs),
+                "created_at": created_at,
+            }])
+            self._table.add(df)
+            return True
+        except Exception:
+            return False
+
+    def search(self, query_vector: list[float], k: int = 10, min_confidence: float = 0.7) -> list[dict]:
+        if not _LANCEDB_AVAILABLE or self._table is None:
+            return []
+        try:
+            results = self._table.search(query_vector).limit(k).to_pandas()
+            filtered = []
+            for _, row in results.iterrows():
+                if row.get("confidence", 0) >= min_confidence:
+                    filtered.append({
+                        "fact_id": row["fact_id"],
+                        "content": row["content"],
+                        "type": row["type"],
+                        "confidence": row["confidence"],
+                        "tags": json.loads(row["tags"]) if row["tags"] else [],
+                        "linear_refs": json.loads(row["linear_refs"]) if row["linear_refs"] else [],
+                        "paperclip_refs": json.loads(row["paperclip_refs"]) if row["paperclip_refs"] else [],
+                        "created_at": row["created_at"],
+                        "distance": row.get("_distance", 0),
+                    })
+            return filtered
+        except Exception:
+            return []
+
+    def rebuild_from_facts(self, facts: list) -> int:
+        """Rebuild vector index from facts list."""
+        if not _LANCEDB_AVAILABLE or self._table is None:
+            return 0
+        try:
+            import pandas as pd
+            data = []
+            for f in facts:
+                if hasattr(f, 'embedding') and f.embedding:
+                    data.append({
+                        "fact_id": f.id,
+                        "vector": f.embedding,
+                        "content": f.content,
+                        "type": f.type.value if hasattr(f.type, 'value') else str(f.type),
+                        "confidence": f.importance if hasattr(f, 'importance') else 0.5,
+                        "tags": json.dumps(f.metadata.get("tags", [])) if hasattr(f, 'metadata') else "[]",
+                        "linear_refs": json.dumps(f.metadata.get("linear_refs", [])) if hasattr(f, 'metadata') else "[]",
+                        "paperclip_refs": json.dumps(f.metadata.get("paperclip_refs", [])) if hasattr(f, 'metadata') else "[]",
+                        "created_at": f.created_at if hasattr(f, 'created_at') else datetime.now(timezone.utc).isoformat(),
+                    })
+            if data:
+                df = pd.DataFrame(data)
+                # Drop and recreate table
+                if self.table_name in self._db.table_names():
+                    self._db.drop_table(self.table_name)
+                self._table = self._db.create_table(self.table_name, data=df)
+                return len(data)
+        except Exception:
+            pass
+        return 0
 
 
 # ---------------------------------------------------------------------------
@@ -163,6 +335,8 @@ class MemoryManager:
         self.db = sqlite3.connect(db_path)
         self.db.row_factory = sqlite3.Row
         self._init_db()
+        # Initialize vector store for BEL-153 integration
+        self.vector_store = VectorStore()
 
     # -- initialisation -----------------------------------------------------
 
@@ -184,7 +358,7 @@ class MemoryManager:
         """Store a new memory. Returns the memory id."""
         mem_id = uuid.uuid4().hex[:12]
         now = datetime.now(timezone.utc).isoformat()
-        embedding = simple_embed(content)
+        embedding = get_embedding(content)  # Use best available embedding
         if not summary:
             summary = content[:120].replace("\n", " ")
         self.db.execute(
@@ -206,6 +380,21 @@ class MemoryManager:
             ),
         )
         self.db.commit()
+
+        # Also add to vector store for BEL-153 semantic layer
+        if self.vector_store._table is not None:
+            self.vector_store.add(
+                fact_id=mem_id,
+                vector=embedding,
+                content=content,
+                fact_type=mem_type.value,
+                confidence=importance,
+                tags=metadata.get("tags", []) if metadata else [],
+                linear_refs=metadata.get("linear_refs", []) if metadata else [],
+                paperclip_refs=metadata.get("paperclip_refs", []) if metadata else [],
+                created_at=now,
+            )
+
         return mem_id
 
     # -- search -------------------------------------------------------------
@@ -217,12 +406,33 @@ class MemoryManager:
         mem_type: MemoryType | None = None,
         limit: int = 10,
         min_importance: float = 0.0,
+        use_vector: bool = True,
     ) -> list[Memory]:
         """Semantic search across memories.
 
         Scoring = cosine_similarity * importance * decay.
+        If use_vector=True and LanceDB available, uses vector search (BEL-153).
         """
-        q_embedding = simple_embed(query)
+        # Try vector search first (BEL-153 semantic layer)
+        if use_vector and self.vector_store._table is not None:
+            query_embedding = get_embedding(query)
+            vector_results = self.vector_store.search(query_embedding, k=limit, min_confidence=min_importance)
+            if vector_results:
+                # Convert vector results to Memory objects
+                memories = []
+                for vr in vector_results:
+                    # Fetch full memory from SQLite
+                    row = self.db.execute(
+                        "SELECT * FROM memories WHERE id = ?", (vr["fact_id"],)
+                    ).fetchone()
+                    if row:
+                        mem = _row_to_memory(row)
+                        memories.append(mem)
+                if memories:
+                    return memories[:limit]
+
+        # Fallback to SQLite-based search
+        q_embedding = get_embedding(query)
         if not q_embedding:
             return []
 
