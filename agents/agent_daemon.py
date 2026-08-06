@@ -51,6 +51,39 @@ _PROJECT_ROOT = Path(os.getenv("STARSHIP_ROOT", os.getenv("AGNETIC_ROOT", str(_S
 AGENTS_DIR = _PROJECT_ROOT / "agents"
 
 
+def ingest_memory_record(agent_name, command, args, response, *, subject="", ingest_dir=None):
+    """Write a BEL-154 raw ingest record (source="hermes") for a processed command.
+
+    Best-effort and failure-isolated: any error (missing import, bad write) is
+    logged at debug and never propagates into the command loop, per the memory
+    layer's "ingestion failure ≠ promotion failure ≠ access failure" principle.
+    """
+    try:
+        if str(_PROJECT_ROOT) not in sys.path:
+            sys.path.insert(0, str(_PROJECT_ROOT))
+        from scripts.memory_ingest import ingest_record
+
+        args_text = json.dumps(args, sort_keys=True) if args else ""
+        content = f"Command: {command}"
+        if args_text:
+            content += f"\nArgs: {args_text}"
+        content += f"\nResponse: {str(response)[:2000]}"
+
+        source_id = subject or f"{agent_name}:{datetime.now().isoformat()}"
+        path = ingest_record(
+            "hermes",
+            source_id,
+            content,
+            agent=agent_name,
+            company="asp",
+            project="aspen-os",
+            ingest_dir=ingest_dir,
+        )
+        log.debug("Memory ingest written: %s", path)
+    except Exception as e:
+        log.debug("Memory ingest skipped for '%s': %s", command, e)
+
+
 def load_agent_config(name):
     """Load agent YAML config."""
     config_path = AGENTS_DIR / f"{name}.yaml"
@@ -357,6 +390,11 @@ async def process_command(agent_name, config, subject, payload, telemetry=None, 
         arch = ArchiveService()
         arch.write(agent=agent_name, command=command, response=response[:5000])
         arch.close()
+    except Exception:
+        pass
+
+    try:
+        ingest_memory_record(agent_name, command, args, response, subject=subject)
     except Exception:
         pass
 
