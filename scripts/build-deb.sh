@@ -19,7 +19,11 @@ OUTPUT_DIR="$REPO_DIR/dist"
 VERSION=$(grep "^Version:" "$CONTROL_SRC/control" | awk '{print $2}')
 # Staging root (must contain DEBIAN + filesystem paths at top level)
 PKG_ROOT="$REPO_DIR/dist/pkgroot"
-export PATH="/tmp/go/bin:${HOME}/.cargo/bin:${PATH:-/usr/bin}"
+export PATH="${HOME}/.cargo/bin:${PATH:-/usr/bin}"
+
+# ─── Pre-flight checks ───────────────────────────────────────────
+command -v go >/dev/null 2>&1 || { echo -e "${RED}[BUILD]${NC} go not found in PATH — install with: sudo apt install golang-go"; exit 1; }
+echo -e "${GREEN}[BUILD]${NC} go version: $(go version)"
 
 echo -e "${BLUE}╔══════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║  Starship OS — Debian Builder       ║${NC}"

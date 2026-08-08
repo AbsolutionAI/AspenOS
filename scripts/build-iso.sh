@@ -24,6 +24,10 @@ OUTPUT_DIR="$REPO_DIR/dist"
 VERSION=$(grep "^Version:" "$REPO_DIR/debian/DEBIAN/control" | awk '{print $2}')
 ISO_NAME="agnet-os-${VERSION}-amd64"
 
+# ─── Pre-flight checks ───────────────────────────────────────────
+command -v go >/dev/null 2>&1 || { echo -e "${RED}[ISO]${NC} go not found in PATH — install with: sudo apt install golang-go"; exit 1; }
+echo -e "${GREEN}[ISO]${NC} go version: $(go version)"
+
 echo -e "${BLUE}╔══════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║  Starship OS — ISO Builder          ║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════╝${NC}"

@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 CARGO := $(HOME)/.cargo/bin/cargo
-GO := /tmp/go/bin/go
-export PATH := /tmp/go/bin:$(HOME)/.cargo/bin:$(HOME)/.local/bin:$(PATH)
+GO := go
+export PATH := $(HOME)/.cargo/bin:$(HOME)/.local/bin:$(PATH)
 
 .PHONY: all build build-agent cli install uninstall run dev stop clean status profile sandbox smoke bench iso-smoke policyexec starshipd heald c11 iso-boot
 
@@ -9,6 +9,7 @@ all: build build-agent
 
 # ─── Build ──────────────────────────────────────────────────────────
 build:
+	@command -v $(GO) >/dev/null 2>&1 || { echo "ERROR: go not found in PATH (install: sudo apt install golang-go)"; exit 1; }
 	cd starshipctl && $(GO) build -o starshipctl .
 	@ln -sf starshipctl starshipctl/agneticctl 2>/dev/null || true
 
