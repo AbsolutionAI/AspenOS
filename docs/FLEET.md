@@ -40,6 +40,8 @@ Fleet is the **topology + exercise** control plane on top.
 
 Legacy `agnetic.fleet.*` is dual-published for Alpha 2.0 clients.
 
+**Publisher inventory (ASP-362):** see [docs/ops/FLEET_SUBJECT_PUBLISHERS.md](ops/FLEET_SUBJECT_PUBLISHERS.md) for monorepo vs package (`aspen.fleet.*`) code paths and ADR-0003 gaps. No subject deletions until ADR-0007.
+
 ## CLI
 
 ```bash
