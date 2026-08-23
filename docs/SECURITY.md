@@ -6,13 +6,18 @@ Install roots: **`/opt/starship`**, **`/etc/starship`**, **`/var/lib/starship`**
 
 ## Threat model (Alpha / Beta)
 
+**Canonical biweekly model:** [`SECURITY_THREAT_MODEL.md`](SECURITY_THREAT_MODEL.md) (v2.2.0 — ASP-298).  
+Host baseline: [`security/AUDITOR_BASELINE.md`](security/AUDITOR_BASELINE.md).
+
 | Asset | Risk | Mitigations |
 |-------|------|-------------|
 | Shell / tool execution | Agent RCE, data wipe | Sandbox blocklists, C11 seccomp, path allowlists |
 | Untrusted red-team agents | Lateral movement | Fleet ACL, tool allowlists, isolated plant-range |
 | NATS bus | Spoofed commands | Accounts/nkeys, token auth, optional TLS |
+| Safety / OT path | Unauthorized act | `propose_act` only + dual human auth (Master Spec; E2E gate open) |
 | Secrets in logs/LLM context | Credential leak | Redaction patterns, gitignore, SecretsManager |
 | Abliterated local models | Weaker refusal | Mandatory policy + sandbox + Droid Shield |
+| Paperclip / board C2 | Org takeover | Tailnet bind, key mode 600, workspace git-root validation |
 
 ## Sandboxed tool execution
 
