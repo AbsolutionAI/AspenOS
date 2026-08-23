@@ -9,6 +9,7 @@ Borrowed patterns:
 
 import os
 import json
+import time
 import asyncio
 import logging
 import subprocess
@@ -149,7 +150,7 @@ class CommandExecutor:
             log.info("[DRY RUN] Would execute: %s", redact(command))
             return ExecuteResult(exit_code=0, stdout=f"[DRY RUN] {command}", command=command)
 
-        # Optional C11 policyexec (shared policy JSON) — STARSHIP_POLICY_NATIVE=1
+        # C11 policyexec (shared policy JSON) — mandatory by default (H-003)
         try:
             from policy_native import native_enabled as policy_native_on, check_command as policy_check_cmd
             if policy_native_on():
@@ -158,12 +159,11 @@ class CommandExecutor:
                     raise SandboxError(denial, command)
         except SandboxError:
             raise
-        except ImportError:
-            pass
-        except Exception as e:
-            log.debug("native policy fallback: %s", e)
+        except (ImportError, FileNotFoundError) as e:
+            # Native bridge/policy binary missing while enforcement is default-on — fail closed
+            raise SandboxError(f"native sandbox/policy enforcement unavailable: {e}", command)
 
-        # Optional C11 sandbox_run (ADR 0001) — STARSHIP_SANDBOX_NATIVE=1
+        # C11 sandbox_run (ADR 0001) — mandatory by default (H-003)
         try:
             from sandbox_native import native_enabled, run_shell_native
             if native_enabled():
@@ -177,12 +177,16 @@ class CommandExecutor:
                     timed_out=nr.timed_out,
                     command=command,
                 )
+            # Explicit operator opt-out only — deprecated Python fallback
+            log.warning(
+                "STARSHIP_SANDBOX_NATIVE explicitly disabled — using deprecated "
+                "Python-only executor fallback (H-003 deprecation)"
+            )
         except SandboxError:
             raise
-        except ImportError:
-            pass
-        except Exception as e:
-            log.debug("native sandbox fallback: %s", e)
+        except ImportError as e:
+            # Native bridge missing while enforcement is default-on — fail closed
+            raise SandboxError(f"native sandbox enforcement unavailable: {e}", command)
 
         try:
             merged_env = {**os.environ, "TERM": "dumb"}
@@ -1900,6 +1904,47 @@ _executor = CommandExecutor(sandbox=True)
 async def execute_tool(name: str, arguments: dict, nats=None, callbacks: dict = None) -> dict:
     """Execute a tool by name with given arguments.
 
+    Audits every call (H-004 / ASP-172) to the per-agent JSONL audit log.
+    Auditing is failure-isolated and never changes the tool result.
+
+    Args:
+        name: Tool name
+        arguments: Tool arguments dict
+        nats: NATS connection for delegation
+        callbacks: Optional dict of callbacks for streaming progress
+    """
+    arguments = repair_tool_arguments(arguments, name)
+    started = time.monotonic()
+    result = await _execute_tool_dispatch(name, arguments, nats=nats, callbacks=callbacks)
+
+    try:
+        from tool_audit import audit_tool_call
+        if result.get("error"):
+            status, exit_code = "error", 1
+            if result.get("policy") in ("fleet", "policyexec") or result.get("code") in (
+                "SANDBOX_DENIED", "ACCESS_DENIED",
+            ):
+                status, exit_code = "denied", None
+        else:
+            status, exit_code = "ok", 0
+        audit_tool_call(
+            name,
+            arguments,
+            duration_ms=int((time.monotonic() - started) * 1000),
+            exit_code=exit_code,
+            status=status,
+        )
+    except ImportError:
+        pass
+    except Exception as e:
+        log.debug("tool audit skipped for '%s': %s", name, e)
+
+    return result
+
+
+async def _execute_tool_dispatch(name: str, arguments: dict, nats=None, callbacks: dict = None) -> dict:
+    """Dispatch a tool by name with given arguments.
+
     Args:
         name: Tool name
         arguments: Tool arguments dict
@@ -1908,8 +1953,6 @@ async def execute_tool(name: str, arguments: dict, nats=None, callbacks: dict = 
     """
     callbacks = callbacks or {}
 
-    # Auto-repair arguments (Hermes pattern)
-    arguments = repair_tool_arguments(arguments, name)
 
     # Fleet red/blue + cross-plant ACL (never unrestricted OpenCode for red-team)
     try:
@@ -1923,7 +1966,7 @@ async def execute_tool(name: str, arguments: dict, nats=None, callbacks: dict = 
     except ImportError:
         pass
 
-    # Optional C11 policyexec tool gate — STARSHIP_POLICY_NATIVE=1
+    # C11 policyexec tool gate — mandatory by default (H-003)
     try:
         from policy_native import native_enabled as policy_native_on, check_tool as policy_check_tool
         if policy_native_on():
@@ -1933,10 +1976,12 @@ async def execute_tool(name: str, arguments: dict, nats=None, callbacks: dict = 
                 if "tool_complete" in callbacks:
                     callbacks["tool_complete"](name, result)
                 return result
-    except ImportError:
-        pass
-    except Exception as e:
-        log.debug("policyexec tool check fallback: %s", e)
+    except (ImportError, FileNotFoundError) as e:
+        # Fail closed: missing native policy module/binary denies tools (H-003)
+        result = {"error": True, "message": f"native policy enforcement unavailable: {e}", "policy": "policyexec"}
+        if "tool_complete" in callbacks:
+            callbacks["tool_complete"](name, result)
+        return result
 
     # Emit tool start (Hermes callback pattern)
     if "tool_start" in callbacks:

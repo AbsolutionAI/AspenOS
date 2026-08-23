@@ -10,7 +10,7 @@ Install roots: **`/opt/starship`**, **`/etc/starship`**, **`/var/lib/starship`**
 |-------|------|-------------|
 | Shell / tool execution | Agent RCE, data wipe | Sandbox blocklists, C11 seccomp, path allowlists |
 | Untrusted red-team agents | Lateral movement | Fleet ACL, tool allowlists, isolated plant-range |
-| NATS bus | Spoofed commands | Accounts/nkeys, token auth, optional TLS |
+| NATS bus | Spoofed commands | Accounts/nkeys, token auth, TLS+mTLS default (H-006), signed node enrollment + revocation list (H-002) |
 | Secrets in logs/LLM context | Credential leak | Redaction patterns, gitignore, SecretsManager |
 | Abliterated local models | Weaker refusal | Mandatory policy + sandbox + Droid Shield |
 
@@ -29,8 +29,10 @@ Agents run tools through `CommandExecutor` (`agents/tools.py`):
 ### Optional C11 isolation
 
 ```bash
-export STARSHIP_SANDBOX_NATIVE=1   # sandbox_run (seccomp + NEWNS/NEWPID)
-export STARSHIP_POLICY_NATIVE=1    # policyexec shared JSON gate
+# Native C11 gates are default-on since H-003; the exports below are no-ops
+# and only needed to pin intent. Opt out (dev only, deprecated):
+# export STARSHIP_SANDBOX_NATIVE=0   # sandbox_run (seccomp + NEWNS/NEWPID)
+# export STARSHIP_POLICY_NATIVE=0    # policyexec shared JSON gate
 export STARSHIP_POLICY=/etc/starship/policy.json
 ```
 
@@ -53,16 +55,35 @@ Shared policy contract: `config/policy.default.json` → packaged as `/etc/stars
 
 | Mode | When | How |
 |------|------|-----|
-| **agent-bus** | edge/server dev | No auth, localhost (`nats/agent-bus.conf`) |
-| **token** | trusted LAN | `STARSHIP_NATS_TOKEN` + `fleet-bus.conf` |
-| **accounts** | ops firstboot default | Multi-tenant `STARSHIP_OPS` / `EDGE` / `RANGE` / `TELEM` |
-| **TLS** | optional | `STARSHIP_NATS_TLS=1` + `scripts/gen-nats-tls.sh` |
+| **accounts** (default) | all profiles, H-001 | Multi-tenant `STARSHIP_OPS` / `EDGE` / `RANGE` / `TELEM` + nkeys |
+| **token** | explicit trusted-LAN opt-in (`STARSHIP_NATS_MODE=fleet`) | `STARSHIP_NATS_TOKEN` + `fleet-bus.conf` |
+| **TLS + mTLS** (default in new deployments) | firstboot auto-runs `gen-nats-tls.sh` (H-006) | server rejects non-TLS; clients present fleet-CA certs (`--node <name>`) |
+| **Node enrollment** | remote nodes, H-002 (`fleet-enroll.sh`) | CSR signed only against a fleet-CA-signed enrollment token; revocation list enforced at sign/connect/peer layers |
+
+The legacy no-auth **agent-bus** mode was removed (H-001 / threat model F-001):
+the bus always authenticates. Clients in accounts mode must present
+user/password or an nkey — bare-token and anonymous connects fail closed
+(`agents/nats_connect.py`).
 
 ```bash
 # Generate multi-tenant accounts + optional nkeys
 bash scripts/gen-nats-accounts.sh --out /etc/starship/nats
 # Clients: source /etc/starship/nats.env  (or creds/ops.env)
 ```
+
+### Single-node dev migration
+
+Local development uses the same accounts mode on localhost — no special
+no-auth config exists anymore:
+
+```bash
+bash scripts/gen-nats-accounts.sh --out nats          # writes conf + creds/ (gitignored)
+nats-server -c nats/fleet-accounts.conf &
+set -a; source nats/nats.env; set +a                  # ops-role client env
+```
+
+`scripts/start-agents.sh` and `make dev` perform this generation automatically
+when no authenticated conf is present.
 
 Dual-publish subjects: `starship.*` (primary) + `agnetic.*` (legacy).  
 Python helper: `agents/nats_connect.py` (user/pass, token, nkey, TLS).
@@ -133,14 +154,50 @@ sudo dpkg -i dist/starship-os_*.deb
 - postinst creates users `agnetic` / `nats`, venv, enables units
 - Firstboot (ops): multi-tenant NATS accounts + optional native sandbox
 
+## Legacy `nats/server.conf` (H-017)
+
+`nats/server.conf` is a **placeholder-only** legacy template. It must never contain
+live tokens/passwords. Installers may copy it under `/etc/starship/nats/` but
+**must not** point `active.conf` at it — active bus remains `fleet-accounts.conf`
+(default) or firstboot-materialized `fleet-bus.conf`.
+
+Lab hosts that once used the historically committed lab tokens must **rotate**
+those credentials (treat them as burned). Prefer:
+
+```bash
+bash scripts/gen-nats-accounts.sh --out /etc/starship/nats
+# + TLS: bash scripts/gen-nats-tls.sh --out /etc/starship/nats/tls --host <cn>
+```
+
+## Paperclip C2 control plane (H-019 / F-019)
+
+Org agent mesh C2 (Paperclip `:3100`, board keys, multi-company blast radius) is
+documented separately — do not conflate with plant NATS safety:
+
+- Runbook: [`docs/security/PAPERCLIP_C2_HARDENING.md`](security/PAPERCLIP_C2_HARDENING.md)
+
+## Biweekly threat-model checklist
+
+Use during ASP-298-style reviews (expand per full threat model when present):
+
+- [ ] NATS: no live secrets in git (`nats/*.conf`); accounts + TLS defaults held (H-001/H-006/H-017)
+- [ ] Paperclip C2: F-019 items in [`docs/security/PAPERCLIP_C2_HARDENING.md`](security/PAPERCLIP_C2_HARDENING.md)
+- [ ] Dual-human `propose_act`→`act` path status (H-016 / ASP-364) — open until wired
+- [ ] Host baseline SSH/UFW draft vs apply gate (H-HOST-01) — human approval required
+- [ ] Sandbox/policyexec mandatory (H-003); ops tool allowlist (H-005)
+- [ ] Budgets non-zero where zero=unlimited; fiscal freeze caps if still active
+- [ ] No secrets in issue/Linear bodies; key files mode 600
+
 ## Recommendations
 
 1. **Ops / multi-node:** accounts mode + TLS; never share red-team credentials with ops
-2. **Enable native gates:** `STARSHIP_SANDBOX_NATIVE=1` and `STARSHIP_POLICY_NATIVE=1`
-3. **Install AppArmor** on bare metal
-4. **Run agents as non-root** (`User=agnetic`)
-5. **Rotate** NATS tokens/passwords after firstboot; store only under `/etc/starship/nats/creds` (mode 600)
-6. **Abliterated models:** treat as untrusted reasoners — policy + sandbox mandatory
+2. **Native gates are mandatory by default (H-003):** startup fails closed if `sandbox_run`/`policyexec` are missing (`python3 -m native_check` runs as `ExecStartPre`)
+3. **Ops role tool allowlist (H-005):** fleet team `ops` (the default identity) is restricted to a minimum-necessary tool set in `config/policy.default.json`; unlisted tools are denied fail-closed, HITL vault approvals (`vault_approve`/`vault_deny`) and expansion tools (`opencode`/`opendesign`) are explicitly denied. Add new tools to the ops allowlist deliberately when a workflow needs them.
+4. **Install AppArmor** on bare metal
+5. **Run agents as non-root** (`User=agnetic`)
+6. **Rotate** NATS tokens/passwords after firstboot; store only under `/etc/starship/nats/creds` (mode 600)
+7. **Abliterated models:** treat as untrusted reasoners — policy + sandbox mandatory
+8. **Paperclip board keys:** mode 600 + rotation SLA per C2 runbook (H-019)
 
 ## Reporting
 

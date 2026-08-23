@@ -49,6 +49,13 @@ check "build-deb uses pkgroot layout" grep -q 'PKG_ROOT' scripts/build-deb.sh
 check "ops firstboot enables native sandbox" grep -q 'STARSHIP_SANDBOX_NATIVE=1' scripts/starship-firstboot.sh
 check "ops profile nats_mode fleet" bash -c 'awk "/^  ops:/{p=1} p&&/nats_mode:/{print; exit}" config/profiles.yaml | grep -q fleet'
 check "fleet-bus token placeholder" grep -q '__STARSHIP_NATS_TOKEN__' nats/fleet-bus.conf
+check "server.conf token placeholder" grep -q '__STARSHIP_NATS_TOKEN__' nats/server.conf
+check "server.conf admin pass placeholder" grep -q '__NATS_ADMIN_PASS__' nats/server.conf
+check "server.conf user pass placeholder" grep -q '__NATS_USER_PASS__' nats/server.conf
+check "no live lab NATS secrets in nats/" bash -c '! grep -RInE "agnetic_s3cr3t_t0k3n|agnetic_admin_2026|agnetic_user_2026" nats/ scripts/setup-nats-auth.sh src/python/lib/scripts/setup-nats-auth.sh 2>/dev/null'
+check "nats tls default-on in firstboot" grep -q 'STARSHIP_NATS_TLS:-1' scripts/starship-firstboot.sh
+check "gen-nats-tls enforces mTLS" grep -q 'verify: true' scripts/gen-nats-tls.sh
+check "firstboot wires tls for both bus modes" bash -c 'grep -q "_setup_nats_tls /etc/starship/nats/fleet-bus.active.conf" scripts/starship-firstboot.sh && grep -q "_setup_nats_tls \"\$out/fleet-accounts.conf\"" scripts/starship-firstboot.sh'
 check "C11 sandbox builds" bash -c 'make -C src/c/sandbox_spike clean all >/dev/null 2>&1'
 check "C11 sandbox echo" bash -c './src/c/sandbox_spike/sandbox_run --timeout 2 -- /bin/echo ok 2>/dev/null | grep -q ok'
 check "C11 sandbox denies mount" bash -c './src/c/sandbox_spike/sandbox_run -- mount >/dev/null 2>&1; test $? -eq 126'
