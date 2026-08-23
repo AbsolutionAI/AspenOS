@@ -139,10 +139,11 @@ sudo dpkg -i dist/starship-os_*.deb
 
 1. **Ops / multi-node:** accounts mode + TLS; never share red-team credentials with ops
 2. **Native gates are mandatory by default (H-003):** startup fails closed if `sandbox_run`/`policyexec` are missing (`python3 -m native_check` runs as `ExecStartPre`)
-3. **Install AppArmor** on bare metal
-4. **Run agents as non-root** (`User=agnetic`)
-5. **Rotate** NATS tokens/passwords after firstboot; store only under `/etc/starship/nats/creds` (mode 600)
-6. **Abliterated models:** treat as untrusted reasoners — policy + sandbox mandatory
+3. **Ops role tool allowlist (H-005):** fleet team `ops` (the default identity) is restricted to a minimum-necessary tool set in `config/policy.default.json`; unlisted tools are denied fail-closed, HITL vault approvals (`vault_approve`/`vault_deny`) and expansion tools (`opencode`/`opendesign`) are explicitly denied. Add new tools to the ops allowlist deliberately when a workflow needs them.
+4. **Install AppArmor** on bare metal
+5. **Run agents as non-root** (`User=agnetic`)
+6. **Rotate** NATS tokens/passwords after firstboot; store only under `/etc/starship/nats/creds` (mode 600)
+7. **Abliterated models:** treat as untrusted reasoners — policy + sandbox mandatory
 
 ## Reporting
 
