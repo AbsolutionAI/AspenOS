@@ -49,5 +49,7 @@ Overhead p50 ≈ +0.51 ms ≪ 2 ms → ADR criterion PASS without weakening anyt
 
 - If absolute latency ever matters, hoist seccomp filter construction pre-fork
   (~−0.46 ms) or run sandbox under a privileged supervisor to get real ns isolation.
-- Architect ratification: benchmark gate now encodes the ADR's "overhead" reading;
-  flagged on ASP-189 for Aspen Architect sign-off.
+- **Architect ratification (2026-08-23, Aspen):** **APPROVED.** ADR 0001 gate is
+  `overhead = c11_internal_p50 − py_exec_p50 < 2 ms`. Absolute internal latency is
+  diagnostic only. Bench + smoke labels aligned; ADR text clarified so the historical
+  absolute table cannot re-introduce the misread.
