@@ -3,24 +3,31 @@
 
 #include <tunables/global>
 
-profile nats /usr/local/bin/nats-server {
+profile nats /{usr/local/bin/nats-server,usr/bin/nats-server} {
   #include <abstractions/base>
   #include <abstractions/nameservice>
 
-  # Binary and library access
+  # Binary and library access (ISO/local + apt)
   /usr/local/bin/nats-server     rix,
+  /usr/bin/nats-server           rix,
+  /usr/bin/env                   rix,
   /usr/lib/nats/**               r,
 
-  # Configuration
+  # Configuration (legacy agnetic + starship)
   /etc/agnetic/nats/**           r,
   allow /etc/agnetic/nats/**     rw,
+  /etc/starship/nats/**          r,
+  allow /etc/starship/nats/**    rw,
+  /etc/starship/nats.env         r,
 
   # Data storage
   /var/lib/agnetic/nats/**       rw,
   /var/lib/agnetic/nats/data/**  rw,
+  /var/lib/starship/nats/**      rw,
 
   # Logs
   /var/log/agnetic/**            rw,
+  /var/log/starship/**           rw,
 
   # Runtime
   /tmp/**                        rw,
@@ -67,6 +74,7 @@ profile nats /usr/local/bin/nats-server {
   deny /root/**                  w,
   deny /etc/**                   w,
   allow /etc/agnetic/nats/**     rw,
+  allow /etc/starship/nats/**    rw,
 
   # Deny ptrace
   deny ptrace (read, trace),
