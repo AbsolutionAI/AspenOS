@@ -1,5 +1,12 @@
 # Starship OS Architecture
 
+> **Superseded as product SoR (2026-08-22).**  
+> Authoritative architecture: [`docs/sor/MASTER_SPEC.md`](sor/MASTER_SPEC.md) (AspenGrove v4.0).  
+> Living overview: [`docs/architecture/overview.md`](architecture/overview.md).  
+> ADRs: [`docs/adr/README.md`](adr/README.md).  
+> Weekly review: [`docs/ops/WEEKLY_ARCHITECTURE_REVIEW_2026-08-22.md`](ops/WEEKLY_ARCHITECTURE_REVIEW_2026-08-22.md).  
+> This file is retained as **historical Alpha agent-mesh notes** (Romi/Proxy/Ergo + legacy `agnetic.*` subjects). Prefer Master Spec + ADR-0002/0003 for fleet/safety.
+
 A native AI operating system for complex system control. AI agents are first-class system services communicating via a NATS/JetStream message bus.
 
 ## Philosophy

@@ -1,9 +1,11 @@
-# ADR 0001 — C11 agent runtime feasibility
+# ADR 0010 — C11 agent runtime feasibility
 
+**Canonical ID:** ADR-0010 (filename kept as `0001-c11-agent-runtime.md` for history)  
+**Also known as:** “ADR 0001” in older code comments and bench scripts — **not** the same as `ADR-0001-aspen-grove-packaging.md`  
 **Status:** Accepted (spike authorized)  
 **Date:** 2026-07-15  
 **Deciders:** Starship OS maintainers  
-**Related:** `docs/PERFORMANCE_PLAN.md`, `src/c/`, `docs/plans/starship-os-streamline.md`
+**Related:** `docs/PERFORMANCE_PLAN.md`, `src/c/`, `docs/plans/starship-os-streamline.md`, `docs/adr/README.md`
 
 ## Context
 

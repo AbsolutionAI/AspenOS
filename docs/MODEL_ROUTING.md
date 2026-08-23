@@ -22,21 +22,21 @@ Local models remain optional for offline experiments only.
 
 | Agent | Path | Primary model | Monthly budget |
 |-------|------|---------------|----------------|
-| aspen | hermes `-p aspen` | grok-4.5 | $200 |
-| Runtime | hermes `-p runtime` | deepseek/deepseek-v4-flash | $50 |
-| robotics | hermes `-p robotics` | deepseek/deepseek-v4-flash | $50 |
-| Auditor | hermes `-p auditor` | deepseek/deepseek-v4-flash | $50 |
-| packndeploy | hermes `-p packndeploy` | deepseek/deepseek-v4-flash | $50 |
-| Dashboard | hermes `-p dashboard` | deepseek/deepseek-v4-flash | $50 |
-| Compliance | hermes `-p compliance` | deepseek/deepseek-v4-flash | $50 |
-| Opencode | opencode_local | opencode/deepseek-v4-flash-free | $150 |
-| Aspen Fast Coder | opencode_local | opencode/deepseek-v4-flash-free | $100 |
-| Aider | process | openrouter/deepseek/deepseek-v4-flash | $75 |
-| Agent Zero | process + Docker UI | configure Flash in A0 UI | $75 |
-| Summarizer | claude_local | claude-haiku-4-5 | $25 |
-| Reflection Coach | claude_local | (profile default) | $25 |
+| aspen | hermes `-p aspen` | grok-4.5 | ~$15–25 (gates only) |
+| Runtime | hermes `-p runtime` | deepseek/deepseek-v4-flash | lean / on-demand |
+| robotics | hermes `-p robotics` | deepseek/deepseek-v4-flash | lean / on-demand |
+| Auditor | hermes `-p auditor` | deepseek/deepseek-v4-flash | lean / on-demand |
+| packndeploy | hermes `-p packndeploy` | deepseek/deepseek-v4-flash | lean / on-demand |
+| Dashboard | hermes `-p dashboard` | deepseek/deepseek-v4-flash | lean / on-demand |
+| Compliance | hermes `-p compliance` | deepseek/deepseek-v4-flash | lean / on-demand |
+| Opencode | opencode_local | opencode/deepseek-v4-flash-free | prefer free path |
+| Aspen Fast Coder | opencode_local | opencode/deepseek-v4-flash-free | prefer free path |
+| Aider | process | openrouter/deepseek/deepseek-v4-flash | on-demand |
+| Agent Zero | process + Docker UI | configure Flash in A0 UI | on-demand |
+| Summarizer | claude_local | claude-haiku-4-5 | rare |
+| Reflection Coach | claude_local | (profile default) | rare |
 
-**Company monthly budget:** $100 (fiscal freeze)
+**Company monthly budget:** **$100 hard ceiling** (fiscal freeze). Per-agent figures above are **soft guidance under the company cap**, not a sum of unlimited envelopes. Prefer wake-on-demand; no timer heartbeats.
 
 ## Escalate ladder (Compound Engineering)
 1. Run on Flash (or role default).
