@@ -28,7 +28,12 @@ Fleet
 Cluster mesh (`services/cluster.py`) remains the low-level node/task router.  
 Fleet is the **topology + exercise** control plane on top.
 
-## NATS subjects (dual-publish)
+## NATS subjects (canonical aspen.* + dual-publish)
+
+**Canonical (ADR-0003):** `aspen.fleet.node.register|heartbeat`, `aspen.fleet.ops.status`, `aspen.fleet.mission.*`, `aspen.safety.estop|clear`  
+**Packages:** [aspen-edge-rrm](https://github.com/AbsolutionAI/aspen-edge-rrm), [aspen-swarm-manager](https://github.com/AbsolutionAI/aspen-swarm-manager)
+
+## NATS subjects (dual-publish legacy)
 
 | Subject | Purpose |
 |---------|---------|
