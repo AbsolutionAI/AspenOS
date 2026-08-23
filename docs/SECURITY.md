@@ -154,6 +154,40 @@ sudo dpkg -i dist/starship-os_*.deb
 - postinst creates users `agnetic` / `nats`, venv, enables units
 - Firstboot (ops): multi-tenant NATS accounts + optional native sandbox
 
+## Legacy `nats/server.conf` (H-017)
+
+`nats/server.conf` is a **placeholder-only** legacy template. It must never contain
+live tokens/passwords. Installers may copy it under `/etc/starship/nats/` but
+**must not** point `active.conf` at it — active bus remains `fleet-accounts.conf`
+(default) or firstboot-materialized `fleet-bus.conf`.
+
+Lab hosts that once used the historically committed lab tokens must **rotate**
+those credentials (treat them as burned). Prefer:
+
+```bash
+bash scripts/gen-nats-accounts.sh --out /etc/starship/nats
+# + TLS: bash scripts/gen-nats-tls.sh --out /etc/starship/nats/tls --host <cn>
+```
+
+## Paperclip C2 control plane (H-019 / F-019)
+
+Org agent mesh C2 (Paperclip `:3100`, board keys, multi-company blast radius) is
+documented separately — do not conflate with plant NATS safety:
+
+- Runbook: [`docs/security/PAPERCLIP_C2_HARDENING.md`](security/PAPERCLIP_C2_HARDENING.md)
+
+## Biweekly threat-model checklist
+
+Use during ASP-298-style reviews (expand per full threat model when present):
+
+- [ ] NATS: no live secrets in git (`nats/*.conf`); accounts + TLS defaults held (H-001/H-006/H-017)
+- [ ] Paperclip C2: F-019 items in [`docs/security/PAPERCLIP_C2_HARDENING.md`](security/PAPERCLIP_C2_HARDENING.md)
+- [ ] Dual-human `propose_act`→`act` path status (H-016 / ASP-364) — open until wired
+- [ ] Host baseline SSH/UFW draft vs apply gate (H-HOST-01) — human approval required
+- [ ] Sandbox/policyexec mandatory (H-003); ops tool allowlist (H-005)
+- [ ] Budgets non-zero where zero=unlimited; fiscal freeze caps if still active
+- [ ] No secrets in issue/Linear bodies; key files mode 600
+
 ## Recommendations
 
 1. **Ops / multi-node:** accounts mode + TLS; never share red-team credentials with ops
@@ -163,6 +197,7 @@ sudo dpkg -i dist/starship-os_*.deb
 5. **Run agents as non-root** (`User=agnetic`)
 6. **Rotate** NATS tokens/passwords after firstboot; store only under `/etc/starship/nats/creds` (mode 600)
 7. **Abliterated models:** treat as untrusted reasoners — policy + sandbox mandatory
+8. **Paperclip board keys:** mode 600 + rotation SLA per C2 runbook (H-019)
 
 ## Reporting
 
