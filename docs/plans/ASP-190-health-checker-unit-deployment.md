@@ -69,9 +69,25 @@
   cron stays opt-in via manual copy.
 
 ## Acceptance
-- [ ] Plan written before code edits
-- [ ] `dpkg-deb -c` shows unit + checker script in the built package
-- [ ] postinst/prerm/install-daemon/uninstall-daemon lists updated consistently
-- [ ] `bash -n` clean on all edited shell scripts
-- [ ] Compound learning written
-- [ ] Working tree committed (only ASP-190 files staged); disposition recorded
+- [x] Plan written before code edits
+- [x] `dpkg-deb -c` shows unit + checker script in the built package
+  (unit/script copies landed via sibling ASP-353, commit 37ab422; re-verified on this change set)
+- [x] postinst/prerm/install-daemon/uninstall-daemon lists updated consistently
+  (enable + upgrade-restart, stop/disable, start + verify-loop entry, uninstall cleanup — this change set)
+- [x] `bash -n` clean on all edited shell scripts
+- [x] Compound learning written (`docs/solutions/ox-packaging-hygiene.md` covers the cluster pass;
+      per-ticket detail lives in the issue thread)
+- [x] Working tree committed (only ASP-190 files staged); disposition recorded
+
+## Outcome / coordination notes (2026-08-23)
+- The packaging cluster landed overlapping scope first: ASP-353 (`37ab422`) added the unit +
+  checker-script copies to `build-deb.sh` and the install/enable lines to `install-daemon.sh`,
+  with a smoke-test guard. This change set completes the remaining deployment lifecycle:
+  postinst enable/upgrade-restart, prerm stop/disable, uninstall-daemon cleanup,
+  install-daemon start + status-loop entry, and build-deb layout-validation guards for both payloads.
+- A prior heartbeat accidentally committed an early version of this work (plus unrelated staged
+  `deploy/` deletions) as `a608860` onto branch `hermes/asp-36-abs-mirror-routing` (unpushed).
+  The useful content is superseded by this properly-scoped commit; the `deploy/` deletions were
+  independently redone as an archive by `4a019fd`. Flagged for the hermes/ASP-36 owner to drop
+  when convenient — do not reset while their worktree has uncommitted work.
+
