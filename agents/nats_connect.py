@@ -3,17 +3,48 @@
 Env (priority):
   1. NATS_URL with embedded user:pass or :token@
   2. NATS_USER + NATS_PASSWORD
-  3. STARSHIP_NATS_TOKEN (token auth)
+  3. STARSHIP_NATS_TOKEN (token auth — fleet shared-token mode only)
   4. STARSHIP_NATS_NKEY_SEED or path in STARSHIP_NATS_NKEY_SEED_FILE
   5. STARSHIP_NATS_TLS=1 + STARSHIP_NATS_CA[/CERT/KEY] for TLS
+
+H-001 (ASP-169): when STARSHIP_NATS_MODE=accounts (the default since the
+no-auth agent-bus removal), connects without user/pass or nkey fail closed.
 """
 
 from __future__ import annotations
 
 import os
+import re
 import ssl
 from typing import Any, Optional
 from urllib.parse import quote
+
+
+def _mode() -> str:
+    return os.getenv("STARSHIP_NATS_MODE", "").strip().lower()
+
+
+def require_account_credentials() -> None:
+    """H-001 (ASP-169): fail closed in accounts mode without real credentials.
+
+    Accounts-mode connections must use user/password or an nkey seed.
+    Bare-token and anonymous connects are refused with a migration hint.
+    """
+    if _mode() != "accounts":
+        return
+    has_user_pass = bool(
+        os.getenv("NATS_USER", "").strip()
+        and os.getenv("NATS_PASSWORD", "").strip()
+        or re.search(r"^[a-z+]+://[^/@:]+:[^/@]+@", (os.getenv("NATS_URL") or "").strip())
+    )
+    if not (has_user_pass or nkey_seed()):
+        raise RuntimeError(
+            "NATS accounts mode requires account credentials "
+            "(NATS_USER/NATS_PASSWORD or STARSHIP_NATS_NKEY_SEED). "
+            "Anonymous/token connects are no longer accepted (H-001). "
+            "Source a role env from /etc/starship/nats/creds/ or run "
+            "scripts/gen-nats-accounts.sh."
+        )
 
 
 def build_nats_url(
@@ -91,6 +122,7 @@ async def connect(url: Optional[str] = None, **kwargs):
     """Connect to NATS using env credentials."""
     from nats import connect as nats_connect
 
+    require_account_credentials()
     final_url = build_nats_url(url)
     kw = connect_kwargs()
     kw.update(kwargs)

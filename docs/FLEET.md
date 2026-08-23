@@ -106,7 +106,7 @@ Enforced by `fleet_policy.check_cross_plant` / `check_tool(..., target_plant=...
 
 | File | Purpose |
 |------|---------|
-| `nats/agent-bus.conf` | Dev/server/edge — auth disabled, localhost |
+| `nats/fleet-accounts.conf.tmpl` | Default bus — multi-tenant accounts (H-001) |
 | `nats/fleet-bus.conf` | Shared token (trusted LAN) |
 | `nats/fleet-accounts.conf.tmpl` | Multi-tenant accounts template |
 | `scripts/gen-nats-accounts.sh` | Materialize accounts + nkeys + client envs |
@@ -150,14 +150,15 @@ Appends `tls { ... }` to fleet-accounts conf; clients use `STARSHIP_NATS_CA` + `
 
 | Profile | NATS mode | Auth |
 |---------|-----------|------|
-| edge | agent-bus | none |
-| server | agent-bus | none |
+| edge | accounts | multi-tenant (`gen-nats-accounts.sh`, edge role) |
+| server | accounts | multi-tenant (`gen-nats-accounts.sh`, ops role) |
 | **ops** | **accounts** | multi-tenant (`gen-nats-accounts.sh`) |
 
 Overrides:
-- `STARSHIP_NATS_ACCOUNTS=1` — force accounts on any profile  
-- `STARSHIP_NATS_MODE=token` + `STARSHIP_FLEET_BUS=1` — shared token fleet-bus  
+- `STARSHIP_NATS_MODE=fleet` + `STARSHIP_FLEET_BUS=1` — shared token fleet-bus (trusted LAN)  
 - `STARSHIP_NATS_ROUTES=...` — cluster routes (token mode)
+
+No-auth mode: removed in H-001 (ASP-169). The bus always authenticates.
 
 ```bash
 STARSHIP_PROFILE=ops sudo bash scripts/starship-firstboot.sh

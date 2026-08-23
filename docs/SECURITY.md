@@ -55,16 +55,34 @@ Shared policy contract: `config/policy.default.json` → packaged as `/etc/stars
 
 | Mode | When | How |
 |------|------|-----|
-| **agent-bus** | edge/server dev | No auth, localhost (`nats/agent-bus.conf`) |
-| **token** | trusted LAN | `STARSHIP_NATS_TOKEN` + `fleet-bus.conf` |
-| **accounts** | ops firstboot default | Multi-tenant `STARSHIP_OPS` / `EDGE` / `RANGE` / `TELEM` |
-| **TLS** | optional | `STARSHIP_NATS_TLS=1` + `scripts/gen-nats-tls.sh` |
+| **accounts** (default) | all profiles, H-001 | Multi-tenant `STARSHIP_OPS` / `EDGE` / `RANGE` / `TELEM` + nkeys |
+| **token** | explicit trusted-LAN opt-in (`STARSHIP_NATS_MODE=fleet`) | `STARSHIP_NATS_TOKEN` + `fleet-bus.conf` |
+| **TLS** | optional hardening | `STARSHIP_NATS_TLS=1` + `scripts/gen-nats-tls.sh` |
+
+The legacy no-auth **agent-bus** mode was removed (H-001 / threat model F-001):
+the bus always authenticates. Clients in accounts mode must present
+user/password or an nkey — bare-token and anonymous connects fail closed
+(`agents/nats_connect.py`).
 
 ```bash
 # Generate multi-tenant accounts + optional nkeys
 bash scripts/gen-nats-accounts.sh --out /etc/starship/nats
 # Clients: source /etc/starship/nats.env  (or creds/ops.env)
 ```
+
+### Single-node dev migration
+
+Local development uses the same accounts mode on localhost — no special
+no-auth config exists anymore:
+
+```bash
+bash scripts/gen-nats-accounts.sh --out nats          # writes conf + creds/ (gitignored)
+nats-server -c nats/fleet-accounts.conf &
+set -a; source nats/nats.env; set +a                  # ops-role client env
+```
+
+`scripts/start-agents.sh` and `make dev` perform this generation automatically
+when no authenticated conf is present.
 
 Dual-publish subjects: `starship.*` (primary) + `agnetic.*` (legacy).  
 Python helper: `agents/nats_connect.py` (user/pass, token, nkey, TLS).

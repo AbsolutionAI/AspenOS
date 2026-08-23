@@ -275,9 +275,12 @@ Creates users `agnetic` / `nats`, Python venv, systemd units.
 
 | Profile | Intent | NATS (firstboot) |
 |---------|--------|------------------|
-| `edge` | Thin node | agent-bus |
-| `server` | Default mesh | agent-bus |
-| `ops` | Full mesh + fleet | multi-tenant accounts |
+| `edge` | Thin node | multi-tenant accounts + nkeys |
+| `server` | Default mesh | multi-tenant accounts + nkeys |
+| `ops` | Full mesh + fleet | multi-tenant accounts + nkeys |
+
+All profiles default to authenticated accounts mode (H-001); the old no-auth
+agent-bus mode was removed. Shared-token fleet bus: `STARSHIP_NATS_MODE=fleet`.
 
 ### ISO
 
