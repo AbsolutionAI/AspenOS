@@ -164,3 +164,14 @@ STARSHIP_PROFILE=ops sudo bash scripts/starship-firstboot.sh
 - Exercise: `POST /api/fleet/exercise` `{"action":"start"|"stop"}`
 - Register: `POST /api/fleet/register`
 - UI panel **Fleet Map** + Exercise Start/Stop buttons (port 8788)
+
+## Cognitive plugin (ADR-0005)
+
+| Package | Role |
+|---------|------|
+| [aspen-langgraph-worker](https://github.com/AbsolutionAI/aspen-langgraph-worker) | In-process / NATS cognitive graphs → **propose_act only** |
+
+- Paperclip + Hermes remain **aspen-dev** org/cost SoR — LangGraph is not a second board.
+- Subjects: `aspen.worker.langgraph.job` → `aspen.worker.langgraph.result` + `aspen.edge.<node>.propose_act`
+- Lab: `make smoke` (stdlib bus); `make nats-e2e` (docker NATS); grove profile `langgraph` (`compose/langgraph-lab.yml`)
+- Invoke: `python -m aspen_lgw.invoke --transport lab|nats` — see package `docs/INVOKE.md`
