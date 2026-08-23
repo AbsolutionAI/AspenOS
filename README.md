@@ -182,7 +182,7 @@ The tool system enforces strict security constraints:
 - **Secret redaction**: Passwords, tokens, API keys automatically redacted from output
 - **Timeout enforcement**: 30-second default with process kill on timeout
 - **Output limits**: 50KB max output, 1MB max file size
-- **Optional C11:** `STARSHIP_SANDBOX_NATIVE=1` · `STARSHIP_POLICY_NATIVE=1`
+- **Mandatory C11 (H-003):** native sandbox + policyexec on by default; opt out with `STARSHIP_SANDBOX_NATIVE=0 STARSHIP_POLICY_NATIVE=0` (deprecated)
 
 ---
 
@@ -240,7 +240,8 @@ Full policy: **[SECURITY.md](SECURITY.md)** · architecture: **[docs/SECURITY.md
 # Ops multi-tenant bus + optional TLS
 bash scripts/gen-nats-accounts.sh --out /etc/starship/nats
 STARSHIP_NATS_TLS=1 bash scripts/gen-nats-tls.sh --out /etc/starship/nats/tls
-export STARSHIP_SANDBOX_NATIVE=1 STARSHIP_POLICY_NATIVE=1
+# Native enforcement is default-on since H-003; opt out ONLY for dev:
+# export STARSHIP_SANDBOX_NATIVE=0 STARSHIP_POLICY_NATIVE=0
 ```
 
 Report vulnerabilities via GitHub Security Advisories (see SECURITY.md) — not public issues.

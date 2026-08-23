@@ -150,7 +150,7 @@ class CommandExecutor:
             log.info("[DRY RUN] Would execute: %s", redact(command))
             return ExecuteResult(exit_code=0, stdout=f"[DRY RUN] {command}", command=command)
 
-        # Optional C11 policyexec (shared policy JSON) — STARSHIP_POLICY_NATIVE=1
+        # C11 policyexec (shared policy JSON) — mandatory by default (H-003)
         try:
             from policy_native import native_enabled as policy_native_on, check_command as policy_check_cmd
             if policy_native_on():
@@ -159,12 +159,11 @@ class CommandExecutor:
                     raise SandboxError(denial, command)
         except SandboxError:
             raise
-        except ImportError:
-            pass
-        except Exception as e:
-            log.debug("native policy fallback: %s", e)
+        except (ImportError, FileNotFoundError) as e:
+            # Native bridge/policy binary missing while enforcement is default-on — fail closed
+            raise SandboxError(f"native sandbox/policy enforcement unavailable: {e}", command)
 
-        # Optional C11 sandbox_run (ADR 0001) — STARSHIP_SANDBOX_NATIVE=1
+        # C11 sandbox_run (ADR 0001) — mandatory by default (H-003)
         try:
             from sandbox_native import native_enabled, run_shell_native
             if native_enabled():
@@ -178,12 +177,16 @@ class CommandExecutor:
                     timed_out=nr.timed_out,
                     command=command,
                 )
+            # Explicit operator opt-out only — deprecated Python fallback
+            log.warning(
+                "STARSHIP_SANDBOX_NATIVE explicitly disabled — using deprecated "
+                "Python-only executor fallback (H-003 deprecation)"
+            )
         except SandboxError:
             raise
-        except ImportError:
-            pass
-        except Exception as e:
-            log.debug("native sandbox fallback: %s", e)
+        except ImportError as e:
+            # Native bridge missing while enforcement is default-on — fail closed
+            raise SandboxError(f"native sandbox enforcement unavailable: {e}", command)
 
         try:
             merged_env = {**os.environ, "TERM": "dumb"}
@@ -1963,7 +1966,7 @@ async def _execute_tool_dispatch(name: str, arguments: dict, nats=None, callback
     except ImportError:
         pass
 
-    # Optional C11 policyexec tool gate — STARSHIP_POLICY_NATIVE=1
+    # C11 policyexec tool gate — mandatory by default (H-003)
     try:
         from policy_native import native_enabled as policy_native_on, check_tool as policy_check_tool
         if policy_native_on():
@@ -1973,10 +1976,12 @@ async def _execute_tool_dispatch(name: str, arguments: dict, nats=None, callback
                 if "tool_complete" in callbacks:
                     callbacks["tool_complete"](name, result)
                 return result
-    except ImportError:
-        pass
-    except Exception as e:
-        log.debug("policyexec tool check fallback: %s", e)
+    except (ImportError, FileNotFoundError) as e:
+        # Fail closed: missing native policy module/binary denies tools (H-003)
+        result = {"error": True, "message": f"native policy enforcement unavailable: {e}", "policy": "policyexec"}
+        if "tool_complete" in callbacks:
+            callbacks["tool_complete"](name, result)
+        return result
 
     # Emit tool start (Hermes callback pattern)
     if "tool_start" in callbacks:

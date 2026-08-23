@@ -40,7 +40,8 @@ bash scripts/gen-nats-accounts.sh --out /etc/starship/nats
 # Optional TLS
 STARSHIP_NATS_TLS=1 bash scripts/gen-nats-tls.sh --out /etc/starship/nats/tls
 # Native isolation
-export STARSHIP_SANDBOX_NATIVE=1 STARSHIP_POLICY_NATIVE=1
+# Native enforcement is default-on since H-003; opt out ONLY for dev:
+# export STARSHIP_SANDBOX_NATIVE=0 STARSHIP_POLICY_NATIVE=0
 # AppArmor
 sudo bash scripts/install-apparmor.sh
 ```

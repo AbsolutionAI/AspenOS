@@ -29,8 +29,10 @@ Agents run tools through `CommandExecutor` (`agents/tools.py`):
 ### Optional C11 isolation
 
 ```bash
-export STARSHIP_SANDBOX_NATIVE=1   # sandbox_run (seccomp + NEWNS/NEWPID)
-export STARSHIP_POLICY_NATIVE=1    # policyexec shared JSON gate
+# Native C11 gates are default-on since H-003; the exports below are no-ops
+# and only needed to pin intent. Opt out (dev only, deprecated):
+# export STARSHIP_SANDBOX_NATIVE=0   # sandbox_run (seccomp + NEWNS/NEWPID)
+# export STARSHIP_POLICY_NATIVE=0    # policyexec shared JSON gate
 export STARSHIP_POLICY=/etc/starship/policy.json
 ```
 
@@ -136,7 +138,7 @@ sudo dpkg -i dist/starship-os_*.deb
 ## Recommendations
 
 1. **Ops / multi-node:** accounts mode + TLS; never share red-team credentials with ops
-2. **Enable native gates:** `STARSHIP_SANDBOX_NATIVE=1` and `STARSHIP_POLICY_NATIVE=1`
+2. **Native gates are mandatory by default (H-003):** startup fails closed if `sandbox_run`/`policyexec` are missing (`python3 -m native_check` runs as `ExecStartPre`)
 3. **Install AppArmor** on bare metal
 4. **Run agents as non-root** (`User=agnetic`)
 5. **Rotate** NATS tokens/passwords after firstboot; store only under `/etc/starship/nats/creds` (mode 600)
