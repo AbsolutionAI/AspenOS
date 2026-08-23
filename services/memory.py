@@ -250,6 +250,7 @@ class VectorStore:
 # ---------------------------------------------------------------------------
 
 class MemoryType(Enum):
+    # Core long-term types (BEL-154 access layer)
     EPISODIC = "episodic"        # Past conversations and events
     SEMANTIC = "semantic"        # Facts and knowledge
     PROCEDURAL = "procedural"    # How to do things (learned skills)
@@ -257,6 +258,26 @@ class MemoryType(Enum):
     DECISION = "decision"        # Past decisions and rationale
     TEMPORAL = "temporal"        # State transitions for compliance
     KNOWLEDGE_GRAPH = "knowledge_graph"  # Entity-relation triples
+    # Mesh / daemon-facing types (ASP-98 — parity with src/python + stresstest)
+    WORKING = "working"          # In-context working memory
+    RETRIEVAL = "retrieval"      # External docs / history chunks
+    PARAMETRIC = "parametric"    # Knowledge baked into model weights (catalog only)
+    PROSPECTIVE = "prospective"  # Future intentions / scheduled commitments
+
+
+MEMORY_DESCRIPTIONS = {
+    MemoryType.WORKING: "In-context working memory — current session context window",
+    MemoryType.SEMANTIC: "Persistent facts, preferences, and domain knowledge",
+    MemoryType.EPISODIC: "Past events, conversations, task runs, outcomes",
+    MemoryType.PROCEDURAL: "How-to knowledge — skills, tool patterns, workflows",
+    MemoryType.RETRIEVAL: "External documents and history chunks via vector search",
+    MemoryType.PARAMETRIC: "Knowledge baked into LLM weights (catalog / audit only)",
+    MemoryType.PROSPECTIVE: "Future intentions, scheduled goals, pending plans",
+    MemoryType.PREFERENCE: "Structured user/operator preferences",
+    MemoryType.DECISION: "Past decisions and rationale",
+    MemoryType.TEMPORAL: "State transitions for compliance — before/after tracking",
+    MemoryType.KNOWLEDGE_GRAPH: "Entity-relation triples — subject-predicate-object",
+}
 
 
 @dataclass
@@ -273,6 +294,25 @@ class Memory:
     accessed_at: str
     access_count: int
     decay: float
+    due_at: str = ""
+    status: str = ""
+
+    def to_dict(self) -> dict:
+        """JSON-friendly shape used by daemon tools and access-layer callers."""
+        return {
+            "id": self.id,
+            "agent": self.agent,
+            "type": self.type.value if isinstance(self.type, Enum) else str(self.type),
+            "content": self.content[:500],
+            "summary": self.summary,
+            "metadata": self.metadata,
+            "importance": self.importance,
+            "created_at": self.created_at,
+            "due_at": self.due_at,
+            "status": self.status,
+            "decay": self.decay,
+            "access_count": self.access_count,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -296,7 +336,9 @@ CREATE TABLE IF NOT EXISTS memories (
     created_at  TEXT NOT NULL,
     accessed_at TEXT NOT NULL,
     access_count INTEGER DEFAULT 0,
-    decay       REAL DEFAULT 1.0
+    decay       REAL DEFAULT 1.0,
+    due_at      TEXT DEFAULT '',
+    status      TEXT DEFAULT ''
 );
 
 CREATE INDEX IF NOT EXISTS idx_memories_agent ON memories(agent);
@@ -305,26 +347,46 @@ CREATE INDEX IF NOT EXISTS idx_memories_importance ON memories(importance DESC);
 """
 
 
-def _row_to_memory(row: tuple) -> Memory:
+def _row_to_memory(row) -> Memory:
+    """Map a SQLite row (tuple or Row) to Memory, including optional columns."""
+    def _get(idx: int, key: str, default=None):
+        if hasattr(row, "keys") and key in row.keys():
+            val = row[key]
+            return default if val is None else val
+        try:
+            return row[idx]
+        except (IndexError, KeyError, TypeError):
+            return default
+
+    type_raw = _get(2, "type", "episodic")
+    try:
+        mem_type = MemoryType(type_raw)
+    except ValueError:
+        mem_type = MemoryType.EPISODIC
+
+    emb_raw = _get(5, "embedding", None)
+    meta_raw = _get(6, "metadata", None)
     return Memory(
-        id=row[0],
-        agent=row[1],
-        type=MemoryType(row[2]),
-        content=row[3],
-        summary=row[4],
-        embedding=json.loads(row[5]) if row[5] else [],
-        metadata=json.loads(row[6]) if row[6] else {},
-        importance=row[7],
-        created_at=row[8],
-        accessed_at=row[9],
-        access_count=row[10],
-        decay=row[11],
+        id=str(_get(0, "id", "")),
+        agent=str(_get(1, "agent", "")),
+        type=mem_type,
+        content=str(_get(3, "content", "")),
+        summary=str(_get(4, "summary", "")),
+        embedding=json.loads(emb_raw) if emb_raw else [],
+        metadata=json.loads(meta_raw) if meta_raw else {},
+        importance=float(_get(7, "importance", 0.5) or 0.5),
+        created_at=str(_get(8, "created_at", "")),
+        accessed_at=str(_get(9, "accessed_at", "")),
+        access_count=int(_get(10, "access_count", 0) or 0),
+        decay=float(_get(11, "decay", 1.0) or 1.0),
+        due_at=str(_get(12, "due_at", "") or ""),
+        status=str(_get(13, "status", "") or ""),
     )
 
 
 def _memory_to_dict(m: Memory) -> dict:
     """Serialise a Memory into the JSON-friendly access-layer shape."""
-    return {
+    d = {
         "id": m.id,
         "agent": m.agent,
         "type": m.type.value,
@@ -336,6 +398,11 @@ def _memory_to_dict(m: Memory) -> dict:
         "created_at": m.created_at,
         "metadata": m.metadata,
     }
+    if m.due_at:
+        d["due_at"] = m.due_at
+    if m.status:
+        d["status"] = m.status
+    return d
 
 
 # ---------------------------------------------------------------------------
@@ -358,7 +425,25 @@ class MemoryManager:
 
     def _init_db(self) -> None:
         self.db.executescript(_SCHEMA_SQL)
+        self._migrate_schema()
         self.db.commit()
+
+    def _migrate_schema(self) -> None:
+        """Add prospective-memory columns on DBs created before ASP-98."""
+        cols = {
+            r[1] for r in self.db.execute("PRAGMA table_info(memories)").fetchall()
+        }
+        if "due_at" not in cols:
+            self.db.execute(
+                "ALTER TABLE memories ADD COLUMN due_at TEXT DEFAULT ''"
+            )
+        if "status" not in cols:
+            self.db.execute(
+                "ALTER TABLE memories ADD COLUMN status TEXT DEFAULT ''"
+            )
+        self.db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status)"
+        )
 
     # -- store --------------------------------------------------------------
 
@@ -370,18 +455,28 @@ class MemoryManager:
         summary: str = "",
         importance: float = 0.5,
         metadata: dict | None = None,
+        due_at: str | None = None,
+        status: str | None = None,
+        embedding: list[float] | None = None,
     ) -> str:
-        """Store a new memory. Returns the memory id."""
+        """Store a new memory. Returns the memory id.
+
+        Optional *due_at* / *status* support prospective intentions (ASP-98).
+        """
         mem_id = uuid.uuid4().hex[:12]
         now = datetime.now(timezone.utc).isoformat()
-        embedding = get_embedding(content)  # Use best available embedding
+        if embedding is None:
+            embedding = get_embedding(content)  # Use best available embedding
         if not summary:
             summary = content[:120].replace("\n", " ")
+        due = due_at or ""
+        st = status or ""
         self.db.execute(
             """INSERT INTO memories
                (id, agent, type, content, summary, embedding, metadata,
-                importance, created_at, accessed_at, access_count, decay)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1.0)""",
+                importance, created_at, accessed_at, access_count, decay,
+                due_at, status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1.0, ?, ?)""",
             (
                 mem_id,
                 agent,
@@ -393,6 +488,8 @@ class MemoryManager:
                 max(0.0, min(1.0, importance)),
                 now,
                 now,
+                due,
+                st,
             ),
         )
         self.db.commit()
@@ -444,14 +541,27 @@ class MemoryManager:
         limit: int = 10,
         min_importance: float = 0.0,
         use_vector: bool = True,
+        status: str | None = None,
     ) -> list[Memory]:
         """Semantic search across memories.
 
         Scoring = cosine_similarity * importance * decay.
         If use_vector=True and LanceDB available, uses vector search (BEL-153).
+        Empty *query* returns filter-only results (newest first) for audits /
+        prospective listings.
         """
+        # Filter-only path (no embedding) — used by prospective lists + audits
+        if not (query or "").strip():
+            return self._filter_memories(
+                agent=agent,
+                mem_type=mem_type,
+                status=status,
+                min_importance=min_importance,
+                limit=limit,
+            )
+
         # Try vector search first (BEL-153 semantic layer)
-        if use_vector and self.vector_store._table is not None:
+        if use_vector and self.vector_store._table is not None and not status:
             query_embedding = get_embedding(query)
             vector_results = self.vector_store.search(query_embedding, k=limit, min_confidence=min_importance)
             if vector_results:
@@ -464,6 +574,10 @@ class MemoryManager:
                     ).fetchone()
                     if row:
                         mem = _row_to_memory(row)
+                        if mem_type and mem.type != mem_type:
+                            continue
+                        if agent and mem.agent != agent:
+                            continue
                         memories.append(mem)
                 if memories:
                     return memories[:limit]
@@ -482,6 +596,9 @@ class MemoryManager:
         if mem_type:
             sql += " AND type = ?"
             params.append(mem_type.value)
+        if status:
+            sql += " AND status = ?"
+            params.append(status)
         if min_importance > 0:
             sql += " AND importance >= ?"
             params.append(min_importance)
@@ -499,6 +616,51 @@ class MemoryManager:
 
         scored.sort(key=lambda t: t[0], reverse=True)
         return [mem for _, mem in scored[:limit]]
+
+    def _filter_memories(
+        self,
+        agent: str | None = None,
+        mem_type: MemoryType | None = None,
+        status: str | None = None,
+        min_importance: float = 0.0,
+        limit: int = 50,
+    ) -> list[Memory]:
+        """Non-semantic listing with optional filters (newest first)."""
+        sql = "SELECT * FROM memories WHERE 1=1"
+        params: list = []
+        if agent:
+            sql += " AND agent = ?"
+            params.append(agent)
+        if mem_type:
+            sql += " AND type = ?"
+            params.append(mem_type.value)
+        if status:
+            sql += " AND status = ?"
+            params.append(status)
+        if min_importance > 0:
+            sql += " AND importance >= ?"
+            params.append(min_importance)
+        sql += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+        rows = self.db.execute(sql, params).fetchall()
+        return [_row_to_memory(r) for r in rows]
+
+    def prospective_search(
+        self,
+        query: str | None = None,
+        limit: int = 10,
+        status: str | None = None,
+        agent: str | None = None,
+    ) -> list[Memory]:
+        """Search / list prospective memories (intentions)."""
+        return self.search(
+            query=query or "",
+            limit=limit,
+            mem_type=MemoryType.PROSPECTIVE,
+            status=status,
+            agent=agent,
+            use_vector=False,
+        )
 
     # -- retrieve (BEL-154 access layer) ------------------------------------
 
@@ -728,6 +890,147 @@ class MemoryManager:
 
     def close(self) -> None:
         self.db.close()
+
+
+# ---------------------------------------------------------------------------
+# Prospective memory (ASP-98 — ported from src/python onto SQLite canonical)
+# ---------------------------------------------------------------------------
+
+
+class ProspectiveMemoryManager:
+    """Future intentions / scheduled commitments on top of MemoryManager.
+
+    Public methods are async to match the legacy LanceDB module and daemon
+    tools (``await pm.create_intention(...)``). Internals are synchronous
+    SQLite; use the ``*_sync`` helpers from non-async callers/tests.
+    """
+
+    def __init__(self, memory_manager: MemoryManager):
+        self.mem = memory_manager
+
+    # -- sync core ----------------------------------------------------------
+
+    def create_intention_sync(
+        self,
+        agent: str,
+        description: str,
+        due_at: str | None = None,
+        priority: float = 0.5,
+        goal_id: str | None = None,
+    ) -> dict:
+        meta: dict = {}
+        if goal_id:
+            meta["goal_id"] = goal_id
+        mem_id = self.mem.store(
+            agent=agent,
+            mem_type=MemoryType.PROSPECTIVE,
+            content=description,
+            summary=f"Intention: {description[:80]}",
+            metadata=meta,
+            importance=priority,
+            due_at=due_at or "",
+            status="pending",
+        )
+        return {
+            "id": mem_id,
+            "agent": agent,
+            "description": description,
+            "due_at": due_at,
+            "priority": priority,
+            "status": "pending",
+        }
+
+    def get_pending_sync(
+        self, agent: str | None = None, limit: int = 20
+    ) -> list[Memory]:
+        return self.mem.prospective_search(
+            status="pending", limit=limit, agent=agent
+        )
+
+    def get_overdue_sync(self, agent: str | None = None) -> list[Memory]:
+        now = datetime.now(timezone.utc).isoformat()
+        results = self.mem.prospective_search(
+            status="pending", limit=50, agent=agent
+        )
+        return [m for m in results if m.due_at and m.due_at < now]
+
+    def complete_sync(self, mem_id: str, outcome: str = "") -> bool:
+        return self.mem.forget(mem_id)
+
+    def defer_sync(self, mem_id: str, new_due_at: str) -> bool:
+        cur = self.mem.db.execute(
+            "UPDATE memories SET due_at = ?, status = ? WHERE id = ?",
+            (new_due_at, "deferred", mem_id),
+        )
+        self.mem.db.commit()
+        return cur.rowcount > 0
+
+    def get_upcoming_sync(
+        self, horizon_hours: int = 24, agent: str | None = None
+    ) -> list[Memory]:
+        from datetime import timedelta
+
+        horizon = (
+            datetime.now(timezone.utc) + timedelta(hours=horizon_hours)
+        ).isoformat()
+        results = self.mem.prospective_search(
+            status="pending", limit=50, agent=agent
+        )
+        return [m for m in results if m.due_at and m.due_at <= horizon]
+
+    # -- async surface (daemon / tools.py) ----------------------------------
+
+    async def create_intention(
+        self,
+        agent: str,
+        description: str,
+        due_at: str | None = None,
+        priority: float = 0.5,
+        goal_id: str | None = None,
+    ) -> dict:
+        return self.create_intention_sync(
+            agent, description, due_at=due_at, priority=priority, goal_id=goal_id
+        )
+
+    async def get_pending(
+        self, agent: str | None = None, limit: int = 20
+    ) -> list[Memory]:
+        return self.get_pending_sync(agent=agent, limit=limit)
+
+    async def get_overdue(self, agent: str | None = None) -> list[Memory]:
+        return self.get_overdue_sync(agent=agent)
+
+    async def complete(self, mem_id: str, outcome: str = "") -> bool:
+        return self.complete_sync(mem_id, outcome=outcome)
+
+    async def defer(self, mem_id: str, new_due_at: str) -> bool:
+        return self.defer_sync(mem_id, new_due_at)
+
+    async def get_upcoming(
+        self, horizon_hours: int = 24, agent: str | None = None
+    ) -> list[Memory]:
+        return self.get_upcoming_sync(horizon_hours=horizon_hours, agent=agent)
+
+
+_memory_manager: MemoryManager | None = None
+_prospective_memory: ProspectiveMemoryManager | None = None
+
+
+def get_memory_manager(db_path: str | None = None) -> MemoryManager:
+    """Process-wide MemoryManager singleton (override path on first call)."""
+    global _memory_manager, _prospective_memory
+    if _memory_manager is None:
+        _memory_manager = MemoryManager(db_path) if db_path else MemoryManager()
+        _prospective_memory = ProspectiveMemoryManager(_memory_manager)
+    return _memory_manager
+
+
+def get_prospective_memory(db_path: str | None = None) -> ProspectiveMemoryManager:
+    """Process-wide ProspectiveMemoryManager singleton."""
+    global _prospective_memory
+    get_memory_manager(db_path)
+    assert _prospective_memory is not None
+    return _prospective_memory
 
 
 # ---------------------------------------------------------------------------
