@@ -49,5 +49,7 @@ Overhead p50 ≈ +0.51 ms ≪ 2 ms → ADR criterion PASS without weakening anyt
 
 - If absolute latency ever matters, hoist seccomp filter construction pre-fork
   (~−0.46 ms) or run sandbox under a privileged supervisor to get real ns isolation.
-- Architect ratification: benchmark gate now encodes the ADR's "overhead" reading;
-  flagged on ASP-189 for Aspen Architect sign-off.
+- ~~Architect ratification: flagged on ASP-189.~~ **RATIFIED 2026-08-23** by
+  Aspen Architect (ASP-189 comment): overhead-gate interpretation is binding;
+  ADR 0001 success criterion + bench gate updated to encode delta overhead
+  explicitly. Absolute p50 alone must not reopen ASP-189.

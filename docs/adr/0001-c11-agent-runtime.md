@@ -54,7 +54,20 @@ Minimal compile targets under `src/c/`:
 - [x] `sandbox_run` builds on Ubuntu 24.04
 - [x] Allowed command exits 0 with captured stdout
 - [x] Denied syscall/path fails closed (non-zero) — `mount` → exit 126
-- [x] Overhead p50 < 2ms for trivial command (vs Python baseline)
+- [x] **Overhead** p50 < 2ms for trivial command **vs Python baseline**
+  (`overhead = c11_internal_wall_p50 − py_exec_p50`). Absolute internal
+  wall-clock is environment-bound (kernel scheduler + fork floor) and is
+  **not** the gate. Gate override: `ADR_P50_OVERHEAD_MAX` (default `2.0`).
+
+### Architect ratification (ASP-189 / ASP-354, 2026-08-23)
+
+Ratified by Aspen Architect: the success criterion is **delta overhead**, not
+absolute latency. BT-ASP-SRV (kernel 7.0.0) measures bare fork+exec+wait
+≈2.9 ms and C11 internal ≈3.4 ms with py_exec ≈2.8 ms → **overhead ≈ +0.5 ms
+→ PASS**. `scripts/bench-sandbox.sh` asserts the overhead form; unprivileged
+namespace soft-fail must surface as `ns_req=` + CAP_SYS_ADMIN warning (not a
+false `ns=1`). Absolute-latency budgets, if ever productized, require a
+separate ADR amendment — do not reopen ASP-189 on absolute p50 alone.
 
 ## Benchmark (2026-07-15, N=200, `/bin/echo ok`)
 
@@ -67,7 +80,10 @@ Run: `make bench` or `bash scripts/bench-sandbox.sh 200`
 | py_exec | ~0.51 | ~0.80 | `subprocess.run` argv |
 | py_shell | ~0.98 | ~1.55 | shell path (CommandExecutor-like) |
 
-**Verdict:** C11 internal p50 **≪ 2ms** — criterion met. Outer spawn adds ~0.6ms for process bootstrap; still acceptable for Alpha 2.1 optional path.
+**Verdict (original host):** C11 internal p50 matched py_exec (~0.51 ms);
+overhead ≈ 0 ms ≪ 2 ms — criterion met. Outer spawn adds ~0.6 ms bootstrap;
+acceptable for Alpha 2.1 optional path. **Re-verify on each host with the
+overhead formula** (see ASP-354 solution note).
 
 ## Seccomp (Phase 3)
 
