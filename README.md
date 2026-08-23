@@ -25,7 +25,7 @@ AspenOS is a local-first, AI-native OS layer where autonomous agents communicate
 - **Install roots:** `/opt/starship`, `/etc/starship` (legacy `/opt/agnetic` symlinks)
 - **CLI:** `starshipctl` (compat `agneticctl`) · **Dashboard:** `:8788`
 - **Fleet:** multi-plant topology, red/blue policy, cross-plant ACL, exercise UI
-- **NATS:** dual-prefix `starship.*` / `agnetic.*`; ops multi-tenant accounts + nkeys; mTLS by default (H-006)
+- **NATS:** dual-prefix `starship.*` / `agnetic.*`; ops multi-tenant accounts + nkeys; mTLS by default (H-006); signed node enrollment + revocation (H-002)
 - **Packaging:** `make deb` → `dist/starship-os_*.deb`; ISO autoinstall edge/server/ops
 - **Plan:** `docs/plans/starship-os-streamline.md` · **Security:** [`SECURITY.md`](SECURITY.md)
 

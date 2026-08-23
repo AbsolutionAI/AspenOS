@@ -151,6 +151,7 @@ class FleetNode:
     status: str = "online"
     last_seen: str = field(default_factory=_utcnow)
     capabilities: dict = field(default_factory=dict)
+    identity: Optional[str] = None  # H-002: CN of the node's mTLS cert
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -158,6 +159,26 @@ class FleetNode:
 
 def local_node_id() -> str:
     return os.getenv("STARSHIP_NODE_ID", socket.gethostname())
+
+
+def identity_revoked(node_id: str | None) -> bool:
+    """H-002: True when node_id is on the fleet revocation list."""
+    if not node_id:
+        return False
+    try:
+        from nats_connect import is_revoked
+        return bool(is_revoked(node_id))
+    except ImportError:
+        return False
+
+
+def local_identity_cn() -> Optional[str]:
+    """H-002: CN of this node's mTLS identity cert, when present."""
+    try:
+        from nats_connect import local_identity_cn as _cn
+        return _cn()
+    except ImportError:
+        return None
 
 
 def detect_caps() -> dict:
@@ -210,6 +231,7 @@ def build_local_node(cfg: dict) -> FleetNode:
         team=node_cfg.get("team", "ops"),
         profile=profile,
         capabilities=detect_caps(),
+        identity=local_identity_cn(),
     )
 
 
@@ -410,6 +432,9 @@ async def daemon_loop(cfg: dict) -> None:
             data = json.loads(msg.data.decode())
             nid = data.get("node_id")
             if nid:
+                if identity_revoked(nid):  # H-002: fail closed on revoked peers
+                    print(f"rejected register from revoked node: {nid}")
+                    return
                 st = load_state()
                 st.setdefault("nodes", {})[nid] = data
                 save_state(st)
@@ -422,6 +447,9 @@ async def daemon_loop(cfg: dict) -> None:
             data = json.loads(msg.data.decode())
             nid = data.get("node_id")
             if nid:
+                if identity_revoked(nid):  # H-002: fail closed on revoked peers
+                    print(f"rejected heartbeat from revoked node: {nid}")
+                    return
                 st = load_state()
                 nodes = st.setdefault("nodes", {})
                 if nid in nodes:

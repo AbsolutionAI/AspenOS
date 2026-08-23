@@ -107,6 +107,7 @@ Enforced by `fleet_policy.check_cross_plant` / `check_tool(..., target_plant=...
 | File | Purpose |
 |------|---------|
 | `nats/fleet-accounts.conf.tmpl` | Default bus — multi-tenant accounts (H-001) |
+| `scripts/fleet-enroll.sh` | Node enrollment: signed tokens, CSR signing, revocation (H-002) |
 | `nats/fleet-bus.conf` | Shared token (trusted LAN) |
 | `nats/fleet-accounts.conf.tmpl` | Multi-tenant accounts template |
 | `scripts/gen-nats-accounts.sh` | Materialize accounts + nkeys + client envs |
@@ -147,6 +148,36 @@ bash scripts/gen-nats-tls.sh --out /etc/starship/nats/tls --node plant-edge-01
 Firstboot runs the generator automatically and appends `tls { ... verify: true }`
 to the active conf — non-TLS connections are rejected and clients must present a
 fleet-CA certificate (`STARSHIP_NATS_CA` + cert/key + `tls://` via `nats_connect.py`).
+
+### Node enrollment (H-002)
+
+Remote nodes get their fleet identity through a signed enrollment protocol
+(`scripts/fleet-enroll.sh`) — the node's private key never leaves the node:
+
+```bash
+# 1. ops manager: mint an enrollment token (RSA-signed by the fleet CA key)
+bash scripts/fleet-enroll.sh issue-token --node cell-7 --days 7
+
+# 2. node: generate keypair + CSR locally (token checked up front)
+bash scripts/fleet-enroll.sh request --node cell-7 --token <TOKEN> --dir /tmp/enroll-cell7
+
+# 3. ship cell-7.csr + token to ops (out of band), then sign:
+bash scripts/fleet-enroll.sh sign --request /path/to/request --out /etc/starship/nats/tls
+
+# 4. ship back node-cell-7-cert.pem + node-cell-7.env; source before connecting
+set -a; source /etc/starship/nats/tls/node-cell-7.env; set +a
+```
+
+A rogue node cannot join: signing refuses invalid, expired, mismatched, or
+already-consumed tokens. Compromised nodes are revoked and every layer fails
+closed — the signer refuses re-issue, the fleet daemon drops register/heartbeat
+events from revoked peers, and `nats_connect.py` refuses to connect when the
+local identity (`STARSHIP_NATS_CERT` CN) is revoked.
+
+```bash
+bash scripts/fleet-enroll.sh revoke --node cell-7 --reason stolen-laptop
+bash scripts/fleet-enroll.sh revoke --list   # <tls-out>/revocations.list
+```
 
 ## Firstboot
 

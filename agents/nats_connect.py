@@ -10,6 +10,11 @@ Env (priority):
 
 H-001 (ASP-169): when STARSHIP_NATS_MODE=accounts (the default since the
 no-auth agent-bus removal), connects without user/pass or nkey fail closed.
+
+H-002 (ASP-170): when the node presents a per-node mTLS identity
+(STARSHIP_NATS_CERT), connecting with a revoked identity fails closed;
+the revocation list lives next to the fleet CA (revocations.list) or at
+STARSHIP_NATS_REVOCATIONS.
 """
 
 from __future__ import annotations
@@ -133,11 +138,76 @@ def connect_kwargs() -> dict[str, Any]:
     return kw
 
 
+def revocations_path() -> Optional[str]:
+    """H-002: locate the fleet node revocation list.
+
+    STARSHIP_NATS_REVOCATIONS wins; otherwise the list is expected next to
+    the fleet CA (revocations.list alongside STARSHIP_NATS_CA).
+    """
+    override = os.getenv("STARSHIP_NATS_REVOCATIONS", "").strip()
+    if override:
+        return override
+    ca = os.getenv("STARSHIP_NATS_CA", "").strip()
+    if ca:
+        return os.path.join(os.path.dirname(ca) or ".", "revocations.list")
+    return None
+
+
+def local_identity_cn() -> Optional[str]:
+    """H-002: CN of this node's mTLS identity cert (STARSHIP_NATS_CERT)."""
+    cert = os.getenv("STARSHIP_NATS_CERT", "").strip()
+    if not cert or not os.path.isfile(cert):
+        return None
+    try:
+        import ssl as _ssl
+
+        info = _ssl._ssl._test_decode_cert(cert)  # type: ignore[attr-defined]
+        for rdn in info.get("subject", []):
+            for key, value in rdn:
+                if key == "commonName":
+                    return value
+    except Exception:
+        return None
+    return None
+
+
+def is_revoked(node_id: Optional[str]) -> bool:
+    """H-002: True when node_id appears on the fleet revocation list."""
+    if not node_id:
+        return False
+    path = revocations_path()
+    if not path or not os.path.isfile(path):
+        return False
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    if line.split()[0] == node_id:
+                        return True
+    except OSError:
+        return False
+    return False
+
+
+def check_local_identity() -> None:
+    """H-002: fail closed when this node's mTLS identity is revoked."""
+    cn = local_identity_cn()
+    if cn and is_revoked(cn):
+        raise RuntimeError(
+            f"Local node identity '{cn}' is on the fleet revocation list "
+            f"({revocations_path()}): refusing to connect (H-002). Contact "
+            "the ops manager to clear revocation or re-enroll via "
+            "scripts/fleet-enroll.sh."
+        )
+
+
 async def connect(url: Optional[str] = None, **kwargs):
     """Connect to NATS using env credentials."""
     from nats import connect as nats_connect
 
     require_account_credentials()
+    check_local_identity()
     final_url = build_nats_url(url)
     kw = connect_kwargs()
     kw.update(kwargs)
