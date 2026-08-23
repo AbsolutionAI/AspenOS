@@ -9,6 +9,7 @@ Borrowed patterns:
 
 import os
 import json
+import time
 import asyncio
 import logging
 import subprocess
@@ -1900,6 +1901,47 @@ _executor = CommandExecutor(sandbox=True)
 async def execute_tool(name: str, arguments: dict, nats=None, callbacks: dict = None) -> dict:
     """Execute a tool by name with given arguments.
 
+    Audits every call (H-004 / ASP-172) to the per-agent JSONL audit log.
+    Auditing is failure-isolated and never changes the tool result.
+
+    Args:
+        name: Tool name
+        arguments: Tool arguments dict
+        nats: NATS connection for delegation
+        callbacks: Optional dict of callbacks for streaming progress
+    """
+    arguments = repair_tool_arguments(arguments, name)
+    started = time.monotonic()
+    result = await _execute_tool_dispatch(name, arguments, nats=nats, callbacks=callbacks)
+
+    try:
+        from tool_audit import audit_tool_call
+        if result.get("error"):
+            status, exit_code = "error", 1
+            if result.get("policy") in ("fleet", "policyexec") or result.get("code") in (
+                "SANDBOX_DENIED", "ACCESS_DENIED",
+            ):
+                status, exit_code = "denied", None
+        else:
+            status, exit_code = "ok", 0
+        audit_tool_call(
+            name,
+            arguments,
+            duration_ms=int((time.monotonic() - started) * 1000),
+            exit_code=exit_code,
+            status=status,
+        )
+    except ImportError:
+        pass
+    except Exception as e:
+        log.debug("tool audit skipped for '%s': %s", name, e)
+
+    return result
+
+
+async def _execute_tool_dispatch(name: str, arguments: dict, nats=None, callbacks: dict = None) -> dict:
+    """Dispatch a tool by name with given arguments.
+
     Args:
         name: Tool name
         arguments: Tool arguments dict
@@ -1908,8 +1950,6 @@ async def execute_tool(name: str, arguments: dict, nats=None, callbacks: dict = 
     """
     callbacks = callbacks or {}
 
-    # Auto-repair arguments (Hermes pattern)
-    arguments = repair_tool_arguments(arguments, name)
 
     # Fleet red/blue + cross-plant ACL (never unrestricted OpenCode for red-team)
     try:
