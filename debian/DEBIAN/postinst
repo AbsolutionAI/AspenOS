@@ -89,12 +89,14 @@ if command -v systemctl &>/dev/null; then
     systemctl enable agnetic-mesh.target 2>/dev/null || true
     echo "[OK] Services enabled"
 
-    # On upgrade, restart services with the new files (prerm kept them running)
+    # On upgrade, restart services with the new files (prerm kept them running).
+    # Include starship-fleet: unit still ships in the .deb and is firstboot-enabled
+    # (ASP-387: not part of ASP-352/192 deploy/ archive; restart must match enable).
     if [[ -n "${OLD_VERSION:-}" ]]; then
         for unit in agnetic-nats agnetic-staragent \
                     agnetic-agent@proxy agnetic-agent@romi agnetic-agent@ergo \
                     agnetic-status-bridge agnetic-message-history agnetic-dashboard \
-                    starship-health-checker; do
+                    starship-fleet starship-health-checker; do
             systemctl restart "$unit.service" 2>/dev/null || true
         done
         echo "[OK] Services restarted after upgrade"
