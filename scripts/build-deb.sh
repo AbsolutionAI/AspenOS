@@ -125,7 +125,8 @@ cp -r "$REPO_DIR/souls/"* "$PKG_ROOT/opt/starship/lib/starship/souls/" 2>/dev/nu
 cp "$REPO_DIR/nats/fleet-bus.conf" "$PKG_ROOT/etc/starship/nats/" 2>/dev/null || true
 cp "$REPO_DIR/nats/fleet-auth.yaml" "$PKG_ROOT/etc/starship/nats/" 2>/dev/null || true
 cp "$REPO_DIR/nats/fleet-accounts.conf.tmpl" "$PKG_ROOT/etc/starship/nats/" 2>/dev/null || true
-cp "$REPO_DIR/nats/server.conf" "$PKG_ROOT/etc/starship/nats/" 2>/dev/null || true
+# H-017: ship placeholder-only legacy conf under .deprecated — never as active secrets
+cp "$REPO_DIR/nats/server.conf" "$PKG_ROOT/etc/starship/nats/server.conf.deprecated" 2>/dev/null || true
 cp "$REPO_DIR/nats/subjects.yaml" "$PKG_ROOT/etc/starship/nats/" 2>/dev/null || true
 # Default active bus = accounts conf (materialized by firstboot/postinst)
 ln -sfn /etc/starship/nats/fleet-accounts.conf "$PKG_ROOT/etc/starship/nats/active.conf"

@@ -165,7 +165,8 @@ log "Installing NATS configuration..."
 
 cp "$REPO_DIR/nats/fleet-bus.conf" /etc/starship/nats/ 2>/dev/null || true
 cp "$REPO_DIR/nats/fleet-accounts.conf.tmpl" /etc/starship/nats/ 2>/dev/null || true
-cp "$REPO_DIR/nats/server.conf" /etc/starship/nats/ 2>/dev/null || true
+# H-017: server.conf is placeholder-only / deprecated — never active production secrets
+cp "$REPO_DIR/nats/server.conf" /etc/starship/nats/server.conf.deprecated 2>/dev/null || true
 cp "$REPO_DIR/nats/subjects.yaml" /etc/starship/nats/ 2>/dev/null || true
 
 # Materialize accounts conf (H-001: no-auth agent-bus removed)

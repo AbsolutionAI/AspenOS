@@ -189,3 +189,109 @@ def test_deb_packages_ship_accounts_template_not_agent_bus():
     build = (PROJECT_ROOT / "scripts" / "build-deb.sh").read_text()
     assert "fleet-accounts.conf.tmpl" in build
     assert 'cp "$REPO_DIR/nats/agent-bus.conf"' not in build
+
+
+# ─── H-017: no live NATS secrets committed ──────────────────────────
+
+# Lab values historically committed in nats/server.conf (F-016). Burned;
+# must never reappear in tracked sources (see docs/SECURITY.md rotation).
+_BURNED_NATS_LAB_SECRETS = (
+    "agnetic_s3cr3t_t0k3n",
+    "agnetic_admin_2026",
+    "agnetic_user_2026",
+)
+
+_TRACKED_SCAN_GLOBS = (
+    "nats/**",
+    "scripts/**",
+    "src/**",
+    "docs/**",
+    "config/**",
+    "agents/**",
+    "services/**",
+    "dashboard/**",
+    "systemd/**",
+    "debian/**",
+    "README.md",
+    "SECURITY.md",
+    "Makefile",
+)
+
+
+def _iter_tracked_text_files():
+    import subprocess
+
+    result = subprocess.run(
+        ["git", "ls-files", "--", *_TRACKED_SCAN_GLOBS],
+        cwd=str(PROJECT_ROOT),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    for rel in result.stdout.splitlines():
+        path = PROJECT_ROOT / rel
+        if not path.is_file():
+            continue
+        # Skip binary-ish
+        if path.suffix in {".png", ".jpg", ".jpeg", ".gif", ".wasm", ".so", ".o"}:
+            continue
+        yield path
+
+
+def test_server_conf_is_placeholder_only():
+    conf = (PROJECT_ROOT / "nats" / "server.conf").read_text(encoding="utf-8")
+    assert "DEPRECATED" in conf or "H-017" in conf
+    assert "__STARSHIP_NATS_TOKEN__" in conf
+    assert "__SYS_PASS__" in conf or "__OPS_PASS__" in conf
+    for secret in _BURNED_NATS_LAB_SECRETS:
+        assert secret not in conf, f"live secret still in nats/server.conf: {secret}"
+    # Must not look like a ready-to-run production secret store
+    assert 'token: "agnetic_' not in conf
+    assert "password: \"agnetic_" not in conf
+
+
+def test_repo_has_no_burned_nats_lab_secrets():
+    offenders = []
+    for path in _iter_tracked_text_files():
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for secret in _BURNED_NATS_LAB_SECRETS:
+            if secret in text:
+                # Allow the regression suite + smoke negative-grep only
+                if path.name in {
+                    "test_nats_accounts_default.py",
+                    "smoke-test.sh",
+                }:
+                    continue
+                offenders.append(f"{path.relative_to(PROJECT_ROOT)}:{secret}")
+    assert not offenders, "burned lab NATS secrets still present:\n" + "\n".join(offenders)
+
+
+def test_setup_nats_auth_uses_generator_not_hardcoded_passwords():
+    for rel in (
+        "scripts/setup-nats-auth.sh",
+        "src/python/lib/scripts/setup-nats-auth.sh",
+    ):
+        text = (PROJECT_ROOT / rel).read_text(encoding="utf-8")
+        assert "gen-nats-accounts.sh" in text, rel
+        for secret in _BURNED_NATS_LAB_SECRETS:
+            assert secret not in text, f"{rel} still references {secret}"
+        assert "Credentials:" not in text or "do not commit" in text.lower()
+
+
+def test_packaging_does_not_install_server_conf_as_active():
+    for rel in (
+        "scripts/install-daemon.sh",
+        "scripts/build-deb.sh",
+        "src/python/lib/scripts/install-daemon.sh",
+        "src/python/lib/scripts/build-deb.sh",
+    ):
+        text = (PROJECT_ROOT / rel).read_text(encoding="utf-8")
+        # Must not copy server.conf to a live path without .deprecated suffix
+        for line in text.splitlines():
+            if "server.conf" not in line or line.lstrip().startswith("#"):
+                continue
+            if "cp " in line and "server.conf" in line:
+                assert "server.conf.deprecated" in line, f"{rel}: {line.strip()}"

@@ -541,27 +541,18 @@ class MockOllama:
 
 ### NATS Permissions
 
-When NATS auth is enabled (`auth_enabled: true` in `agents/config.yaml`), each agent's token should be scoped:
+Default NATS mode is multi-tenant **accounts** (H-001). Do not put live tokens
+or passwords in `nats/server.conf` (H-017 — that file is a deprecated
+placeholder stub). Generate conf + role env:
 
-```yaml
-# nats/server.conf
-authorization: {
-    proxy: {
-        publish:   "agnetic.agent.proxy.>"
-        subscribe: "agnetic.agent.proxy.command.>"
-    }
-    romi: {
-        publish:   "agnetic.agent.romi.>"
-        subscribe: "agnetic.agent.romi.command.>"
-    }
-    ergo: {
-        publish:   ["agnetic.agent.ergo.>", "agnetic.telemetry.>"]
-        subscribe: ["agnetic.agent.ergo.command.>", "agnetic.agent.*.event.>"]
-    }
-}
+```bash
+bash scripts/gen-nats-accounts.sh --out nats   # or /etc/starship/nats
+set -a; source nats/nats.env; set +a
 ```
 
-This ensures agents can only publish their own events and subscribe to their own commands, preventing cross-agent interference.
+Subject allow-lists live in `nats/fleet-accounts.conf.tmpl` (OPS / EDGE / RANGE /
+TELEM). Agents load credentials from environment (`NATS_USER` /
+`NATS_PASSWORD` / nkey), never from committed conf.
 
 ### Additional Security Rules
 

@@ -196,7 +196,7 @@ Every file in the repository with its purpose.
 
 | File | Purpose |
 |---|---|
-| `server.conf` | Production config: port 4222, JetStream (1GB mem / 10GB file), auth token, account permissions. |
+| `server.conf` | **Deprecated (H-017)** placeholder-only stub — no live secrets; packaging ships as `server.conf.deprecated`. |
 | `fleet-accounts.conf.tmpl` | Default config template: multi-tenant accounts + nkeys (materialized by `scripts/gen-nats-accounts.sh`, H-001). |
 | `subjects.yaml` | NATS subject topology reference. |
 
@@ -690,8 +690,8 @@ Or use the Makefile: `make run-all`
 | `agents/config.yaml` | YAML | Master config: agent definitions (model, nats_url, enabled, skills, schedules), NATS settings, dashboard port/host | agent_daemon.py, scheduler.py |
 | `agents/<name>.yaml` | YAML | Per-agent definition (model, role, skills, NATS subjects) | agent_daemon.py |
 | `agents/Modelfile.<name>` | Ollama format | LLM parameters: base model, context size, temperature, system prompt | `ollama create <name> -f ...` |
-| `nats/server.conf` | NATS config | Production NATS: port, auth token, JetStream limits, accounts, subject permissions | nats-server |
-| `nats/fleet-accounts.conf.tmpl` | NATS config | Multi-tenant accounts bus: OPS/EDGE/RANGE/TELEM + nkeys (default, H-001) | nats-server |
+| `nats/server.conf` | NATS config | Deprecated placeholder stub (H-017); never active secrets | reference only |
+| `nats/fleet-accounts.conf.tmpl` | NATS config | Multi-tenant accounts bus: OPS/EDGE/RANGE/TELEM + nkeys (default, H-001) | nats-server (via gen) |
 | `systemd/*.service` | systemd unit | ExecStart, After, BindsTo, User, Restart policy | systemd |
 | `deploy/*.target` / `.service` | systemd unit | Mesh deployment: targets, template units, chained dependencies | systemd |
 | `cinnamon/settings-schema.json` | JSON | Desklet refresh interval (1–60s, default 5) | Cinnamon |

@@ -88,6 +88,52 @@ when no authenticated conf is present.
 Dual-publish subjects: `starship.*` (primary) + `agnetic.*` (legacy).  
 Python helper: `agents/nats_connect.py` (user/pass, token, nkey, TLS).
 
+### H-017 — no live NATS secrets in git
+
+`nats/server.conf` is **placeholder-only / deprecated**. It must never carry
+real tokens or account passwords. Production and lab buses are generated under
+`/etc/starship/nats/` (or gitignored `nats/creds/`, `nats/fleet-accounts.conf`,
+`nats/nats.env`).
+
+| Path | Role |
+|------|------|
+| `nats/fleet-accounts.conf.tmpl` | Committed template (`__OPS_PASS__`, …) |
+| `scripts/gen-nats-accounts.sh` | Materializes conf + per-role env (chmod 600) |
+| `scripts/setup-nats-auth.sh` | Dev helper: generate → start → smoke pub |
+| `scripts/starship-firstboot.sh` | Ops path: `_enable_accounts_bus` + TLS |
+| `nats/server.conf` | Deprecated stub with `__STARSHIP_NATS_TOKEN__` / `__SYS_PASS__` markers only |
+
+Packaging installs the stub as `/etc/starship/nats/server.conf.deprecated` so it
+cannot be mistaken for `active.conf`.
+
+### NATS secret rotation (historically committed lab values)
+
+The following **lab** strings were previously committed in `nats/server.conf` and
+are **revoked**. Do not reuse them on any node, CI runner, or golden image:
+
+- token formerly named in threat model F-016 / H-017 (plain token auth)
+- account passwords formerly used for `admin` / `agnetic` users
+
+**Operator action on any host that ever ran the old conf:**
+
+```bash
+# 1) Stop the bus
+sudo systemctl stop agnetic-nats 2>/dev/null || pkill -x nats-server || true
+
+# 2) Regenerate accounts + client env (new random secrets)
+sudo bash /opt/starship/lib/starship/scripts/gen-nats-accounts.sh \
+  --out /etc/starship/nats --host 127.0.0.1
+
+# 3) Point active conf + reload unit env
+sudo ln -sfn /etc/starship/nats/fleet-accounts.conf /etc/starship/nats/active.conf
+sudo cp /etc/starship/nats/nats.env /etc/starship/nats.env
+sudo systemctl daemon-reload
+sudo systemctl restart agnetic-nats starship-fleet 'agnetic-agent@*' 2>/dev/null || true
+```
+
+Edge nodes must re-enroll / pull fresh role env (`creds/edge.env` or fleet
+installer token path). Treat git history as public for those lab values.
+
 ### Subject permission sketch (accounts mode)
 
 | Role | Account | Publish (examples) |

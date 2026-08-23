@@ -108,11 +108,11 @@ Enforced by `fleet_policy.check_cross_plant` / `check_tool(..., target_plant=...
 |------|---------|
 | `nats/fleet-accounts.conf.tmpl` | Default bus — multi-tenant accounts (H-001) |
 | `scripts/fleet-enroll.sh` | Node enrollment: signed tokens, CSR signing, revocation (H-002) |
-| `nats/fleet-bus.conf` | Shared token (trusted LAN) |
-| `nats/fleet-accounts.conf.tmpl` | Multi-tenant accounts template |
+| `nats/fleet-bus.conf` | Shared token placeholder (trusted LAN opt-in) |
 | `scripts/gen-nats-accounts.sh` | Materialize accounts + nkeys + client envs |
 | `nats/fleet-auth.yaml` | Role → account / subject map |
 | `agents/nats_connect.py` | Client helper (user/pass / token / nkey) |
+| `nats/server.conf` | Deprecated placeholder stub (H-017) — never live secrets |
 | `/etc/starship/nats/active.conf` | Symlink to active server conf |
 | `/etc/starship/nats.env` | Client credentials for fleet daemon |
 
@@ -120,9 +120,11 @@ Enforced by `fleet_policy.check_cross_plant` / `check_tool(..., target_plant=...
 
 | Mode | When | Auth |
 |------|------|------|
-| `agent` | edge/server default | none |
-| `token` | `STARSHIP_NATS_MODE=token` or fleet-bus only | shared `STARSHIP_NATS_TOKEN` |
-| **`accounts`** | **ops firstboot default** | per-role user/pass + optional nkeys |
+| **`accounts`** | **default (all profiles, H-001)** | per-role user/pass + optional nkeys |
+| `token` / `fleet` | explicit `STARSHIP_NATS_MODE=fleet` | shared `STARSHIP_NATS_TOKEN` via fleet-bus |
+
+Live credentials are generated under `/etc/starship/nats/` (or gitignored
+`nats/creds/`). See `docs/SECURITY.md` H-017 for scrub + rotation.
 
 ```bash
 # Generate multi-tenant accounts (ops)
