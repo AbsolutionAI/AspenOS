@@ -19,13 +19,13 @@ plants:
     description: Primary production mesh
     region: local
     profile: server                # edge | server | ops
-    roles_allowed: [proxy, romi, ergo, ops, plant-controller]
+    roles_allowed: [proxy, romi, ergo, robotics, ops, plant-controller]
   plant-edge:
     name: Edge Plant
     description: Edge / IoT style nodes
     region: edge
     profile: edge
-    roles_allowed: [proxy, plant-controller]
+    roles_allowed: [proxy, robotics, plant-controller]
   plant-range:
     name: Training Range
     description: Red/blue exercise plant (isolated policy)
@@ -45,6 +45,9 @@ roles:
   ergo:
     team: ops
     description: Automation agent
+  robotics:
+    team: ops
+    description: Fleet robotics agent — cobot swarm commander
   ops:
     team: ops
     description: Ops manager / C2 node
