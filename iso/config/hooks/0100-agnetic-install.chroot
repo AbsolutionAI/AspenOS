@@ -4,8 +4,8 @@ set -e
 
 echo "=== Starship OS ISO — Custom Hook ==="
 
-# Install Ollama
-curl -fsSL https://ollama.com/install.sh | sh
+# Install Ollama (pinned; install.sh honors OLLAMA_VERSION)
+curl -fsSL https://ollama.com/install.sh | OLLAMA_VERSION="0.31.2" sh
 
 # Install NATS
 NATS_VERSION="2.14.3"
@@ -16,9 +16,10 @@ useradd --system --no-create-home --shell /usr/sbin/nologin --comment "Starship 
 useradd --system --no-create-home --shell /usr/sbin/nologin --comment "NATS" nats || true
 
 # Create directories (starship primary, legacy agnetic compat symlinks)
-mkdir -p /opt/starship/{bin,lib/starship,venv}
+# NB: plain sh (no brace expansion) — hook runs under dash in live-build
+mkdir -p /opt/starship/bin /opt/starship/lib/starship /opt/starship/venv
 mkdir -p /etc/starship/nats
-mkdir -p /var/lib/starship/{nats,message-history}
+mkdir -p /var/lib/starship/nats /var/lib/starship/message-history
 mkdir -p /var/log/starship
 
 # Transitional Alpha 2.1 dual-root (legacy agnetic paths), mirrors install-daemon.sh
