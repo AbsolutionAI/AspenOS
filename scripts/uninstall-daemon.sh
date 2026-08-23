@@ -25,7 +25,8 @@ echo ""
 log "Stopping services..."
 for unit in agnetic-dashboard agnetic-message-history agnetic-status-bridge \
             agnetic-agent@proxy agnetic-agent@romi agnetic-agent@ergo \
-            agnetic-staragent agnetic-nats; do
+            agnetic-staragent agnetic-nats \
+            starship-fleet starship-health-checker; do
     systemctl stop "$unit.service" 2>/dev/null || true
     systemctl disable "$unit.service" 2>/dev/null || true
 done
@@ -34,6 +35,8 @@ done
 log "Removing systemd units..."
 rm -f /etc/systemd/system/agnetic-*.service
 rm -f /etc/systemd/system/agnetic-*.target
+rm -f /etc/systemd/system/starship-fleet.service
+rm -f /etc/systemd/system/starship-health-checker.service
 rm -f /etc/systemd/system/ollama.service.d/override.conf
 rmdir /etc/systemd/system/ollama.service.d 2>/dev/null || true
 systemctl daemon-reload

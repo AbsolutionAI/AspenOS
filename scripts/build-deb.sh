@@ -166,9 +166,11 @@ for need in \
     "opt/starship/bin/starship-firstboot.sh" \
     "opt/starship/lib/starship/agents/agent_daemon.py" \
     "opt/starship/lib/starship/services/fleet.py" \
+    "opt/starship/lib/starship/scripts/agent-health-checker.py" \
     "etc/starship/fleet.yaml" \
     "etc/starship/nats/agent-bus.conf" \
     "lib/systemd/system/starship-fleet.service" \
+    "lib/systemd/system/starship-health-checker.service" \
     "usr/local/bin/starshipctl"; do
     if [[ ! -e "$PKG_ROOT/$need" && ! -L "$PKG_ROOT/$need" ]]; then
         err "missing required path in package: $need"

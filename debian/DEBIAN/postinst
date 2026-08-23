@@ -83,7 +83,7 @@ if command -v systemctl &>/dev/null; then
     for unit in agnetic-nats agnetic-staragent \
                 agnetic-agent@proxy agnetic-agent@romi agnetic-agent@ergo \
                 agnetic-status-bridge agnetic-message-history agnetic-dashboard \
-                starship-fleet; do
+                starship-fleet starship-health-checker; do
         systemctl enable "${unit}.service" 2>/dev/null || true
     done
     systemctl enable agnetic-mesh.target 2>/dev/null || true
@@ -93,7 +93,8 @@ if command -v systemctl &>/dev/null; then
     if [[ -n "${OLD_VERSION:-}" ]]; then
         for unit in agnetic-nats agnetic-staragent \
                     agnetic-agent@proxy agnetic-agent@romi agnetic-agent@ergo \
-                    agnetic-status-bridge agnetic-message-history agnetic-dashboard; do
+                    agnetic-status-bridge agnetic-message-history agnetic-dashboard \
+                    starship-health-checker; do
             systemctl restart "$unit.service" 2>/dev/null || true
         done
         echo "[OK] Services restarted after upgrade"

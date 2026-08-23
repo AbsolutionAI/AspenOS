@@ -18,7 +18,8 @@ echo "Stopping Starship OS services..."
 if command -v systemctl &>/dev/null; then
     for unit in agnetic-dashboard agnetic-message-history agnetic-status-bridge \
                 agnetic-agent@proxy agnetic-agent@romi agnetic-agent@ergo \
-                agnetic-staragent agnetic-nats; do
+                agnetic-staragent agnetic-nats \
+                starship-fleet starship-health-checker; do
         systemctl stop "$unit.service" 2>/dev/null || true
         systemctl disable "$unit.service" 2>/dev/null || true
     done
