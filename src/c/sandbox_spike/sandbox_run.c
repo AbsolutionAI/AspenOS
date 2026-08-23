@@ -100,7 +100,12 @@ static int apply_seccomp(void) {
 }
 #endif
 
-/* Best-effort namespaces (soft-fail without CAP_SYS_ADMIN). */
+/* Best-effort namespaces (soft-fail without CAP_SYS_ADMIN, with a warning). */
+static void ns_warn(const char *what) {
+    fprintf(stderr, "sandbox: %s unavailable (need CAP_SYS_ADMIN): %s\n",
+            what, strerror(errno));
+}
+
 static int enter_namespaces(int use_ns) {
     int flags = 0;
     if (!use_ns) {
@@ -112,6 +117,8 @@ static int enter_namespaces(int use_ns) {
 #ifdef CLONE_NEWNS
     if (unshare(CLONE_NEWNS) == 0) {
         flags |= 1;
+    } else if (errno == EPERM) {
+        ns_warn("mount namespace");
     }
 #endif
 #ifdef CLONE_NEWPID
@@ -193,8 +200,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     if (pid == 0) {
-        int ns_flags = enter_namespaces(use_ns);
-        (void)ns_flags;
+        enter_namespaces(use_ns);
 #if SANDBOX_HAS_SECCOMP
         if (use_seccomp) {
             if (apply_seccomp() != 0) {
@@ -232,7 +238,7 @@ int main(int argc, char **argv) {
     clock_gettime(CLOCK_MONOTONIC, &t1);
     double ms = (t1.tv_sec - t0.tv_sec) * 1000.0 +
                 (t1.tv_nsec - t0.tv_nsec) / 1e6;
-    fprintf(stderr, "sandbox: wall_ms=%.3f exit=%d seccomp=%d ns=%d\n",
+    fprintf(stderr, "sandbox: wall_ms=%.3f exit=%d seccomp=%d ns_req=%d\n",
             ms, WIFEXITED(status) ? WEXITSTATUS(status) : -1, use_seccomp, use_ns);
 
     if (WIFEXITED(status)) {
