@@ -79,6 +79,9 @@ static int apply_seccomp(void) {
         SCMP_SYS(execve), SCMP_SYS(execveat), SCMP_SYS(openat), SCMP_SYS(open),
         SCMP_SYS(readlink), SCMP_SYS(readlinkat), SCMP_SYS(sysinfo), SCMP_SYS(uname),
         SCMP_SYS(futex), SCMP_SYS(getdents64), SCMP_SYS(pread64), SCMP_SYS(pwrite64),
+        /* glibc init and runtime on kernel 7.x */
+        SCMP_SYS(sigaltstack), SCMP_SYS(prctl), SCMP_SYS(poll),
+        SCMP_SYS(sched_getaffinity), SCMP_SYS(get_mempolicy), SCMP_SYS(landlock_create_ruleset),
         /* clone/fork needed if dynamic linker or runtime forks — keep minimal */
         SCMP_SYS(clone), SCMP_SYS(clone3), SCMP_SYS(fork), SCMP_SYS(vfork),
         SCMP_SYS(wait4), SCMP_SYS(waitid),

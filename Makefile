@@ -38,8 +38,7 @@ dev: cli
 	sleep 1
 	setsid .venv/bin/python3 agents/agent_daemon.py proxy > logs/agents-proxy.log 2>&1 < /dev/null &
 	setsid .venv/bin/python3 agents/agent_daemon.py romi > logs/agents-romi.log 2>&1 < /dev/null &
-	setsid .venv/bin/python3 agents/agent_daemon.py ergo > logs/agents-ergo.log 2>&1 < /dev/null &
-	setsid .venv/bin/python3 tray/agnetic-status.py > logs/status-bridge.log 2>&1 < /dev/null &
+		setsid .venv/bin/python3 agents/agent_daemon.py ergo > logs/agents-ergo.log 2>&1 < /dev/null &\n	setsid .venv/bin/python3 agents/agent_daemon.py robotics > logs/agents-robotics.log 2>&1 < /dev/null &\n	setsid .venv/bin/python3 tray/agnetic-status.py > logs/status-bridge.log 2>&1 < /dev/null &
 	setsid .venv/bin/python3 scripts/message_history.py > logs/message-history.log 2>&1 < /dev/null &
 	DASHBOARD_PORT=8788 setsid .venv/bin/python3 dashboard/server.py > logs/dashboard.log 2>&1 < /dev/null &
 	sleep 2
@@ -106,6 +105,7 @@ iso-smoke:
 	@bash scripts/iso-firstboot-smoke.sh
 
 iso-boot:
+	@command -v qemu-system-x86_64 >/dev/null 2>&1 || { echo "  SKIP  ISO boot smoke — qemu-system-x86_64 not installed (control-plane host)."; echo "        Static checks only via: make iso-smoke"; exit 0; }
 	@bash scripts/iso-boot-smoke.sh
 
 # ─── Clean ──────────────────────────────────────────────────────────
@@ -118,8 +118,9 @@ clean:
 deb: build build-agent
 	@bash scripts/build-deb.sh
 
-# ─── ISO image ──────────────────────────────────────────────────────
+# ─── ISO image (requires builder host toolchain — SKIP on control plane) ──
 iso: build build-agent
+	@command -v lb >/dev/null 2>&1 || { echo "  SKIP  ISO build — live-build (lb) not installed. This is a control-plane host."; echo "        See docs/ops/ISO_BUILDER.md"; exit 0; }
 	@echo "Building ISO (requires root)..."
 	sudo bash scripts/build-iso.sh
 
