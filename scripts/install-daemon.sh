@@ -227,24 +227,27 @@ log "Configs installed to /etc/starship/ (legacy: /etc/agnetic)"
 # ─── 6. Install NATS config ────────────────────────────────────────
 log "Installing NATS configuration..."
 
-cp "$REPO_DIR/nats/agent-bus.conf" /etc/starship/nats/
 cp "$REPO_DIR/nats/fleet-bus.conf" /etc/starship/nats/ 2>/dev/null || true
 cp "$REPO_DIR/nats/fleet-auth.yaml" /etc/starship/nats/ 2>/dev/null || true
 cp "$REPO_DIR/nats/fleet-accounts.conf.tmpl" /etc/starship/nats/ 2>/dev/null || true
-cp "$REPO_DIR/nats/server.conf" /etc/starship/nats/ 2>/dev/null || true
+# H-017: server.conf is placeholder-only / deprecated — never active production secrets
+cp "$REPO_DIR/nats/server.conf" /etc/starship/nats/server.conf.deprecated 2>/dev/null || true
 cp "$REPO_DIR/nats/subjects.yaml" /etc/starship/nats/ 2>/dev/null || true
 cp "$REPO_DIR/scripts/gen-nats-accounts.sh" /opt/starship/lib/starship/scripts/ 2>/dev/null || true
 cp "$REPO_DIR/agents/nats_connect.py" /opt/starship/lib/starship/agents/ 2>/dev/null || true
-# Default active bus = agent-bus (firstboot ops → accounts / fleet-bus)
-if [[ ! -e /etc/starship/nats/active.conf ]]; then
-  ln -sfn /etc/starship/nats/agent-bus.conf /etc/starship/nats/active.conf
+# Default active bus = accounts (H-001: no-auth agent-bus removed)
+if [[ ! -f /etc/starship/nats/fleet-accounts.conf && -f /etc/starship/nats/fleet-accounts.conf.tmpl ]]; then
+  bash /opt/starship/lib/starship/scripts/gen-nats-accounts.sh \
+    --out /etc/starship/nats --host "${STARSHIP_NATS_HOST:-127.0.0.1}" 2>/dev/null \
+    || warn "could not materialize fleet-accounts.conf (firstboot will retry)"
+fi
+if [[ -f /etc/starship/nats/fleet-accounts.conf ]]; then
+  ln -sfn /etc/starship/nats/fleet-accounts.conf /etc/starship/nats/active.conf
+elif [[ ! -e /etc/starship/nats/active.conf ]]; then
+  warn "no active NATS conf — firstboot must complete before starting nats"
 fi
 
-# Update NATS config to use correct paths
-sed -i 's|/home/tech/agnetic-os/nats|/etc/starship/nats|g' /etc/starship/nats/agent-bus.conf 2>/dev/null || true
-sed -i 's|/etc/agnetic/nats|/etc/starship/nats|g' /etc/starship/nats/agent-bus.conf 2>/dev/null || true
-
-log "NATS config installed to /etc/starship/nats/ (active → $(readlink -f /etc/starship/nats/active.conf 2>/dev/null || echo agent-bus))"
+log "NATS config installed to /etc/starship/nats/ (active → $(readlink -f /etc/starship/nats/active.conf 2>/dev/null || echo none))"
 
 # ─── 7. Create Python venv ─────────────────────────────────────────
 log "Creating Python venv..."

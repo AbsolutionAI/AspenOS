@@ -1,7 +1,7 @@
-# Aspen OS / Paperclip Foundation Snapshot
+## Aspen OS / Paperclip Foundation Snapshot
 
-**Linear:** BEL-132  
-**Paperclip proof tickets:** ASP-2 (foundation), ASP-5 (Aider), ASP-6 (Agent Zero)  
+**Linear:** BEL-132, BEL-153, BEL-113, BEL-114, BEL-154  
+**Paperclip proof tickets:** ASP-2 (foundation), ASP-5 (Aider), ASP-6 (Agent Zero), ABS-7, ABS-8, ABS-9, ABS-10  
 **Captured by:** Aspen Hermes (board-assisted foundation harden)
 
 ## Versions
@@ -39,6 +39,23 @@
 | Compliance | hermes_local | QA/compliance |
 | Reflection Coach / Summarizer | claude_local | Built-ins |
 
+## ABS Company (Absolution Studios)
+- Name: Absolution Studios
+- ID: 9b183445-abef-48b2-a45f-52950b04da49
+- Prefix: ABS
+- Budget: $40/mo (budgetMonthlyCents=4000)
+- Hire approval: requireBoardApprovalForNewAgents=false
+- Project: Aspen OS Development vertical
+
+## ABS Agent roster
+| Agent | Adapter | Model | Notes |
+|-------|---------|-------|-------|
+| Ergo | hermes_local | Nemotron 3 Ultra | CEO / Orchestration |
+| Proxy | hermes_local | DeepSeek V4-Flash | Execution Specialist |
+| Romi | hermes_local | DeepSeek V4-Flash | Creative Director |
+| OpenCode | opencode_local | DeepSeek V4-Flash | Code Runner |
+| OpenDesign | opencode_local | DeepSeek V4-Flash | Prototype Builder |
+
 ## Linear integration
 - OAuth MCP on aspen profile
 - Workspace: bellahtech · Team BEL (dev SoR)
@@ -52,13 +69,38 @@
 5. Compound Engineering gates (BEL-133)
 6. Aider + Agent Zero process workers (BEL-134)
 
+## ABS Hardening applied (2026-08-04) — foundation-harden checklist
+1. ✅ Workspace git roots validated (all agents)
+2. ✅ Adapter binaries resolve (Ergo, Proxy, Romi, OpenCode, Aspen)
+3. ✅ Sticky errors cleared (no adapter_failed, no workspace_validation_failed)
+4. ✅ Budget gates enforced ($40 ABS, $40 ASP, $35 ABSA, $15 Content; wake-on-demand)
+5. ✅ CE gates wired in AGENTS.md (Discovery → Plan → Implement → QA → Compound)
+6. ✅ Proof tickets: ABS-7, ABS-8, ABS-9, ABS-10 (this doc + docs/ops/FOUNDATION.md)
+
 ## Known follow-ups
 - [x] Aider process worker online (BEL-134 / ASP-5)
 - [x] Agent Zero docker image pull + UI config (ASP-6)
 - [ ] GitHub auth for push/PR
 - [ ] Google Workspace OAuth
 - [ ] BEL-135+ stack items
+- [ ] docs/ops/FOUNDATION.md proof ticket for ABS-7
+- [ ] COMPANY_MAP.md updated with ABS mirror mappings
 
+## ABS Mirror issues (Aspen OS Development vertical)
+| Linear | ABS | Title | Status |
+|--------|-----|-------|--------|
+| BEL-153 | ABS-7 | Core agent mesh hardening | ✅ done |
+| BEL-113 | ABS-8 | Compound Engineering gates | ✅ done |
+| BEL-114 | ABS-9 | Security Auditor baseline | ✅ done |
+| BEL-154 | ABS-10 | Shared Local Memory & Conversation Caching Layer | ✅ done |
+
+Mirror convention: Paperclip issues include `Linear: BEL-N` + URL in description.
+
+## ABS mirror deliverable routing (ASP-36)
+
+**Decision:** keep ABS/ASP shared proof in this monorepo (ABS agents share this git cwd; ABS company paused $0). Do **not** move trees to a non-existent ABS product repo. Path ownership + `.gitignore` protect the public AspenOS remote.
+
+Full table (ASP product vs shared proof vs local-only ABSA/Content/OSINT): **`docs/ops/ABS_MIRROR_ROUTING.md`**.
 
 ## Model routing (2026-08-03)
 - Local Ollama **retired** for Paperclip heartbeats (P2000 5GB too slow/small).

@@ -14,6 +14,7 @@ ifneq ($(SECCOMP_LIBS),)
   LDLIBS += $(SECCOMP_LIBS)
 else
   CFLAGS += -DHAVE_SECCOMP=0
+  $(warning *** libseccomp not found: building WITHOUT seccomp (reduced isolation). Install libseccomp-dev/pkg-config and rebuild.)
 endif
 
 .PHONY: all clean test bench

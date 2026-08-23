@@ -5,7 +5,7 @@ Documentation=https://github.com/AbsolutionAI/AspenOS
 
 [Service]
 Type=simple
-# active.conf → agent-bus.conf (dev/server/edge) or fleet-bus.conf (ops)
+# active.conf → fleet-accounts.conf (default, H-001) or fleet-bus.active.conf (token)
 ExecStart=/usr/local/bin/nats-server -c /etc/starship/nats/active.conf
 ExecReload=/bin/kill -s HUP $MAINPID
 Restart=always

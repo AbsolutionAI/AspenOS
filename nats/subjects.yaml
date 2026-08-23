@@ -51,6 +51,15 @@ subjects:
     status: "starship.fleet.status"
     ops_status: "starship.fleet.ops.status"
     exercise: "starship.fleet.exercise"
+    # ADR-0002: aspen fleet + safety subjects
+    aspen:
+      node_register: "aspen.fleet.node.register"
+      node_heartbeat: "aspen.fleet.node.heartbeat"
+      mission: "aspen.fleet.mission.>"
+      edge_propose: "aspen.edge.>.propose_act"
+  safety:
+    estop: "aspen.safety.estop"
+    clear: "aspen.safety.clear"
     legacy:
       register: "agnetic.fleet.register"
       heartbeat: "agnetic.fleet.heartbeat"

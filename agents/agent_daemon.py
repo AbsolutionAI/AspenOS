@@ -403,6 +403,9 @@ async def process_command(agent_name, config, subject, payload, telemetry=None, 
 
 async def run_agent(agent_name, model_override=None):
     """Main agent daemon loop."""
+    # Identity for per-agent tool audit log (H-004 / ASP-172)
+    os.environ.setdefault("STARSHIP_AGENT_NAME", agent_name)
+
     from nats_subjects import dual, dual_publish, agent_command, agent_status, agent_event, telemetry
 
     config = load_agent_config(agent_name)

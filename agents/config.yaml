@@ -33,6 +33,19 @@ agents:
         cron: "0 6 * * 1"
         workflow: security-audit
 
+  robotics:
+    model: qwen2.5:7b
+    nats_url: nats://[IP_ADDRESS]:4222
+    nats_token: ""
+    enabled: true
+    skills:
+      - robotics-fleet
+      - system-health
+    schedule:
+      - name: fleet-heartbeat
+        cron: "*/10 * * * * *"
+        workflow: fleet-heartbeat
+
 nats:
   url: nats://127.0.0.1:4222
   jetstream: true

@@ -49,6 +49,12 @@ check "build-deb uses pkgroot layout" grep -q 'PKG_ROOT' scripts/build-deb.sh
 check "ops firstboot enables native sandbox" grep -q 'STARSHIP_SANDBOX_NATIVE=1' scripts/starship-firstboot.sh
 check "ops profile nats_mode fleet" bash -c 'awk "/^  ops:/{p=1} p&&/nats_mode:/{print; exit}" config/profiles.yaml | grep -q fleet'
 check "fleet-bus token placeholder" grep -q '__STARSHIP_NATS_TOKEN__' nats/fleet-bus.conf
+check "server.conf has no live secrets (H-017)" bash -c '! grep -E "agnetic_s3cr3t_t0k3n|agnetic_admin_2026|agnetic_user_2026" nats/server.conf scripts/setup-nats-auth.sh'
+check "server.conf is placeholder-only" bash -c 'grep -q __STARSHIP_NATS_TOKEN__ nats/server.conf && grep -qE "DEPRECATED|H-017" nats/server.conf'
+check "setup-nats-auth uses gen-nats-accounts" grep -q 'gen-nats-accounts.sh' scripts/setup-nats-auth.sh
+check "nats tls default-on in firstboot" grep -q 'STARSHIP_NATS_TLS:-1' scripts/starship-firstboot.sh
+check "gen-nats-tls enforces mTLS" grep -q 'verify: true' scripts/gen-nats-tls.sh
+check "firstboot wires tls for both bus modes" bash -c 'grep -q "_setup_nats_tls /etc/starship/nats/fleet-bus.active.conf" scripts/starship-firstboot.sh && grep -q "_setup_nats_tls \"\$out/fleet-accounts.conf\"" scripts/starship-firstboot.sh'
 check "C11 sandbox builds" bash -c 'make -C src/c/sandbox_spike clean all >/dev/null 2>&1'
 check "C11 sandbox echo" bash -c './src/c/sandbox_spike/sandbox_run --timeout 2 -- /bin/echo ok 2>/dev/null | grep -q ok'
 check "C11 sandbox denies mount" bash -c './src/c/sandbox_spike/sandbox_run -- mount >/dev/null 2>&1; test $? -eq 126'
@@ -70,12 +76,15 @@ check "iso-boot smoke script" test -f scripts/iso-boot-smoke.sh
 check "iso-boot smoke runs" bash -c 'bash scripts/iso-boot-smoke.sh >/dev/null'
 check "bench-sandbox script" test -x scripts/bench-sandbox.sh -o -f scripts/bench-sandbox.sh
 check "sandbox_native import" bash -c 'PYTHONPATH=agents python3 -c "from sandbox_native import sandbox_binary,native_enabled; assert sandbox_binary()"'
-check "C11 p50 under 2ms" bash -c 'bash scripts/bench-sandbox.sh 100 >/dev/null 2>&1'
+check "C11 overhead p50 < 2ms vs Python" bash -c 'bash scripts/bench-sandbox.sh 100 >/dev/null 2>&1'
 check "profiles.yaml present" test -f config/profiles.yaml
 check "fleet.yaml present" test -f config/fleet.yaml
 check "pins.json present" test -f third_party/pins.json
 check "dashboard server syntax" python3 -c "import ast; ast.parse(open('dashboard/server.py').read())"
 check "nats subjects dual" grep -q 'starship.fleet' nats/subjects.yaml
+check "nats subjects aspen fleet" grep -q 'aspen.fleet.node.register' nats/subjects.yaml
+check "nats subjects aspen safety" grep -q 'aspen.safety.estop' nats/subjects.yaml
+check "fleet bus smoke" bash -c 'PYTHONPATH=agents:../aspen-swarm-manager:../aspen-edge-rrm ASPEN_SIM=1 python3 scripts/smoke-fleet-bus.py >/dev/null'
 
 echo ""
 echo "Result: $PASS passed, $FAIL failed"

@@ -66,6 +66,21 @@ nats/nats-server.log
 nats/creds/
 nats/**/creds/
 nats/tls/
+nats/nats.env
 **/fleet-accounts.conf
 !nats/fleet-accounts.conf.tmpl
 .aider*
+.worktrees/
+.serena/
+
+# ---------------------------------------------------------------------------
+# Multi-company local-only (ASP-36 / docs/ops/ABS_MIRROR_ROUTING.md)
+# Public remote: AbsolutionAI/AspenOS — never publish other-company or secret
+# inventory material. Paths stay on disk for agents; git will not track them.
+# ---------------------------------------------------------------------------
+docs/COMPANY_CREDENTIALS.md
+docs/commerce/
+docs/marketing/
+docs/architecture/OSINT_INTEGRATION_MASTER_PLAN.md
+docs/architecture/WORLDMONITOR_INTEGRATION.md
+docs/architecture/UNIFIED_PLATFORM.md
