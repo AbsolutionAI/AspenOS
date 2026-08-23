@@ -10,7 +10,7 @@ Install roots: **`/opt/starship`**, **`/etc/starship`**, **`/var/lib/starship`**
 |-------|------|-------------|
 | Shell / tool execution | Agent RCE, data wipe | Sandbox blocklists, C11 seccomp, path allowlists |
 | Untrusted red-team agents | Lateral movement | Fleet ACL, tool allowlists, isolated plant-range |
-| NATS bus | Spoofed commands | Accounts/nkeys, token auth, optional TLS |
+| NATS bus | Spoofed commands | Accounts/nkeys, token auth, TLS+mTLS default (H-006) |
 | Secrets in logs/LLM context | Credential leak | Redaction patterns, gitignore, SecretsManager |
 | Abliterated local models | Weaker refusal | Mandatory policy + sandbox + Droid Shield |
 
@@ -57,7 +57,7 @@ Shared policy contract: `config/policy.default.json` → packaged as `/etc/stars
 |------|------|-----|
 | **accounts** (default) | all profiles, H-001 | Multi-tenant `STARSHIP_OPS` / `EDGE` / `RANGE` / `TELEM` + nkeys |
 | **token** | explicit trusted-LAN opt-in (`STARSHIP_NATS_MODE=fleet`) | `STARSHIP_NATS_TOKEN` + `fleet-bus.conf` |
-| **TLS** | optional hardening | `STARSHIP_NATS_TLS=1` + `scripts/gen-nats-tls.sh` |
+| **TLS + mTLS** (default in new deployments) | firstboot auto-runs `gen-nats-tls.sh` (H-006) | server rejects non-TLS; clients present fleet-CA certs (`--node <name>`) |
 
 The legacy no-auth **agent-bus** mode was removed (H-001 / threat model F-001):
 the bus always authenticates. Clients in accounts mode must present

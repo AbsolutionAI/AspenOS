@@ -5,7 +5,8 @@ Env (priority):
   2. NATS_USER + NATS_PASSWORD
   3. STARSHIP_NATS_TOKEN (token auth — fleet shared-token mode only)
   4. STARSHIP_NATS_NKEY_SEED or path in STARSHIP_NATS_NKEY_SEED_FILE
-  5. STARSHIP_NATS_TLS=1 + STARSHIP_NATS_CA[/CERT/KEY] for TLS
+  5. STARSHIP_NATS_TLS=1 + STARSHIP_NATS_CA[/CERT/KEY] for mTLS (H-006: fails
+     closed without a fleet CA unless STARSHIP_NATS_TLS_INSECURE=1)
 
 H-001 (ASP-169): when STARSHIP_NATS_MODE=accounts (the default since the
 no-auth agent-bus removal), connects without user/pass or nkey fail closed.
@@ -88,7 +89,14 @@ def nkey_seed() -> Optional[str]:
 
 
 def tls_context() -> Optional[ssl.SSLContext]:
-    """Build SSL context when STARSHIP_NATS_TLS is enabled."""
+    """Build SSL context when STARSHIP_NATS_TLS is enabled.
+
+    H-006 (ASP-174): fail closed when TLS is requested but no fleet CA is
+    configured — silently trusting any server cert defeats TLS. Per-node
+    mTLS identities come from gen-nats-tls.sh --node <name> via
+    STARSHIP_NATS_CERT/STARSHIP_NATS_KEY. Set STARSHIP_NATS_TLS_INSECURE=1
+    only for throwaway local development.
+    """
     flag = os.getenv("STARSHIP_NATS_TLS", "").strip().lower()
     if flag not in ("1", "true", "yes", "on"):
         return None
@@ -96,14 +104,21 @@ def tls_context() -> Optional[ssl.SSLContext]:
     cert = os.getenv("STARSHIP_NATS_CERT", "").strip()
     key = os.getenv("STARSHIP_NATS_KEY", "").strip()
     ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-    if ca and os.path.isfile(ca):
-        ctx.load_verify_locations(cafile=ca)
-    else:
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
     if cert and key and os.path.isfile(cert) and os.path.isfile(key):
         ctx.load_cert_chain(certfile=cert, keyfile=key)
-    return ctx
+    if ca and os.path.isfile(ca):
+        ctx.load_verify_locations(cafile=ca)
+        return ctx
+    if os.getenv("STARSHIP_NATS_TLS_INSECURE", "").strip().lower() in ("1", "true", "yes", "on"):
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        return ctx
+    raise RuntimeError(
+        "STARSHIP_NATS_TLS=1 requires STARSHIP_NATS_CA pointing at the fleet "
+        "CA (H-006). Source /etc/starship/nats.env or regenerate material with "
+        "scripts/gen-nats-tls.sh. Set STARSHIP_NATS_TLS_INSECURE=1 only for "
+        "throwaway local development."
+    )
 
 
 def connect_kwargs() -> dict[str, Any]:

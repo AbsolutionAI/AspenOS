@@ -25,7 +25,7 @@ AspenOS is a local-first, AI-native OS layer where autonomous agents communicate
 - **Install roots:** `/opt/starship`, `/etc/starship` (legacy `/opt/agnetic` symlinks)
 - **CLI:** `starshipctl` (compat `agneticctl`) · **Dashboard:** `:8788`
 - **Fleet:** multi-plant topology, red/blue policy, cross-plant ACL, exercise UI
-- **NATS:** dual-prefix `starship.*` / `agnetic.*`; ops multi-tenant accounts + nkeys; optional TLS
+- **NATS:** dual-prefix `starship.*` / `agnetic.*`; ops multi-tenant accounts + nkeys; mTLS by default (H-006)
 - **Packaging:** `make deb` → `dist/starship-os_*.deb`; ISO autoinstall edge/server/ops
 - **Plan:** `docs/plans/starship-os-streamline.md` · **Security:** [`SECURITY.md`](SECURITY.md)
 
@@ -233,13 +233,13 @@ Full policy: **[SECURITY.md](SECURITY.md)** · architecture: **[docs/SECURITY.md
 | Tools | Sandbox blocklists, path allowlists, redaction |
 | C11 | `sandbox_run` (seccomp/NS), `policyexec` (shared JSON) |
 | Fleet | Red-team tool deny, cross-plant ACL, range isolation |
-| NATS | Dev open / token / multi-tenant accounts+nkeys / optional TLS |
+| NATS | Dev open / token / multi-tenant accounts+nkeys / mTLS by default (H-006) |
 | OS | systemd hardening, AppArmor profiles, non-root `agnetic` user |
 
 ```bash
-# Ops multi-tenant bus + optional TLS
+# Ops multi-tenant bus; TLS+mTLS is default-on since H-006 (opt out: STARSHIP_NATS_TLS=0)
 bash scripts/gen-nats-accounts.sh --out /etc/starship/nats
-STARSHIP_NATS_TLS=1 bash scripts/gen-nats-tls.sh --out /etc/starship/nats/tls
+bash scripts/gen-nats-tls.sh --out /etc/starship/nats/tls
 # Native enforcement is default-on since H-003; opt out ONLY for dev:
 # export STARSHIP_SANDBOX_NATIVE=0 STARSHIP_POLICY_NATIVE=0
 ```

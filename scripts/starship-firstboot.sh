@@ -90,6 +90,46 @@ _gen_nats_token() {
   fi
 }
 
+# H-006 (ASP-174): TLS is on by default — opt out explicitly with
+# STARSHIP_NATS_TLS=0/false/off/no.
+_tls_disabled() {
+  case "${STARSHIP_NATS_TLS:-1}" in
+    0|false|off|no) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+_setup_nats_tls() {
+  # $1 = materialized active server conf that should carry the tls block
+  local active_conf="$1"
+  if _tls_disabled; then
+    echo "  TLS: disabled (STARSHIP_NATS_TLS=${STARSHIP_NATS_TLS})"
+    return 0
+  fi
+  local tls_gen="$REPO_DIR/scripts/gen-nats-tls.sh"
+  [[ -f "$tls_gen" ]] || tls_gen="/opt/starship/lib/starship/scripts/gen-nats-tls.sh"
+  if [[ ! -f "$tls_gen" ]]; then
+    echo "warn: gen-nats-tls.sh not found — cannot enable NATS TLS (H-006)" >&2
+    return 0
+  fi
+  mkdir -p /etc/starship/nats/tls
+  bash "$tls_gen" --out /etc/starship/nats/tls \
+    --host "${STARSHIP_NATS_TLS_HOST:-$(hostname -f 2>/dev/null || echo localhost)}" || true
+  if [[ -f /etc/starship/nats/tls/tls.conf.snippet && -f "$active_conf" ]]; then
+    if ! grep -q '^tls {' "$active_conf"; then
+      cat /etc/starship/nats/tls/tls.conf.snippet >> "$active_conf"
+    fi
+  fi
+  if [[ -f /etc/starship/nats/tls/client.env && -f /etc/starship/nats.env ]]; then
+    # merge TLS env into nats.env without clobbering user/pass
+    grep -E '^(STARSHIP_NATS_TLS|STARSHIP_NATS_CA|STARSHIP_NATS_CERT|STARSHIP_NATS_KEY)=' \
+      /etc/starship/nats/tls/client.env >> /etc/starship/nats.env 2>/dev/null || true
+    # rewrite NATS_URL scheme to tls://
+    sed -i 's|^NATS_URL=nats://|NATS_URL=tls://|' /etc/starship/nats.env 2>/dev/null || true
+  fi
+  echo "  TLS: enabled (mTLS, /etc/starship/nats/tls)"
+}
+
 _enable_fleet_bus() {
   echo "NATS mode: fleet-bus (ops multi-node auth)"
   _install_nats_configs
@@ -155,6 +195,7 @@ CLUSTEREOF
 
   mkdir -p /var/lib/starship/nats
   chown nats:nats /var/lib/starship/nats 2>/dev/null || true
+  _setup_nats_tls /etc/starship/nats/fleet-bus.active.conf
   echo "  active.conf → fleet-bus (token set, host=${host})"
 }
 
@@ -215,26 +256,8 @@ EOF
   if ! grep -q '^STARSHIP_SANDBOX_NATIVE=' /etc/starship/nats.env 2>/dev/null; then
     echo "STARSHIP_SANDBOX_NATIVE=1" >> /etc/starship/nats.env
   fi
-  # Optional TLS (STARSHIP_NATS_TLS=1)
-  if [[ "${STARSHIP_NATS_TLS:-}" == "1" || "${STARSHIP_NATS_TLS:-}" == "true" ]]; then
-    local tls_gen="$REPO_DIR/scripts/gen-nats-tls.sh"
-    if [[ -f "$tls_gen" ]]; then
-      bash "$tls_gen" --out /etc/starship/nats/tls --host "${STARSHIP_NATS_TLS_HOST:-$(hostname -f 2>/dev/null || echo localhost)}" || true
-    fi
-    if [[ -f /etc/starship/nats/tls/tls.conf.snippet && -f /etc/starship/nats/fleet-accounts.conf ]]; then
-      if ! grep -q '^tls {' /etc/starship/nats/fleet-accounts.conf; then
-        cat /etc/starship/nats/tls/tls.conf.snippet >> /etc/starship/nats/fleet-accounts.conf
-      fi
-      if [[ -f /etc/starship/nats/tls/client.env ]]; then
-        # merge TLS env into nats.env without clobbering user/pass
-        grep -E '^(STARSHIP_NATS_TLS|STARSHIP_NATS_CA|STARSHIP_NATS_CERT|STARSHIP_NATS_KEY)=' \
-          /etc/starship/nats/tls/client.env >> /etc/starship/nats.env 2>/dev/null || true
-        # rewrite NATS_URL scheme to tls://
-        sed -i 's|^NATS_URL=nats://|NATS_URL=tls://|' /etc/starship/nats.env 2>/dev/null || true
-      fi
-      echo "  TLS: enabled (/etc/starship/nats/tls)"
-    fi
-  fi
+  # H-006 (ASP-174): TLS + mTLS on by default (opt out with STARSHIP_NATS_TLS=0)
+  _setup_nats_tls "$out/fleet-accounts.conf"
 
   chown nats:nats /var/lib/starship/nats 2>/dev/null || true
   echo "  active.conf → fleet-accounts (role=${role_env})"

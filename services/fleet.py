@@ -313,14 +313,17 @@ def cmd_register(cfg: dict) -> int:
 
 async def _nats_register(node: FleetNode) -> None:
     try:
-        from nats_connect import connect as nats_connect, safe_url
+        from nats_connect import connect as nats_connect, connect_kwargs, safe_url
     except ImportError:
         from nats import connect as nats_connect
 
         def safe_url(u=None):
             return u or NATS_URL
 
-    nc = await nats_connect(_nats_url())
+        def connect_kwargs():
+            return {}
+
+    nc = await nats_connect(_nats_url(), **connect_kwargs())
     payload = json.dumps(node.to_dict()).encode()
     await dual_publish(nc, SUBJECT_REGISTER, payload)
     await dual_publish(nc, SUBJECT_STATUS, payload)
@@ -358,11 +361,14 @@ def cmd_exercise(cfg: dict, action: str) -> int:
 
 async def _nats_exercise(exercise: dict) -> None:
     try:
-        from nats_connect import connect as nats_connect
+        from nats_connect import connect as nats_connect, connect_kwargs
     except ImportError:
         from nats import connect as nats_connect
 
-    nc = await nats_connect(_nats_url())
+        def connect_kwargs():
+            return {}
+
+    nc = await nats_connect(_nats_url(), **connect_kwargs())
     await dual_publish(nc, SUBJECT_EXERCISE, json.dumps(exercise).encode())
     await nc.flush()
     await nc.close()
@@ -370,7 +376,7 @@ async def _nats_exercise(exercise: dict) -> None:
 
 async def daemon_loop(cfg: dict) -> None:
     try:
-        from nats_connect import connect as nats_connect, safe_url
+        from nats_connect import connect as nats_connect, connect_kwargs, safe_url
     except ImportError:
         from nats import connect as nats_connect
 
@@ -378,13 +384,16 @@ async def daemon_loop(cfg: dict) -> None:
             u = u or _nats_url()
             return u.split("@")[-1] if "@" in u else u
 
+        def connect_kwargs():
+            return {}
+
     node = build_local_node(cfg)
     state = load_state()
     state.setdefault("nodes", {})[node.node_id] = node.to_dict()
     save_state(state)
 
     url = _nats_url()
-    nc = await nats_connect(url)
+    nc = await nats_connect(url, **connect_kwargs())
     mode = os.getenv("STARSHIP_NATS_MODE", "")
     if os.getenv("NATS_USER") or mode == "accounts":
         auth = f"accounts/{os.getenv('STARSHIP_NATS_ROLE', os.getenv('NATS_USER', 'user'))}"

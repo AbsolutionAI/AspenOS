@@ -29,7 +29,7 @@ STARSHIP_PROFILE=<edge|server|ops> /opt/starship/bin/starship-firstboot.sh
 |---------|------------------|-------|
 | edge | multi-tenant accounts | thin node |
 | server | multi-tenant accounts | default mesh |
-| ops | multi-tenant accounts | optional `STARSHIP_NATS_TLS=1` |
+| ops | multi-tenant accounts | TLS+mTLS on by default (`STARSHIP_NATS_TLS=0` to opt out) |
 
 Static smoke (no QEMU): `bash scripts/iso-firstboot-smoke.sh`  
 Full ISO: `scripts/test-iso.sh` / `scripts/build-iso.sh`

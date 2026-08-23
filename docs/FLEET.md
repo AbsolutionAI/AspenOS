@@ -135,14 +135,18 @@ Accounts: `STARSHIP_OPS` · `STARSHIP_EDGE` · `STARSHIP_RANGE` (red/blue) · `S
 Nkeys: optional (`nk` from `go install github.com/nats-io/nkeys/nk@latest`) → `creds/*.nk`  
 Heartbeats dual-publish `starship.fleet.heartbeat` + `agnetic.fleet.heartbeat`.
 
-### Optional TLS
+### TLS + mTLS (default in new deployments, H-006)
 
 ```bash
 bash scripts/gen-nats-tls.sh --out /etc/starship/nats/tls --host ops.example
-# firstboot: STARSHIP_NATS_TLS=1 STARSHIP_PROFILE=ops sudo bash scripts/starship-firstboot.sh
+# per-node client identity (signed by the fleet CA):
+bash scripts/gen-nats-tls.sh --out /etc/starship/nats/tls --node plant-edge-01
+# opt out (dev only): STARSHIP_NATS_TLS=0 bash scripts/starship-firstboot.sh
 ```
 
-Appends `tls { ... }` to fleet-accounts conf; clients use `STARSHIP_NATS_CA` + `tls://` via `nats_connect.py`.
+Firstboot runs the generator automatically and appends `tls { ... verify: true }`
+to the active conf — non-TLS connections are rejected and clients must present a
+fleet-CA certificate (`STARSHIP_NATS_CA` + cert/key + `tls://` via `nats_connect.py`).
 
 ## Firstboot
 
