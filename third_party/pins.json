@@ -1,6 +1,6 @@
 {
   "schema": "starship-os/third_party-pins/v1",
-  "updated": "2026-07-15",
+  "updated": "2026-08-24",
   "components": {
     "opencode": {
       "package": "opencode-ai",
@@ -23,6 +23,26 @@
       "config": "config/opencode/oh-my-opencode-slim.starship.json",
       "system_config": "/etc/starship/opencode/oh-my-opencode-slim.json",
       "notes": "Multi-agent suite; use starship-local preset (Eve-V2 + qwen2.5:7b)"
+    },
+    "aspen-edge-rrm": {
+      "package": "aspen-edge-rrm",
+      "source": "git",
+      "github": "https://github.com/AbsolutionAI/aspen-edge-rrm",
+      "branch": "master",
+      "commit": "aa3f84d06e7f8e1715f3de6f0b8be86dc5fc5d85",
+      "clone_into": "../aspen-edge-rrm",
+      "used_by": "scripts/smoke-fleet-bus.py",
+      "notes": "Fleet bus contracts (aspen.fleet.* / aspen.safety.*); pinned for CI smoke"
+    },
+    "aspen-swarm-manager": {
+      "package": "aspen-swarm-manager",
+      "source": "git",
+      "github": "https://github.com/AbsolutionAI/aspen-swarm-manager",
+      "branch": "master",
+      "commit": "e6628071924992916007aa01a36ea5db1742938e",
+      "clone_into": "../aspen-swarm-manager",
+      "used_by": "scripts/smoke-fleet-bus.py",
+      "notes": "Swarm mission lifecycle contracts; pinned for CI smoke"
     }
   }
 }
