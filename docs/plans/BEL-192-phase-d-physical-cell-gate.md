@@ -4,7 +4,7 @@
 **Linear:** [BEL-192](https://linear.app/bellahtech/issue/BEL-192/d1-first-physical-cell-gate-range-plant-only)  
 **Paperclip:** ASP-381 (child of ASP-50 / BEL-179)  
 **Owner:** Captain (josiah) — spend scope/$ ceiling · aspen — architecture · robotics — G6/G7  
-**Updated:** 2026-08-24 (G4 accept + G5 conditional go)
+**Updated:** 2026-08-24 (G5 conditional go + G6/G7 prep seeds)
 
 ## Intent
 
@@ -27,8 +27,8 @@ Single physical cell on **plant-range only**, with skill-based hold-to-enable an
 | G3 | Dual-human `propose_act` → `act` path verified (sim/dry-run; refuse single-actor self-approve) | aspen | ASP-384 · detail `docs/plans/BEL-192-g3-dual-human-auth-gate.md` | **GREEN** — `scripts/sim_dual_human_gate.py` exit 0 (4 refuse + happy path) |
 | G4 | Fiscal un-defer — explicit captain approval for cell hardware/spend | captain (josiah) | Human only | **GREEN (formal)** — Paperclip confirmation `confirmation:…:g4-fiscal-undefer-v1` **accepted** 2026-08-24 by captain user; **scope + $ ceiling still required in comment before PO** |
 | G5 | Architecture go/no-go after G1–G4 | aspen | `docs/plans/BEL-192-g5-architecture-go.md` + ASP-381/BEL-192 | **CONDITIONAL GO** — see G5 record |
-| G6 | Cell profile: `plant-range` only, isolation true, human arm ≠ `sim`, hold-to-enable skill | robotics | child of ASP-381 | **OPEN** — config + runbook only until ceiling posted |
-| G7 | Estop latch + audit chain proven on the cell node | robotics + auditor | child of ASP-381 | **OPEN** — no live drivers until G6 profile locked |
+| G6 | Cell profile: `plant-range` only, isolation true, human arm ≠ `sim`, hold-to-enable skill | robotics | **ASP-416** · `config/cells/plant-range-d1.yaml` · `docs/runbooks/plant-range-d1-hold-to-enable.md` · `scripts/sim_plant_range_cell_profile.py` | **IN PROGRESS** — architecture seeds landed; robotics owns lock + sim verify |
+| G7 | Estop latch + audit chain proven on the cell node | robotics + auditor | **ASP-417** · `docs/runbooks/plant-range-estop-audit-drill.md` | **OPEN** — drill runbook seeded; no live drivers until G6 profile locked |
 
 ## Agent-closeable vs human-only
 
@@ -61,8 +61,9 @@ Single physical cell on **plant-range only**, with skill-based hold-to-enable an
 3. ~~Captain G4 confirmation accept.~~
 4. ~~aspen G5 architecture conditional go (this revision).~~
 5. **Captain:** post scope + $ ceiling (required before PO).
-6. **robotics:** G6 cell profile + G7 estop/audit on plant-range (sim first; live only after ceiling + dual-auth path).
-7. Phase D D1 exit criteria (below).
+6. **robotics:** G6 lock via ASP-416 (profile sim proof exit 0) + G7 estop/audit drill ASP-417 (sim first; live only after ceiling + dual-auth path).
+7. **aspen/runtime:** prefer ASP-364 (H-016) live dual-auth wire before first live act.
+8. Phase D D1 exit criteria (below).
 
 ## Dual-human gate (G3) summary
 

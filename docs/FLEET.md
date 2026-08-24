@@ -75,6 +75,7 @@ node:
 ## Red/blue policy notes
 
 - Exercises default to `plant-range` (`isolation: true`).
+- Phase D D1 first physical cell (BEL-192): profile `config/cells/plant-range-d1.yaml`, runbooks under `docs/runbooks/plant-range-*`, sim proofs `scripts/sim_plant_range_cell_profile.py` + `scripts/sim_dual_human_gate.py`. **No free motion** until G6+G7 green and dual-auth usable.
 - Red-team never gets unrestricted OpenCode (enforced in `agents/fleet_policy.py` + toolsets `red_team` / `security_audit`).
 - Red-team allowed tools: `read_file`, `list_dir`, `search_files`, `http_get`, `delegate_to_agent`.
 - Set identity via env: `STARSHIP_FLEET_TEAM=red` `STARSHIP_FLEET_ROLES=red-team` or `/etc/starship/fleet-node.yaml`.
