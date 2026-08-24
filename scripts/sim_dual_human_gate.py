@@ -13,18 +13,28 @@ import json
 import sys
 from pathlib import Path
 
-# Shared library lives in the sibling aspen-edge-rrm checkout.
+# Shared library lives in aspen-edge-rrm (sibling of aspen-os, or under repos/).
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-for _p in (_REPO_ROOT.parent / "aspen-edge-rrm",):
-    if _p.is_dir() and str(_p) not in sys.path:
-        sys.path.insert(0, str(_p))
+_CANDIDATES = []
+for _parent in [_REPO_ROOT.parent, *_REPO_ROOT.parents]:
+    _cand = _parent / "aspen-edge-rrm"
+    if _cand not in _CANDIDATES:
+        _CANDIDATES.append(_cand)
+_p = None
+for _cand in _CANDIDATES:
+    if (_cand / "aspen_edge").is_dir():
+        _p = _cand
+        if str(_cand) not in sys.path:
+            sys.path.insert(0, str(_cand))
+        break
 
 try:
     from aspen_edge.gate import DualHumanGate, GateRefused, ENABLE_WINDOW_S
 except ImportError as e:  # pragma: no cover
     print(
         f"error: cannot import aspen_edge.gate ({e}); "
-        f"expected sibling checkout at {_p}",
+        f"expected aspen-edge-rrm checkout near aspen-os "
+        f"(searched {[str(c) for c in _CANDIDATES[:6]]}…)",
         file=sys.stderr,
     )
     sys.exit(2)
