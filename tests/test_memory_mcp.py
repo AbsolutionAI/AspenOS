@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("mcp.server", reason="mcp SDK not installed (pip install 'mcp>=1.0')")
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MCP_SRC = REPO_ROOT / "mcp" / "aspen-memory-mcp" / "src"
 if str(MCP_SRC) not in sys.path:

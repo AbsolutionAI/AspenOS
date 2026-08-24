@@ -1,7 +1,9 @@
 import sys
 import json
 import pytest
-from aiohttp import web
+
+pytest.importorskip("aiohttp", reason="aiohttp not installed")
+from aiohttp import web  # noqa: E402
 from unittest.mock import patch, AsyncMock, MagicMock
 
 import server as srv
