@@ -32,7 +32,9 @@ Identity rules:
   is refused as `duplicate_principal`.
 - The proposer's operator-of-record cannot authorize (`self_approval`).
   EdgeRRM binds it via `operator_of_record`; production wiring MUST set this
-  from an authenticated identity source (open design item for Aspen Architect).
+  from an authenticated identity source — see
+  [`docs/adr/ADR-0008-operator-of-record-binding.md`](../adr/ADR-0008-operator-of-record-binding.md)
+  (Proposed; required before G9 / non-sim arm).
 
 ## Estop clear (human-only)
 
@@ -45,8 +47,9 @@ stop-causer is refused (`self_approval`). Mirrors G7 sim semantics.
 
 The room is a human front-end that emits exactly the authorize payload above.
 One approval message per principal; the bridge MUST attach the authenticated
-Matrix user id as `human_id` (never display names) and MUST NOT synthesize a
-second principal from one account.
+Matrix user id (`event.sender` MXID) as `human_id` (never display names) and
+MUST NOT synthesize a second principal from one account. Binding rules:
+ADR-0008.
 
 ```json
 {
