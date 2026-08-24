@@ -178,13 +178,16 @@ documented separately — do not conflate with plant NATS safety:
 
 ## Biweekly threat-model checklist
 
-Use during ASP-298-style reviews (expand per full threat model when present):
+Use during ASP-298/ASP-431-style reviews (see full model at [`SECURITY_THREAT_MODEL_v2.2.md`](SECURITY_THREAT_MODEL_v2.2.md)):
 
 - [ ] NATS: no live secrets in git (`nats/*.conf`); accounts + TLS defaults held (H-001/H-006/H-017)
 - [ ] Paperclip C2: F-019 items in [`docs/security/PAPERCLIP_C2_HARDENING.md`](security/PAPERCLIP_C2_HARDENING.md)
 - [x] Dual-human `propose_act`→`act` path wired (H-016 / ASP-364): `aspen_edge.gate.DualHumanGate` in EdgeRRM; contract [`docs/security/ACT_GATE_CONTRACT.md`](security/ACT_GATE_CONTRACT.md); sim-only until G9
 - [ ] Host baseline SSH/UFW draft vs apply gate (H-HOST-01) — human approval required
 - [ ] Sandbox/policyexec mandatory (H-003); ops tool allowlist (H-005)
+- [ ] Physical cell prerequisites: OT network segmentation (H-025), HITL vault approval gate (H-022), hardware estop watchdog (H-023)
+- [ ] Backlog hardening: H-020 (software data-diode) and H-021 (directional ACL) still open
+- [ ] IEC 62443-4-2 mapping gap items: identity role model (F-015), OT transport segmentation (F-017)
 - [ ] Budgets non-zero where zero=unlimited; fiscal freeze caps if still active
 - [ ] No secrets in issue/Linear bodies; key files mode 600
 
@@ -193,11 +196,13 @@ Use during ASP-298-style reviews (expand per full threat model when present):
 1. **Ops / multi-node:** accounts mode + TLS; never share red-team credentials with ops
 2. **Native gates are mandatory by default (H-003):** startup fails closed if `sandbox_run`/`policyexec` are missing (`python3 -m native_check` runs as `ExecStartPre`)
 3. **Ops role tool allowlist (H-005):** fleet team `ops` (the default identity) is restricted to a minimum-necessary tool set in `config/policy.default.json`; unlisted tools are denied fail-closed, HITL vault approvals (`vault_approve`/`vault_deny`) and expansion tools (`opencode`/`opendesign`) are explicitly denied. Add new tools to the ops allowlist deliberately when a workflow needs them.
-4. **Install AppArmor** on bare metal
-5. **Run agents as non-root** (`User=agnetic`)
-6. **Rotate** NATS tokens/passwords after firstboot; store only under `/etc/starship/nats/creds` (mode 600)
-7. **Abliterated models:** treat as untrusted reasoners — policy + sandbox mandatory
-8. **Paperclip board keys:** mode 600 + rotation SLA per C2 runbook (H-019)
+4. **G9 prerequisite: OT network segmentation (H-025):** cell NATS must not share transport with plant agents. Dedicated loop or VLAN + drop-and-forward bridge.
+5. **G9 prerequisite: HITL vault approval gate (H-022):** physical cell act requires vault approval path, not just dual-human NATS authorize.
+6. **Install AppArmor** on bare metal
+7. **Run agents as non-root** (`User=agnetic`)
+8. **Rotate** NATS tokens/passwords after firstboot; store only under `/etc/starship/nats/creds` (mode 600)
+9. **Abliterated models:** treat as untrusted reasoners — policy + sandbox mandatory
+10. **Paperclip board keys:** mode 600 + rotation SLA per C2 runbook (H-019)
 
 ## Reporting
 
