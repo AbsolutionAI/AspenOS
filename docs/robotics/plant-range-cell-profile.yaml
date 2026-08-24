@@ -6,10 +6,10 @@
 # Starship fleet topology. plant-range is an isolated training/exercise zone
 # with no hardware commitment until G7 green.
 #
-# CONDITIONS FOR LIVE USE (G7 gate):
-#   - G7 green (estop latch + audit chain complete)
-#   - Dual-human authorize usable (H-016)
-#   - Captain $ ceiling approved
+# CONDITIONS FOR LIVE USE (G9 gate):
+#   - G7 green (estop latch + audit chain complete) — ASP-417 done
+#   - G8 green: dual-human authorize wired in control path — ASP-364 / H-016 done (sim)
+#   - G9: Captain $ ceiling approved (still open)
 
 cell:
   name: plant-range-cell
@@ -54,8 +54,24 @@ cell:
       required: true                        # hold-to-enable mandatory
       max_interval_s: 0.5                   # max gap before enable drops
       audit_event: "cell.hold_to_enable"
+    dual_auth:
+      required: true                        # H-016 / ASP-364 (G8): no single-principal act
+      principals: 2                         # two DISTINCT stable human ids
+      distinct_from_proposer_operator: true # operator-of-record cannot approve
+      enable_window_s: 600                  # new propose_act required after expiry
+      library: "aspen_edge.gate.DualHumanGate"
+      authorize_channel: "aspen.edge.<node>.authorize"   # payload {proposal_id, human_id, note}
+      front_ends: ["matrix:#aspen-authz", "sentinel-ui"] # documented contract; bridge optional
+      refuse_reasons:
+        - insufficient_principals
+        - duplicate_principal
+        - self_approval
+        - expired
+        - unknown_proposal
+      audit_event_prefix: "gate."           # propose_act|authorize|enable_act|execute_act|refuse
     estop:
       requires_clear: true
+      clear_requires_dual_human: true       # stop-causer cannot authorize the clear
       audit_event: "aspen.safety.estop"
 
   # ── Scheduling ──
@@ -67,10 +83,16 @@ cell:
       - "no_hardware_until_g7"
       - "sim_only"
       - "hold_to_enable_not_engaged"
+      - "estop_latched"                     # G7
+      - "held_dual_auth"                    # G8: safety_adjacent holds at propose_act
+      - "refused_insufficient_principals"
+      - "refused_duplicate_principal"
+      - "refused_self_approval"
+      - "refused_expired"
 
   # ── Lifecycle ──
   lifecycle:
     g6: sim_only_profile
-    g7: estop_latch_and_audit               # tracked by ASP-417
-    g8: dual_auth_wired                     # H-016
+    g7: estop_latch_and_audit               # ASP-417 (done)
+    g8: dual_auth_wired_sim                 # ASP-364 / H-016 — wired in sim control path
     g9: captain_ceiling_approved

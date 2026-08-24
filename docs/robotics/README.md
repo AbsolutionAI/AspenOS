@@ -28,6 +28,9 @@ PYTHONPATH=agents:../aspen-swarm-manager:../aspen-edge-rrm \
 # Run dual-human gate refuse proofs (BEL-192 Phase D gate)
 python3 scripts/sim_dual_human_gate.py
 
+# Run end-to-end act-gate wire drill (G8 / H-016, ASP-364)
+python3 scripts/sim_act_gate_wire.py
+
 # Run full fleet bus smoke
 python3 scripts/smoke-fleet-bus.py
 ```
@@ -47,5 +50,5 @@ python3 scripts/smoke-fleet-bus.py
 |---|---|---|
 | G6 (this) | ASP-416 | Cell profile, hold-to-enable skill, sim-only ACL proof |
 | G7 | ASP-417 | Estop latch + audit chain on range cell |
-| G8 | H-016 (ASP-376) | Dual-human authorize usable |
+| G8 | H-016 (ASP-364) | Dual-human authorize usable |
 | G9 | _(future)_ | Captain \$ ceiling approved |

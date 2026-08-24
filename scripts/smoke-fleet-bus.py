@@ -75,6 +75,8 @@ for subj in [
     "aspen.safety.estop",
     "aspen.safety.clear",
     "aspen.edge.robot-sim-1.propose_act",
+    "aspen.edge.robot-sim-1.authorize",
+    "aspen.safety.authorize_clear",
 ]:
     bus.subscribe(subj, record)
 
@@ -102,21 +104,45 @@ check("node heartbeat status online", hb_events[-1]["data"]["status"] == "online
 check("ops manager sees node", "robot-sim-1" in ops.nodes,
       f"nodes={list(ops.nodes.keys())}")
 
-# ── 3. Action proposal ────────────────────────────────────────────────
-print("\n--- 2. Action Proposal (propose_act) ---")
+# ── 3. Action proposal (G8 dual-human gate, H-016) ───────────────────
+print("\n--- 2. Action Proposal (propose_act -> dual-auth hold -> act) ---")
 agent = rrm.add_agent("micro-arm-1")
-agent.tick({"target": "pose_home"})
+p1 = agent.tick({"target": "pose_home"})  # default risk_class=safety_adjacent
 
-propose_events = [e for e in events if "propose_act" in e.get("type", "")]
-check("propose_act published", len(propose_events) >= 1,
-      f"subject={propose_events[0]['subject'] if propose_events else 'none'}")
-check("propose_act accepted in sim", any(
+held = [a for a in rrm.audit if a.get("result") == "held_dual_auth"]
+check("safety_adjacent held at propose_act", len(held) == 1,
+      f"held={len(held)}")
+pid = held[-1]["proposal_id"]
+
+# act before dual authorization must refuse
+r = rrm.request_act(pid)
+check("act refused before dual auth", r["result"] == "refused_insufficient_principals",
+      f"result={r['result']}")
+
+# two distinct human principals authorize over the bus channel
+bus.publish("aspen.edge.robot-sim-1.authorize",
+            {"proposal_id": pid, "human_id": "op-b"}, source="human/op-b")
+bus.publish("aspen.edge.robot-sim-1.authorize",
+            {"proposal_id": pid, "human_id": "op-c"}, source="human/op-c")
+r = rrm.request_act(pid)
+check("dual-human authorize enables act", r["result"] == "executed_sim",
+      f"result={r['result']} principals={r.get('principals_seen')}")
+
+authorize_events = [e for e in events if e.get("type", "").endswith(".authorize")]
+check("authorize channel on bus", len(authorize_events) == 2,
+      f"count={len(authorize_events)}")
+
+# explicit safe-class proposal keeps the direct sim path
+agent.tick({"target": "pose_home"}, risk_class="safe")
+check("safe class accepted in sim", any(
     a.get("result") == "accepted_sim" for a in rrm.audit
 ), f"audit entries={len(rrm.audit)}")
 
-# ── 4. Safety (estop / clear) ─────────────────────────────────────────
-print("\n--- 3. Safety Chain (estop / clear) ---")
-bus.publish("aspen.safety.estop", {"reason": "operator_test", "source": "operator"}, source="safety")
+# ── 4. Safety (estop / dual-human clear) ─────────────────────────────
+print("\n--- 3. Safety Chain (estop / dual-principal clear) ---")
+bus.publish("aspen.safety.estop",
+            {"reason": "operator_test", "source": "operator", "actor": "op-a"},
+            source="safety")
 check("estop sets flag", rrm.estop is True)
 
 agent.tick({"target": "pose_a"})
@@ -124,8 +150,15 @@ check("estop blocks action", any(
     a.get("result") == "refused_estop" for a in rrm.audit
 ), "propose_act refused during estop")
 
+# bare clear cannot unlatch (H-016 hardening)
 bus.publish("aspen.safety.clear", {"source": "operator"}, source="safety")
-check("clear resets flag", rrm.estop is False)
+check("bare clear refused", rrm.estop is True)
+
+# two distinct humans authorize the clear, then clear executes
+bus.publish("aspen.safety.authorize_clear", {"human_id": "op-b"}, source="human/op-b")
+bus.publish("aspen.safety.authorize_clear", {"human_id": "op-c"}, source="human/op-c")
+bus.publish("aspen.safety.clear", {"source": "operator"}, source="safety")
+check("dual-human clear resets flag", rrm.estop is False)
 
 # ── 5. SwarmManager mission lifecycle ─────────────────────────────────
 print("\n--- 4. Mission Lifecycle (planned → armed → running → done) ---")

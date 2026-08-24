@@ -182,7 +182,7 @@ Use during ASP-298-style reviews (expand per full threat model when present):
 
 - [ ] NATS: no live secrets in git (`nats/*.conf`); accounts + TLS defaults held (H-001/H-006/H-017)
 - [ ] Paperclip C2: F-019 items in [`docs/security/PAPERCLIP_C2_HARDENING.md`](security/PAPERCLIP_C2_HARDENING.md)
-- [ ] Dual-human `propose_act`→`act` path status (H-016 / ASP-364) — open until wired
+- [x] Dual-human `propose_act`→`act` path wired (H-016 / ASP-364): `aspen_edge.gate.DualHumanGate` in EdgeRRM; contract [`docs/security/ACT_GATE_CONTRACT.md`](security/ACT_GATE_CONTRACT.md); sim-only until G9
 - [ ] Host baseline SSH/UFW draft vs apply gate (H-HOST-01) — human approval required
 - [ ] Sandbox/policyexec mandatory (H-003); ops tool allowlist (H-005)
 - [ ] Budgets non-zero where zero=unlimited; fiscal freeze caps if still active

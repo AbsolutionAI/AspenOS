@@ -100,7 +100,10 @@ forbidden until the named gate clears.
 | Hardware PO | `sim_only` | G9 captain ceiling | Procurement |
 | ASPEN_SIM=0 driver start | `sim_only` | G7 | ASP-417 |
 | arm_operator = "sim" | `sim_operator_not_allowed` | G6 | This runbook |
-| Single-principal enable | `insufficient_principals` | G8 dual-auth | H-016 / G8 gate |
+| Single-principal enable | `insufficient_principals` | G8 dual-auth | H-016 / ASP-364, `docs/security/ACT_GATE_CONTRACT.md` |
+| Proposer operator approves own proposal | `self_approval` | G8 dual-auth | H-016 / ASP-364 |
+| Same human twice (any session) | `duplicate_principal` | G8 dual-auth | H-016 / ASP-364 |
+| Single-principal estop clear | `insufficient_principals` | G7/G8 estop gate | ASP-417 + ASP-364 |
 
 ### Cross-plant refuse proof
 
@@ -143,8 +146,13 @@ propose_act (<enable_held: bool>)
                             └── sim motion only → ACCEPTED → mission planned
 ```
 
-G7 adds estop latch enforcement. G8 adds dual-human authorize. G9 adds captain
-ceiling checks.
+G7 adds estop latch enforcement. G8 (ASP-364 / H-016) wires dual-human
+authorize into the control path: safety_adjacent proposals hold at
+`propose_act result=held_dual_auth` until two distinct human principals
+authorize (`aspen.edge.<node>.authorize` / Matrix `#aspen-authz` front-end,
+schema in `docs/security/ACT_GATE_CONTRACT.md`), and `request_act` re-verifies
+the two-principal record immediately before act. Estop clear requires two
+distinct humans; the stop-causer is refused. G9 adds captain ceiling checks.
 
 ---
 
@@ -161,6 +169,9 @@ python3 docs/robotics/sim-verify-cell-acl.py
 # Run the full fleet bus smoke
 ASPEN_SIM=1 python3 scripts/smoke-fleet-bus.py
 
-# Run dual-human gate refuse proofs
+# Run dual-human gate refuse proofs (library suite)
 python3 scripts/sim_dual_human_gate.py
+
+# Run end-to-end act-gate wire drill (propose->held->authorize A/B->act + refuses)
+python3 scripts/sim_act_gate_wire.py
 ```
