@@ -31,7 +31,7 @@ plants:
     description: Red/blue exercise plant (isolated policy)
     region: range
     profile: ops
-    roles_allowed: [proxy, romi, ergo, red-team, blue-team, ops]
+    roles_allowed: [proxy, romi, ergo, robotics, red-team, blue-team, ops]
     isolation: true
 
 # Node role catalog

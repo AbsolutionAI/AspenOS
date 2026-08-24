@@ -27,6 +27,7 @@ capabilities:
 skills:
   - robotics-fleet
   - system-health
+  - hold-to-enable
   - software-development/spike
   - software-development/systematic-debugging
   - research/arxiv
