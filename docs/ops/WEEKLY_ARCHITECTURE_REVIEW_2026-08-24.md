@@ -18,7 +18,7 @@
 | Fleet / swarm / RRM contracts | **Green (sim)** | **G6–G8 landed:** cell profile, estop hash chain, dual-human wire |
 | Dual-human act gate (H-016) | **Green (sim)** | ASP-364 **done** — `aspen_edge.gate` + EdgeRRM hold/authorize/act |
 | LangGraph plugin (ADR-0005) | **Amber** | Still propose_act-only; H-018 scheduler guard backlog (ASP-366) |
-| Memory tiering (ADR-0006) | **Amber** | Draft **Proposed**; ready for accept next review |
+| Memory tiering (ADR-0006) | **Green** | **Accepted** 2026-08-24 (ASP-428 / ASP-426 D1); T1 default, no PG under freeze |
 | C11 sandbox (ADR-0010) | **Amber** | Overhead gate ratified earlier; native mandatory (H-003) |
 | Bus dual-publish | **Amber** | Inventory exists (`FLEET_SUBJECT_PUBLISHERS.md`); sunset still ADR-0007 candidate |
 | Doc/git hygiene | **Red → fixing** | Master Spec + ADR-0001..0006 were **not** on this worktree tip / master — primary risk this week |
@@ -37,7 +37,7 @@
 | ADR-0003 Bus contracts | Prefer `aspen.*`; envelope schema | Yes | **Amended this cycle** with G8 `authorize` + dual `authorize_clear` |
 | ADR-0004 Light core | Kernel vs plugins | Yes | Align module-catalog later |
 | ADR-0005 LangGraph | Cognitive plugin; Paperclip stays SoR | Yes | Guard dual scheduler (ASP-366) |
-| ADR-0006 Memory tiering | T1 LanceDB/SQLite default; optional T2 PG+AGE | **Proposed** | Accept when human/architect confirms (no PG install) |
+| ADR-0006 Memory tiering | T1 LanceDB/SQLite default; optional T2 PG+AGE | **Accepted** (ASP-428) | Binding; no PG install under freeze |
 | ADR-0010 C11 (file `0001-c11-…`) | Spike sandbox first; Python CP | Yes | Keep; H-003 mandatory native |
 | ADR-0007 (candidate) | Sunset dual-publish | Not filed | Wait for consumer share or external pilot |
 | ADR-0008 (candidate) | Authenticated operator-of-record for gate | Not filed | Blocker before non-sim arm |
@@ -94,7 +94,7 @@ Hardware / sim (ASPEN_SIM=1 · plant-range status: sim_only)
 
 | # | Decision | Recommendation | Urgency |
 |---|----------|----------------|---------|
-| D1 | Accept ADR-0006 memory tiering | **Accept** as Proposed→Accepted next human ack; no PG under freeze | Medium |
+| D1 | Accept ADR-0006 memory tiering | **Done** ASP-428 (2026-08-24) — Accepted; no PG under freeze | Closed |
 | D2 | operator-of-record identity source | File ADR-0008 before G9; Matrix/`#aspen-authz` binds `human_id` only | High before physical |
 | D3 | Merge SoR+ADRs to `origin/master` | **Do now** — unblock every agent worktree | **High** |
 | D4 | plant-edge→plant-alpha ACL (ASP-369) | Keep backlog; no ACL widen under freeze | Medium |
@@ -137,7 +137,7 @@ Hardware / sim (ASPEN_SIM=1 · plant-range status: sim_only)
 
 1. **Merge SoR + ADR set to master** — aspen / packndeploy (PR from this branch or cherry-pick docs-only)  
 2. **H-018 single plant scheduler guard** — already ASP-366; assign robotics or Opencode when capacity  
-3. **Accept ADR-0006** — aspen short confirmation issue (docs status flip only)  
+3. **Accept ADR-0006** — **done** ASP-428 (docs status flip only)  
 4. **ADR-0008 draft: operator-of-record binding** — aspen plan-only before any G9  
 5. No new physical-cell work under freeze
 
