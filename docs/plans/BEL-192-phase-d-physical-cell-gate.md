@@ -1,10 +1,10 @@
 # BEL-192 / ASP-381 — Phase D first physical cell gate
 
-**Status:** G5 CONDITIONAL GO — architecture approved; physical motion still gated  
+**Status:** Software residual **CLOSED** — G1/G3/G4/G5/G6/G7 green (sim/docs); physical D1 exit still open  
 **Linear:** [BEL-192](https://linear.app/bellahtech/issue/BEL-192/d1-first-physical-cell-gate-range-plant-only)  
 **Paperclip:** ASP-381 (child of ASP-50 / BEL-179)  
-**Owner:** Captain (josiah) — spend scope/$ ceiling · aspen — architecture · robotics — G6/G7  
-**Updated:** 2026-08-24 (G5 conditional go + G6/G7 prep seeds)
+**Owner:** Captain (josiah) — motion-day / spend supersede · aspen — architecture · robotics — live bring-up  
+**Updated:** 2026-08-24 (children completed closeout — G6/G7 done + G4 spend lock)
 
 ## Intent
 
@@ -15,82 +15,92 @@ Single physical cell on **plant-range only**, with skill-based hold-to-enable an
 - Agents emit **`propose_act` only** on safety-adjacent subjects until dual human auth clears **`act`**.
 - Micro-agents never write actuators; swarm never streams setpoints; Hermes never issues joints.
 - `ASPEN_SIM=1` is **forbidden** on real cells.
-- No hardware PO / cash outlay without captain **scope + $ ceiling** comment (see G4 note).
-- Do not assign joint motion until G6–G7 green and dual-auth path available for the cell.
+- Spend locked **$0 / compute_net_only** until captain supersedes (see G4 detail).
+- Do not assign joint motion until live dual-auth usable + captain motion-day authorization.
 
-## Gate checklist (all green required for Phase D D1 exit)
+## Gate checklist
 
-| # | Gate | Owner | Tracker | State (2026-08-24) |
-|---|------|-------|---------|---------------------|
-| G1 | Sim E2E residual: live NATS fleet bus + robotics agent contracts (sim) | robotics + aspen | ASP-380 · BEL-179 residual | **GREEN** — ASP-380 `done` |
-| G2 | Package smokes stay green (`aspen-swarm-manager`, `aspen-edge-rrm`, optional langgraph-worker) | robotics | package `make smoke` | **Partial/GREEN** — held under freeze unless regression reported |
-| G3 | Dual-human `propose_act` → `act` path verified (sim/dry-run; refuse single-actor self-approve) | aspen | ASP-384 · detail `docs/plans/BEL-192-g3-dual-human-auth-gate.md` | **GREEN** — `scripts/sim_dual_human_gate.py` exit 0 (4 refuse + happy path) |
-| G4 | Fiscal un-defer — explicit captain approval for cell hardware/spend | captain (josiah) | Human only | **GREEN (formal)** — Paperclip confirmation `confirmation:…:g4-fiscal-undefer-v1` **accepted** 2026-08-24 by captain user; **scope + $ ceiling still required in comment before PO** |
-| G5 | Architecture go/no-go after G1–G4 | aspen | `docs/plans/BEL-192-g5-architecture-go.md` + ASP-381/BEL-192 | **CONDITIONAL GO** — see G5 record |
-| G6 | Cell profile: `plant-range` only, isolation true, human arm ≠ `sim`, hold-to-enable skill | robotics | **ASP-416** · `config/cells/plant-range-d1.yaml` · `docs/runbooks/plant-range-d1-hold-to-enable.md` · `scripts/sim_plant_range_cell_profile.py` | **IN PROGRESS** — architecture seeds landed; robotics owns lock + sim verify |
-| G7 | Estop latch + audit chain proven on the cell node | robotics + auditor | **ASP-417** · `docs/runbooks/plant-range-estop-audit-drill.md` | **OPEN** — drill runbook seeded; no live drivers until G6 profile locked |
+| # | Gate | Owner | Tracker | State (2026-08-24 closeout) |
+|---|------|-------|---------|------------------------------|
+| G1 | Sim E2E residual: live NATS fleet bus + robotics agent contracts (sim) | robotics + aspen | ASP-380 | **GREEN** — `done` |
+| G2 | Package smokes stay green | robotics | package `make smoke` | **Partial/GREEN** — freeze hold unless regression |
+| G3 | Dual-human `propose_act` → `act` (sim/dry-run) | aspen | ASP-384 · `scripts/sim_dual_human_gate.py` | **GREEN** — exit 0 (4 refuse + happy) |
+| G4 | Fiscal un-defer + spend detail | captain (josiah) | interactions `g4-fiscal-undefer-v1` + `g4-spend-detail-v1` | **GREEN (locked)** — formal accept + **scope=`compute_net_only` · ceiling=`$0`** |
+| G5 | Architecture go/no-go | aspen | `docs/plans/BEL-192-g5-architecture-go.md` | **CONDITIONAL GO** — prep complete |
+| G6 | Cell profile: plant-range, isolation, hold-to-enable | robotics | ASP-416 · `config/cells/plant-range-d1.yaml` · `scripts/sim_plant_range_cell_profile.py` | **GREEN** — ASP-416 `done` |
+| G7 | Estop latch + audit chain (sim) | robotics + auditor | ASP-417 · `scripts/sim_estop_range_cell.py` | **GREEN** — ASP-417 `done` |
 
 ## Agent-closeable vs human-only
 
 | Class | Items | Status |
 |-------|--------|--------|
-| Agent-closeable sim gates | G1, G3 (+ G2 held) | **Closed** |
-| Human formal un-defer | G4 confirmation accept | **Closed (accept)** |
-| Human spend detail | G4 scope + $ ceiling comment | **Open — josiah before PO** |
+| Agent-closeable sim gates | G1, G3, G6, G7 (+ G2 held) | **Closed** |
+| Human formal un-defer | G4 confirmation accept | **Closed** |
+| Human spend detail | G4 scope + $ ceiling | **Closed — $0 / compute_net_only** |
 | Architecture | G5 | **CONDITIONAL GO recorded** |
-| Physical bring-up | G6–G7 + Phase D D1 exit | Open — no joints until both green + dual-auth usable |
+| Physical bring-up / D1 exit | Live test card + motion-day | **Open — new child; not agent-auto** |
 
-## Allowed now (post G5 conditional go)
-
-- Docs, cell profile YAML drafts, plant ACL reviews, BOM shortlist (no buy).
-- G6/G7 software config + sim drills.
-- Live Hermes dual-auth wiring (H-016 / ASP-364) — software only; **prefer before first real act**.
-- Captain comment: hardware scope + hard $ ceiling (unblocks PO path only).
-
-## Still forbidden
-
-- Joint motion / `ASPEN_SIM=0` with live drivers attached.
-- Hardware PO until captain scope + $ ceiling is on ASP-381 or BEL-192.
-- Cross-plant schedule from range → edge/alpha.
-- Auto-arm with operator string `sim` on the physical cell.
-
-## Unblock sequence (remaining)
-
-1. ~~ASP-380 → done.~~
-2. ~~ASP-384 → dual-auth sim proof.~~
-3. ~~Captain G4 confirmation accept.~~
-4. ~~aspen G5 architecture conditional go (this revision).~~
-5. **Captain:** post scope + $ ceiling (required before PO).
-6. **robotics:** G6 lock via ASP-416 (profile sim proof exit 0) + G7 estop/audit drill ASP-417 (sim first; live only after ceiling + dual-auth path).
-7. **aspen/runtime:** prefer ASP-364 (H-016) live dual-auth wire before first live act.
-8. Phase D D1 exit criteria (below).
-
-## Dual-human gate (G3) summary
-
-Full flow, refuse matrix, audit schema: `docs/plans/BEL-192-g3-dual-human-auth-gate.md`.
+## Proofs (re-run this closeout)
 
 ```bash
 python3 scripts/sim_dual_human_gate.py
-# expect: {"proof":"dual_human_gate","result":"pass","refuse_cases":4,"happy_path":true} and exit 0
+# {"proof":"dual_human_gate","result":"pass","refuse_cases":4,"happy_path":true}
+
+python3 scripts/sim_plant_range_cell_profile.py
+# {"proof":"plant_range_cell_profile","result":"pass",...}
+
+python3 scripts/sim_estop_range_cell.py
+# {"proof":"estop_range_cell","result":"pass",...,"verify_audit":"pass"}
 ```
 
-Refuse cases proven: `insufficient_principals`, `duplicate_principal`, `self_approval`, `expired`.
+## Allowed now
 
-Live runtime wiring: H-016 / ASP-364 (backlog). **First physical `act` must not precede a usable dual-auth path** (sim proof alone is insufficient on live hardware).
+- Docs, cell profile YAML, plant ACL reviews, BOM shortlist (no buy).
+- Live Hermes dual-auth wiring (H-016 / ASP-364) — software only.
+- Inventory existing compute/network on range under $0 lock (no PO).
+- Captain motion-day authorization when ready for first live test card (still no arm PO under current lock).
 
-## Exit criteria (Phase D D1)
+## Still forbidden
 
-- [ ] Range plant cell online under RRM with estop drill pass
+- Joint motion / `ASPEN_SIM=0` with live drivers attached without motion-day go + dual-auth.
+- Hardware PO (ceiling **$0**).
+- Arm purchase / conveyor / production jig without new G5 + spend supersede.
+- Cross-plant schedule from range → edge/alpha.
+- Auto-arm with operator string `sim` on the physical cell.
+
+## Unblock sequence (physical D1 only)
+
+1. ~~Software gates G1/G3/G6/G7.~~
+2. ~~Captain G4 accept + spend lock.~~
+3. ~~aspen G5 conditional go.~~
+4. **aspen/runtime:** prefer ASP-364 (H-016) live dual-auth wire before first live act.
+5. **Captain:** motion-day go (or supersede spend if arm/PO needed).
+6. **robotics:** live test card on named plant-range node (profile, estop hardware, dual-auth, enable window).
+7. Phase D D1 exit criteria (below).
+
+## Dual-human gate (G3) summary
+
+Full flow: `docs/plans/BEL-192-g3-dual-human-auth-gate.md`.  
+Live runtime wiring: H-016 / ASP-364 (backlog). **First physical `act` must not precede a usable dual-auth path.**
+
+## Exit criteria (Phase D D1 physical)
+
+- [ ] Range plant cell online under RRM with **live** estop drill pass
 - [ ] Mission arm requires human operator string ≠ `sim`
-- [ ] Dual auth recorded before first `act` (audit hash chain verifies)
+- [ ] Dual auth recorded before first `act` (audit hash chain verifies) — **live path**
 - [ ] No cross-plant schedule from range → edge/alpha
-- [ ] Captain scope + $ ceiling recorded; any spend within ceiling
-- [ ] BEL-192 + ASP-381 marked done with evidence links
+- [x] Captain scope + $ ceiling recorded (`compute_net_only` / `$0`)
+- [ ] BEL-192 physical exit marked done with evidence links
+
+Software residual (ASP-381 prep scope) may close with G1–G7 green + G5 record; physical exit tracks a follow-up issue.
 
 ## References
 
 - G5 decision: `docs/plans/BEL-192-g5-architecture-go.md`
 - G3 detail: `docs/plans/BEL-192-g3-dual-human-auth-gate.md`
+- G7: `docs/plans/ASP-417-estop-range-cell.md`
+- Cell profile: `config/cells/plant-range-d1.yaml` · `docs/robotics/plant-range-cell-profile.yaml`
+- Runbooks: `docs/runbooks/plant-range-d1-hold-to-enable.md` · `docs/runbooks/plant-range-estop-audit-drill.md`
 - Master Spec safety / ADR layering: skill `aspen-fleet-edge`
 - FLEET ACL: `docs/FLEET.md` (`plant-range: []`)
-- Paperclip: ASP-381 · ASP-380 (done) · ASP-384 (done) · ASP-364 (H-016 open)
+- Paperclip: ASP-381 · ASP-380/384/416/417 (done) · ASP-364 (H-016 open)
