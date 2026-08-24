@@ -28,10 +28,11 @@ plants:
     roles_allowed: [proxy, robotics, plant-controller]
   plant-range:
     name: Training Range
-    description: Red/blue exercise plant (isolated policy)
+    description: Red/blue exercise + Phase D D1 physical cell (isolated policy)
     region: range
     profile: ops
-    roles_allowed: [proxy, romi, ergo, red-team, blue-team, ops]
+    # robotics + plant-controller required for BEL-192 D1 cell (ASP-416)
+    roles_allowed: [proxy, romi, ergo, robotics, plant-controller, red-team, blue-team, ops]
     isolation: true
 
 # Node role catalog
