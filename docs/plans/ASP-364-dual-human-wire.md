@@ -107,10 +107,10 @@ All executable paths here run under `ASPEN_SIM` assumptions; nothing sets
 
 ## Acceptance criteria (restated)
 
-- [ ] `propose_act` cannot transition to `act` without two distinct human approvals — proven by refuse-case tests + sim drill.
-- [ ] Authz path records both approvals with audit trail (hash-chained JSONL; Matrix/local channel documented with payload schema).
-- [ ] Estop clear remains human-only and authenticated (dual distinct principals; single/duplicate refused + audited).
-- [ ] Documented sim path (`ASPEN_SIM`) stays isolated from production arm (no `ASPEN_SIM=0`, cell `status: sim_only`).
+- [x] `propose_act` cannot transition to `act` without two distinct human approvals — proven by refuse-case tests + sim drill.
+- [x] Authz path records both approvals with audit trail (hash-chained JSONL; Matrix/local channel documented with payload schema).
+- [x] Estop clear remains human-only and authenticated (dual distinct principals; single/duplicate refused + audited).
+- [x] Documented sim path (`ASPEN_SIM`) stays isolated from production arm (no `ASPEN_SIM=0`, cell `status: sim_only`).
 
 ## QA plan
 
