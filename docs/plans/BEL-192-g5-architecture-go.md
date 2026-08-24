@@ -72,8 +72,8 @@ This is **not** a no-go on architecture. It is a go to **prepare** the range cel
 
 | ID | Work | Owner | Notes |
 |----|------|-------|-------|
-| G6 child | Cell profile + hold-to-enable runbook | robotics | Config/docs/sim first |
-| G7 child | Estop latch + audit verify on cell node | robotics + auditor | Sim drill OK before live |
+| G6 ASP-416 | Cell profile + hold-to-enable | robotics | Seeds: `config/cells/plant-range-d1.yaml`, runbook, `scripts/sim_plant_range_cell_profile.py` |
+| G7 ASP-417 | Estop latch + audit verify | robotics + auditor | Seed: `docs/runbooks/plant-range-estop-audit-drill.md` — sim drill OK before live |
 | ASP-364 | H-016 live dual-human wire | aspen / runtime | Prefer before first live act |
 | Captain | Scope + $ ceiling comment | josiah | Unblocks PO only |
 

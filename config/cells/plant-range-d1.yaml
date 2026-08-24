@@ -1,0 +1,72 @@
+# BEL-192 / ASP-381 / ASP-416 — Phase D D1 cell profile (plant-range only)
+# Architecture lock: docs/plans/BEL-192-g5-architecture-go.md
+# Status: DRAFT config — sim/runbook only. No live drivers. No PO.
+#
+# Install path (later, after captain $ ceiling + G7):
+#   /etc/starship/fleet-node.yaml  (merge node: block)
+#   /etc/starship/cells/plant-range-d1.yaml (this file, optional full profile)
+
+version: "1.0"
+cell:
+  id: plant-range-d1
+  name: "Phase D first physical cell (range)"
+  plant: plant-range
+  isolation: true
+  phase: D1
+  aspen_sim: false          # real cell MUST leave ASPEN_SIM unset/0
+  motion_allowed: false     # flip only after G6+G7 green + dual-auth usable + captain ceiling
+
+# Node identity (override hostname/node_id at install)
+node:
+  plant: plant-range
+  roles: [robotics, plant-controller, ops]
+  team: ops
+  profile: ops
+  # Prefer STARSHIP_RANGE NATS account; never share alpha ops creds on range node
+
+# Mission / arm gate
+arm:
+  hold_to_enable: true
+  require_human_operator: true
+  forbid_operator_values: [sim, ""]
+  auto_arm: false             # never auto-arm on physical profile
+  enable_window_seconds: 600  # matches dual-human enable window default
+
+# Act path (safety-adjacent)
+act:
+  path: propose_act_only
+  dual_human_required: true
+  refuse:
+    - insufficient_principals
+    - duplicate_principal
+    - self_approval
+    - expired
+  live_wire_tracker: ASP-364   # H-016 — required before first live act
+  sim_proof: scripts/sim_dual_human_gate.py
+
+# Cross-plant ACL expectation (must match config/fleet.yaml)
+acl:
+  outbound_allow: []          # plant-range: [] — never schedule into edge/alpha
+  refuse_schedule_to:
+    - plant-alpha
+    - plant-edge
+
+# Safety
+safety:
+  estop_subject: aspen.safety.estop
+  clear_subject: aspen.safety.clear
+  latch: true
+  audit:
+    path_env: ASPEN_AUDIT_PATH
+    default_path: /var/lib/aspen/audit/plant-range-d1.jsonl
+    require_hash_chain: true
+    verify_command: "python3 -c 'from aspen_edge.audit import verify_audit; ...'"  # package path on edge-rrm
+
+# Explicit non-goals for this profile
+forbidden:
+  - joint_setpoint_stream_from_hermes
+  - micro_agent_actuator_write
+  - aspen_sim_1_on_real_cell
+  - cross_plant_schedule_out
+  - unattended_dark_shift
+  - hardware_po_without_captain_ceiling
