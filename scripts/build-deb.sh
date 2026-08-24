@@ -19,10 +19,11 @@ OUTPUT_DIR="$REPO_DIR/dist"
 VERSION=$(grep "^Version:" "$CONTROL_SRC/control" | awk '{print $2}')
 # Staging root (must contain DEBIAN + filesystem paths at top level)
 PKG_ROOT="$REPO_DIR/dist/pkgroot"
-export PATH="${HOME}/.cargo/bin:${PATH:-/usr/bin}"
+# /tmp/go/bin: host CI layout (ASP-118); cargo for staragent (ASP-387 hybrid)
+export PATH="/tmp/go/bin:${HOME}/.cargo/bin:${PATH:-/usr/bin}"
 
 # ─── Pre-flight checks ───────────────────────────────────────────
-command -v go >/dev/null 2>&1 || { echo -e "${RED}[BUILD]${NC} go not found in PATH — install with: sudo apt install golang-go"; exit 1; }
+command -v go >/dev/null 2>&1 || { echo -e "${RED}[BUILD]${NC} go not found in PATH — install golang-go or place toolchain at /tmp/go/bin"; exit 1; }
 echo -e "${GREEN}[BUILD]${NC} go version: $(go version)"
 
 echo -e "${BLUE}╔══════════════════════════════════════════════╗${NC}"
@@ -114,6 +115,8 @@ cp "$REPO_DIR/dashboard/index.html" "$PKG_ROOT/opt/starship/lib/starship/dashboa
 cp "$REPO_DIR/tray/agnetic-status.py" "$PKG_ROOT/opt/starship/lib/starship/tray/" 2>/dev/null || true
 
 cp "$REPO_DIR/scripts/message_history.py" "$PKG_ROOT/opt/starship/lib/starship/scripts/"
+# Hard-required: layout assert below requires this path (ASP-151 / ASP-387)
+cp "$REPO_DIR/scripts/agent-health-checker.py" "$PKG_ROOT/opt/starship/lib/starship/scripts/"
 cp "$REPO_DIR/scripts/starship-firstboot.sh" "$PKG_ROOT/opt/starship/lib/starship/scripts/"
 cp "$REPO_DIR/scripts/gen-nats-accounts.sh" "$PKG_ROOT/opt/starship/lib/starship/scripts/" 2>/dev/null || true
 cp "$REPO_DIR/scripts/gen-nats-tls.sh" "$PKG_ROOT/opt/starship/lib/starship/scripts/" 2>/dev/null || true
@@ -138,7 +141,8 @@ done
 # Systemd
 for u in agnetic-nats.service agnetic-staragent.service agnetic-agent@.service \
          agnetic-dashboard.service agnetic-status-bridge.service \
-         agnetic-message-history.service agnetic-mesh.target starship-fleet.service; do
+         agnetic-message-history.service agnetic-mesh.target starship-fleet.service \
+         starship-health-checker.service; do
     cp "$REPO_DIR/systemd/$u" "$PKG_ROOT/lib/systemd/system/" 2>/dev/null || true
 done
 
@@ -164,9 +168,11 @@ for need in \
     "opt/starship/bin/starship-firstboot.sh" \
     "opt/starship/lib/starship/agents/agent_daemon.py" \
     "opt/starship/lib/starship/services/fleet.py" \
+    "opt/starship/lib/starship/scripts/agent-health-checker.py" \
     "etc/starship/fleet.yaml" \
     "etc/starship/nats/agent-bus.conf" \
     "lib/systemd/system/starship-fleet.service" \
+    "lib/systemd/system/starship-health-checker.service" \
     "usr/local/bin/starshipctl"; do
     if [[ ! -e "$PKG_ROOT/$need" && ! -L "$PKG_ROOT/$need" ]]; then
         err "missing required path in package: $need"
