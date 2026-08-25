@@ -42,6 +42,21 @@ that wasn't rebased onto the latest `master` would fail these checks.
 - The runtime assertions already on lines 61–62 (`-- echo ok` and
   `-- mount` deny) cover actual sandbox behavior
 
+### Contract tests added
+
+A subsequent refinement (`236f7b1` on `fix/ci-assertion-hardening`) added
+`tests/test_ci_assertions.py` — a dedicated contract test that asserts:
+
+- The `gen accounts conf valid` smoke check includes `/usr/local/bin` in PATH
+- The check skips gracefully when `nats-server` is absent
+- Neither `ci.yml` nor `smoke-test.sh` contain `grep -q built-in` (regression guard)
+- The CI workflow guards NATS install with `command -v`
+- `sandbox_run --help` uses `>/dev/null` not `grep -q built-in`
+
+The same refinement also minor-cleaned the PATH order in `ci.yml`
+(`/usr/local/bin` first) and the skip mechanism in `smoke-test.sh`
+(using `exit 0` instead of the accumulator `PASS=$((PASS+1))`).
+
 ## Reflection
 
 The root cause was coupling CI assertions to incidental output strings
@@ -60,6 +75,7 @@ radius.
   for NATS install, `sandbox_run --help >/dev/null` replacement
 - `scripts/smoke-test.sh` — PATH fix + skip-on-missing for NATS check,
   `sandbox_run --help >/dev/null` replacement
+- `tests/test_ci_assertions.py` — contract tests for CI assertion patterns
 
 ## Related
 
