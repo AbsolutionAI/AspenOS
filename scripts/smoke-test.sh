@@ -33,7 +33,7 @@ check "fleet-auth.yaml present" test -f nats/fleet-auth.yaml
 check "fleet-accounts template" test -f nats/fleet-accounts.conf.tmpl
 check "gen-nats-accounts script" test -f scripts/gen-nats-accounts.sh
 check "nats_connect helper" bash -c 'PYTHONPATH=agents python3 -c "from nats_connect import build_nats_url; assert \"nats://\" in build_nats_url()"'
-check "gen accounts conf valid" bash -c 'export PATH="$HOME/go/bin:/root/go/bin:/usr/local/bin:$PATH"; if ! command -v nats-server >/dev/null 2>&1; then echo "  SKIP  gen accounts conf valid (nats-server not installed)"; PASS=$((PASS+1)); else OUT=$(mktemp -d); bash scripts/gen-nats-accounts.sh --out "$OUT" --port 14222 >/dev/null && nats-server -c "$OUT/fleet-accounts.conf" -t >/dev/null && rm -rf "$OUT"; fi'
+check "gen accounts conf valid" bash -c 'export PATH="/usr/local/bin:$HOME/go/bin:/root/go/bin:$PATH"; if ! command -v nats-server >/dev/null 2>&1; then echo "  SKIP  gen accounts conf valid (nats-server not installed)"; exit 0; fi; OUT=$(mktemp -d); bash scripts/gen-nats-accounts.sh --out "$OUT" --port 14222 >/dev/null && nats-server -c "$OUT/fleet-accounts.conf" -t >/dev/null && rm -rf "$OUT"'
 check "gen-nats-tls script" test -f scripts/gen-nats-tls.sh
 check "tls material generates" bash -c 'OUT=$(mktemp -d); bash scripts/gen-nats-tls.sh --out "$OUT" --host localhost >/dev/null && test -f "$OUT/ca.pem" && test -f "$OUT/server-cert.pem" && rm -rf "$OUT"'
 check "firstboot syntax" bash -n scripts/starship-firstboot.sh
