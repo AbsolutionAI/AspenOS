@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -25,7 +26,7 @@ def audit_env(tmp_path, monkeypatch):
 
 
 def _read_lines(audit_dir: Path, agent: str = "proxy"):
-    path = audit_dir / f"{agent}-{time.strftime('%Y%m%d')}.jsonl"
+    path = audit_dir / f"{agent}-{datetime.now(timezone.utc).strftime('%Y%m%d')}.jsonl"
     assert path.exists(), f"missing audit file {path}"
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
