@@ -11,8 +11,14 @@ Covers:
   7. aspen.fleet.mission.held — hold on estop
 
 Simulates the full robotics agent contract surface.
+
+Usage:
+  python3 scripts/smoke-fleet-bus.py
+  python3 scripts/smoke-fleet-bus.py --repo-root /path/to/aspen-os
+  ASPEN_REPO_ROOT=/path/to/aspen-os python3 scripts/smoke-fleet-bus.py
 """
 
+import argparse
 import os
 import sys
 import json
@@ -21,8 +27,15 @@ from pathlib import Path
 # Ensure ASPEN_SIM=1
 os.environ.setdefault("ASPEN_SIM", "1")
 
-# Add both repos to sys.path
-REPO_DIR = Path(__file__).resolve().parent
+# Allow explicit repo root from CLI flag or env var (supports git worktrees)
+_parser = argparse.ArgumentParser()
+_parser.add_argument("--repo-root", help="Override repo root (supports git worktrees)")
+_args = _parser.parse_args()
+
+REPO_DIR = Path(_args.repo_root).resolve() if _args.repo_root else (
+    Path(os.environ.get("ASPEN_REPO_ROOT")) if os.environ.get("ASPEN_REPO_ROOT") else
+    Path(__file__).resolve().parent
+)
 ASPEN_OS = REPO_DIR
 SWARM_DIR = REPO_DIR.parent / "aspen-swarm-manager"
 RRM_DIR = REPO_DIR.parent / "aspen-edge-rrm"

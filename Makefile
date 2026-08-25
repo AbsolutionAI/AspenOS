@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-CARGO := $(HOME)/.cargo/bin/cargo
+CARGO := $(shell command -v cargo 2>/dev/null || echo "$(HOME)/.cargo/bin/cargo")
 GO := go
 export PATH := $(HOME)/.cargo/bin:$(HOME)/.local/bin:$(PATH)
 
@@ -114,7 +114,7 @@ smoke:
 	@bash scripts/smoke-test.sh
 
 fleet-smoke:
-	@PYTHONPATH=agents:../aspen-swarm-manager:../aspen-edge-rrm ASPEN_SIM=1 python3 scripts/smoke-fleet-bus.py
+	@PYTHONPATH=agents:../aspen-swarm-manager:../aspen-edge-rrm ASPEN_SIM=1 python3 scripts/smoke-fleet-bus.py --repo-root "$$(pwd)"
 
 iso-smoke:
 	@bash scripts/iso-firstboot-smoke.sh
