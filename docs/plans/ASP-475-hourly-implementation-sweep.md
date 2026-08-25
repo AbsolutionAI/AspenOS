@@ -36,10 +36,26 @@
 
 6. **Check for plan drift** — verify that existing plans reference correct issue IDs, branch names, and that their dispositions are recorded.
 
-## Implementation order
+## Disposition (completed 2026-08-25)
 
-1. Assess existing compound learnings for gaps (check asp-463-ci-assertion-hardening.md for coverage of latest CI hardening).
-2. Write missing compound learning for CI assertion hardening v2 if needed.
-3. Write compound learning for NATS credential scrub (ASP-365) if missing.
-4. Assess stale hermetic branches for cleanup.
-5. Post disposition on ASP-475.
+### Done this heartbeat
+
+1. **Compound learning: fleet D1 cell profile seeds** — Added `docs/solutions/asp-381-plant-range-d1-cell-profile.md` covering the D1 cell profile YAML, hold-to-enable runbook, estop audit drill runbook, sim profile contract script, fleet ACL integration, and plant-range robotics role. (commit `75417c9`)
+
+2. **Stale branch cleanup** — Deleted 10 local branches that were fully merged into HEAD: `asp-169`, `asp-171`, `asp-172`, `asp-173`, `asp-174`, `asp-36`, `asp-364`, `asp-384`, `asp-417`, and `hermes/asp-364-dual-human-wire`.
+
+### Previously completed (commit `95daac9`)
+
+3. **Compound learning: ASP-365 NATS credential scrub** — Added `docs/solutions/asp-365-nats-credential-scrub.md`.
+4. **Compound learning: ASP-463 CI hardening v2** — Updated `docs/solutions/asp-463-ci-assertion-hardening.md` for contract tests.
+5. **CI noise reduction learning** — `asp-ci-noise-reduction-paths-ignore.md` already present.
+
+### Items assessed with no action needed
+
+- **Packaging forward-port branch health** — `hermes/asp-459-packaging-forward-port` is ahead of `origin/master` by 30 commits (all features, fixes, and docs). No merge conflicts; no reconciliation needed. The branch is the active development branch.
+
+- **Stale origin `hermes/hermes-*` branches** — 20 orphan hash-named branches on origin. These are stale worktree artifacts from prior Hermes sessions. Cannot delete remote branches without confirmation — flagged for future sweep.
+
+### Not actionable this heartbeat
+
+- ASP-454 (backlog starship-health-checker deb) — already resolved by `48d5b57` on this branch. Can be closed.
