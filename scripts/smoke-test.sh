@@ -51,9 +51,9 @@ check "ops firstboot enables native sandbox" grep -q 'STARSHIP_SANDBOX_NATIVE=1'
 check "ops profile nats_mode fleet" bash -c 'awk "/^  ops:/{p=1} p&&/nats_mode:/{print; exit}" config/profiles.yaml | grep -q fleet'
 check "fleet-bus token placeholder" grep -q '__STARSHIP_NATS_TOKEN__' nats/fleet-bus.conf
 check "server.conf token placeholder" grep -q '__STARSHIP_NATS_TOKEN__' nats/server.conf
-check "server.conf admin pass placeholder" grep -q '__NATS_ADMIN_PASS__' nats/server.conf
-check "server.conf user pass placeholder" grep -q '__NATS_USER_PASS__' nats/server.conf
-check "no live lab NATS secrets in nats/" bash -c '! grep -RInE "agnetic_s3cr3t_t0k3n|agnetic_admin_2026|agnetic_user_2026" nats/ scripts/setup-nats-auth.sh src/python/lib/scripts/setup-nats-auth.sh 2>/dev/null'
+check "server.conf has no live secrets (H-017)" bash -c '! grep -E "agnetic_s3cr3t_t0k3n|agnetic_admin_2026|agnetic_user_2026" nats/server.conf scripts/setup-nats-auth.sh'
+check "server.conf is placeholder-only" bash -c 'grep -q __STARSHIP_NATS_TOKEN__ nats/server.conf && grep -qE "DEPRECATED|H-017" nats/server.conf'
+check "setup-nats-auth uses gen-nats-accounts" grep -q 'gen-nats-accounts.sh' scripts/setup-nats-auth.sh
 check "nats tls default-on in firstboot" grep -q 'STARSHIP_NATS_TLS:-1' scripts/starship-firstboot.sh
 check "gen-nats-tls enforces mTLS" grep -q 'verify: true' scripts/gen-nats-tls.sh
 check "firstboot wires tls for both bus modes" bash -c 'grep -q "_setup_nats_tls /etc/starship/nats/fleet-bus.active.conf" scripts/starship-firstboot.sh && grep -q "_setup_nats_tls \"\$out/fleet-accounts.conf\"" scripts/starship-firstboot.sh'

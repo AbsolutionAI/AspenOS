@@ -230,7 +230,8 @@ log "Installing NATS configuration..."
 cp "$REPO_DIR/nats/fleet-bus.conf" /etc/starship/nats/ 2>/dev/null || true
 cp "$REPO_DIR/nats/fleet-auth.yaml" /etc/starship/nats/ 2>/dev/null || true
 cp "$REPO_DIR/nats/fleet-accounts.conf.tmpl" /etc/starship/nats/ 2>/dev/null || true
-cp "$REPO_DIR/nats/server.conf" /etc/starship/nats/ 2>/dev/null || true
+# H-017: server.conf is placeholder-only / deprecated — never active production secrets
+cp "$REPO_DIR/nats/server.conf" /etc/starship/nats/server.conf.deprecated 2>/dev/null || true
 cp "$REPO_DIR/nats/subjects.yaml" /etc/starship/nats/ 2>/dev/null || true
 cp "$REPO_DIR/scripts/gen-nats-accounts.sh" /opt/starship/lib/starship/scripts/ 2>/dev/null || true
 cp "$REPO_DIR/agents/nats_connect.py" /opt/starship/lib/starship/agents/ 2>/dev/null || true

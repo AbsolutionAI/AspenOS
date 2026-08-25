@@ -28,7 +28,7 @@ We aim to acknowledge reports within **7 days**.
 | **Tool sandbox** | Python `CommandExecutor` + optional C11 `sandbox_run` (seccomp, namespaces) |
 | **Policy** | Shared JSON (`config/policy.default.json`) + C11 `policyexec` + fleet red/blue ACL |
 | **NATS** | Dual-prefix subjects; multi-tenant accounts + nkeys; mTLS by default (H-006); per-node enrollment tokens + revocation list (H-002) |
-| **Secrets** | Gitignored credentials; AES-256-GCM secrets helper; output redaction |
+| **Secrets** | No live NATS tokens/passwords in git (H-017); gitignored `nats/creds/`; AES-256-GCM secrets helper; output redaction |
 | **Runtime** | systemd `NoNewPrivileges`, `ProtectSystem=strict`; AppArmor profiles |
 | **Models** | Local Ollama only by default; abliterated models require policy + sandbox |
 
