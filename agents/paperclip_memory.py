@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 """Starship OS — Paperclip memory ingestion hook (BEL-154 Component 1).
 
-Agent-side wiring so a Paperclip task/session completion can append a raw
+Agent-side wiring so a Paperclip session/task completion can append a raw
 BEL-154 ingest record (``source="paperclip"``) that the promotion pipeline
-(``scripts/memory_promote.py``) consumes. Mirrors the Hermes hook
-(``agents/agent_daemon.py::ingest_memory_record``), the OpenCode hook
-(``agents/opencode_memory.py``), and the Aider hook
-(``agents/aider_memory.py``): best-effort and failure-isolated — a memory
+(``scripts/memory_promote.py``) consumes. Mirrors the Aider hook
+(``agents/aider_memory.py``) and the OpenCode hook
+(``agents/opencode_memory.py``): best-effort and failure-isolated — a memory
 hiccup can never break the caller.
 
 CLI (usable as a Paperclip run-completion hook / wrapper / one-off)::
 
     python3 agents/paperclip_memory.py --source-id ASP-77 \\
-        --content "Task summary …" --files docs/x,agents/y --tools bash,edit \\
+        --content "Task summary \u2026" --files docs/x,agents/y --tools bash,edit \\
         --linear-refs BEL-154 --paperclip-refs ASP-77
     cat summary.txt | python3 agents/paperclip_memory.py --source-id ASP-77 --stdin
 
@@ -54,7 +53,7 @@ def ingest_paperclip_record(
 
     Best-effort and failure-isolated: any error (missing import, bad write,
     oversized content) is logged at debug and never propagates to the caller,
-    per the memory layer's "ingestion failure ≠ promotion failure ≠ access
+    per the memory layer's "ingestion failure \u2260 promotion failure \u2260 access
     failure" principle. Returns the written path, or ``None`` on failure.
     """
     try:

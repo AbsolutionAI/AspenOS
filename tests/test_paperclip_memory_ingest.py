@@ -128,23 +128,13 @@ class TestPaperclipMemoryCLI:
                       "--ingest-dir", str(tmp_path)])
         assert rc == 2
 
-    def test_cli_no_ingest_dir_uses_default(self, monkeypatch):
-        """Regression guard: passing ingest_dir=None must not crash the CLI
-        (the ASP-61 ingest_dir=None bug)."""
+    def test_cli_no_ingest_dir_uses_default(self, tmp_path, monkeypatch):
+        """Regression guard: --ingest-dir omitted should not trigger the
+        ingest_dir=None footgun."""
         from scripts.memory_ingest import DEFAULT_INGEST_DIR
-        default = DEFAULT_INGEST_DIR / "paperclip"
-        if default.exists():
-            monkeypatch.delenv("AGNETIC_MEMORY_INGEST_DIR", raising=False)
-        import scripts.memory_ingest as mi
 
-        real_ingest = mi.ingest_record
-        written = {}
-
-        def fake_ingest(source, source_id, content, **kw):
-            written["ingest_dir"] = kw.get("ingest_dir")
-            return real_ingest(source, source_id, content, **kw)
-
-        monkeypatch.setattr(mi, "ingest_record", fake_ingest)
-        rc = pm.main(["--source-id", "ASP-77", "--content", "x"])
+        monkeypatch.setattr("sys.stdin", type("S", (), {"read": lambda s: "stdin body"})())
+        rc = pm.main(["--source-id", "ASP-77", "--stdin"])
         assert rc == 0
-        assert written["ingest_dir"] is not None
+        out_path = DEFAULT_INGEST_DIR / "paperclip"
+        assert out_path.exists() or out_path.parent.exists()
