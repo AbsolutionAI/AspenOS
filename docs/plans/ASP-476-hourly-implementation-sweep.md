@@ -38,13 +38,20 @@
 
 ## Disposition (completed 2026-08-25)
 
-### Done this heartbeat
+### Done this heartbeat (continuation run 2026-08-25)
 
 1. **Stale branch + worktree cleanup** — Removed orphan `hermes/hermes-f3f73eab` local branch and its locked worktree at `.worktrees/hermes-f3f73eab`.
 
 2. **Untracked plan file cleanup** — Removed stale `docs/plans/ASP-472-hourly-implementation-sweep.md` (leftover from prior sweep, superseded by ASP-475/476).
 
 3. **Upstream tracking fix** — Set `hermes/asp-459-packaging-forward-port` to track `origin/hermes/asp-459-packaging-forward-port` (was missing upstream reference).
+
+4. **Stale plan file cleanup** — Removed 3 completed/orphaned plan files:
+   - `docs/plans/ASP-8-foundation-checkbox-sync.md` (checkbox sync, completed)
+   - `docs/plans/ASP-9-model-routing-docs.md` (doc commit, completed)
+   - `docs/plans/2026-08-10-epos-pcake.md` (3-line Linear reference, no aspen-os code)
+   - `BEL-134-aider-agent-zero.md` and `BEL-135-appflowy-knowledge-layer.md` retained as reference/future-work docs.
+   - `alpha-2.1-addendum.md`, `starship-os-streamline.md`, `paperclip-multi-company-alignment.md` retained (pre-rebrand/orphaned but substantive).
 
 ### Items assessed with no action needed
 
