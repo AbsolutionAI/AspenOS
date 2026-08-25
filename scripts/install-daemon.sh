@@ -266,6 +266,9 @@ cp "$REPO_DIR/systemd/agnetic-dashboard.service" /etc/systemd/system/
 cp "$REPO_DIR/systemd/agnetic-status-bridge.service" /etc/systemd/system/
 cp "$REPO_DIR/systemd/agnetic-message-history.service" /etc/systemd/system/
 cp "$REPO_DIR/systemd/agnetic-mesh.target" /etc/systemd/system/
+cp "$REPO_DIR/systemd/starship-fleet.service" /etc/systemd/system/ 2>/dev/null || true
+cp "$REPO_DIR/systemd/starship-health-checker.service" /etc/systemd/system/
+cp "$REPO_DIR/scripts/agent-health-checker.py" /opt/starship/lib/starship/scripts/
 
 systemctl daemon-reload
 log "Systemd units installed and daemon reloaded"
@@ -293,6 +296,8 @@ systemctl enable agnetic-status-bridge.service
 systemctl enable agnetic-message-history.service
 systemctl enable agnetic-dashboard.service
 systemctl enable agnetic-mesh.target
+systemctl enable starship-fleet.service 2>/dev/null || true
+systemctl enable starship-health-checker.service
 
 log "All services enabled"
 
