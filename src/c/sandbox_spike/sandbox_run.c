@@ -140,8 +140,8 @@ static int enter_namespaces(int use_ns) {
     return flags;
 }
 
-static void usage(const char *argv0) {
-    fprintf(stderr,
+static void usage(FILE *out, const char *argv0) {
+    fprintf(out,
             "Usage: %s [--timeout SECS] [--no-seccomp] [--no-ns] -- COMMAND [ARGS...]\n"
             "  Starship OS C11 sandbox (ADR 0001)\n"
             "  seccomp: %s\n",
@@ -175,13 +175,13 @@ int main(int argc, char **argv) {
             break;
         }
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
-            usage(argv[0]);
+            usage(stdout, argv[0]);
             return 0;
         }
         break;
     }
     if (i >= argc) {
-        usage(argv[0]);
+        usage(stderr, argv[0]);
         return 2;
     }
 

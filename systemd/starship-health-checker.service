@@ -1,5 +1,5 @@
 [Unit]
-Description=Starship OS Agent Health Checker
+Description=Starship OS Agent Health Checker — monitors agent connectivity to Ollama models
 Documentation=https://starshipos.ai/docs/health
 After=network.target agnetic-nats.service
 Wants=agnetic-nats.service

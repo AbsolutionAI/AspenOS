@@ -314,6 +314,7 @@ systemctl start agnetic-agent@ergo.service
 systemctl start agnetic-status-bridge.service
 systemctl start agnetic-message-history.service
 systemctl start agnetic-dashboard.service
+systemctl start starship-health-checker.service
 
 sleep 3
 log "All services started"
@@ -325,7 +326,7 @@ echo -e "${BLUE}  Installation Complete — Service Status${NC}"
 echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
 echo ""
 
-for unit in agnetic-nats agnetic-staragent agnetic-agent@proxy agnetic-agent@romi agnetic-agent@ergo agnetic-status-bridge agnetic-message-history agnetic-dashboard; do
+for unit in agnetic-nats agnetic-staragent agnetic-agent@proxy agnetic-agent@romi agnetic-agent@ergo agnetic-status-bridge agnetic-message-history agnetic-dashboard starship-health-checker; do
     status=$(systemctl is-active "$unit.service" 2>/dev/null || echo "inactive")
     if [[ "$status" == "active" ]]; then
         echo -e "  ${GREEN}●${NC} $unit.service — ${GREEN}running${NC}"

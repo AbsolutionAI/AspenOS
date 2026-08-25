@@ -180,19 +180,7 @@ Every file in the repository with its purpose.
 | `agnetic-agents.service` | Starts `agent_daemon.py`. BindsTo `nats`. |
 | `agnetic-dashboard.service` | Starts `dashboard/server.py`. After agents. |
 
-### 2.8 `deploy/` — Advanced Systemd Units (Mesh)
-
-| File | Purpose |
-|---|---|
-| `nats.service` | Alternative NATS service. |
-| `staragent.service` | Alternative StarAgent service. |
-| `agnetic-agent-mesh.target` | Target requiring NATS + StarAgent + agent template units. |
-| `agnetic-agent@.service` | Template unit (`%i` = proxy/romi/ergo). |
-| `agnetic-dashboard.target` | Target for dashboard stack. |
-| `agnetic-dashboard-web.service` | Dashboard HTTP server. |
-| `agnetic-status-bridge.service` | NATS→JSON bridge. |
-
-### 2.9 `nats/` — NATS Configuration
+### 2.8 `nats/` — NATS Configuration
 
 | File | Purpose |
 |---|---|
@@ -200,14 +188,14 @@ Every file in the repository with its purpose.
 | `fleet-accounts.conf.tmpl` | Default config template: multi-tenant accounts + nkeys (materialized by `scripts/gen-nats-accounts.sh`, H-001). |
 | `subjects.yaml` | NATS subject topology reference. |
 
-### 2.10 `tray/` — System Tray Components
+### 2.9 `tray/` — System Tray Components
 
 | File | Purpose |
 |---|---|
 | `agnetic-indicator.py` | GTK3 AppIndicator — reads `status.json`, colored icons, menu with commands. |
 | `agnetic-status.py` | NATS→JSON bridge: subscribes status/telemetry/events, writes to `/tmp/agnetic-status.json`. |
 
-### 2.11 `cinnamon/` — Cinnamon Desklet
+### 2.10 `cinnamon/` — Cinnamon Desklet
 
 | File | Purpose |
 |---|---|
@@ -217,13 +205,13 @@ Every file in the repository with its purpose.
 | `stylesheet.css` | Dark glass theme with Orbitron headers. |
 | `link-desklet.sh` | Symlinks files into Cinnamon desklet directory. |
 
-### 2.12 `conky/`
+### 2.11 `conky/`
 
 | File | Purpose |
 |---|---|
 | `agnetic.conkyrc` | Conky config — top-right overlay, agent status + telemetry via `execi python3 -c`. |
 
-### 2.13 `skills/` — Skill Definitions
+### 2.12 `skills/` — Skill Definitions
 
 | File | Purpose |
 |---|---|
@@ -233,7 +221,7 @@ Every file in the repository with its purpose.
 | `romi-interface/SKILL.md` | Romi: NL understanding, task explanation, multi-turn conversation. |
 | `system-health/SKILL.md` | Proxy: resource monitoring, process mgmt, alerting. |
 
-### 2.14 `souls/` — Agent Persona Definitions
+### 2.13 `souls/` — Agent Persona Definitions
 
 | File | Purpose |
 |---|---|
@@ -241,20 +229,20 @@ Every file in the repository with its purpose.
 | `romi/SOUL.md` | Romi persona: Andromi — warm proactive PA. |
 | `ergo/SOUL.md` | Ergo persona: Diplomatic strategist (Trance + Hunt + Andromeda). |
 
-### 2.15 `agent/` — Rust StarAgent
+### 2.14 `agent/` — Rust StarAgent
 
 | File | Purpose |
 |---|---|
 | `Cargo.toml` | Dependencies: `async-nats`, `sysinfo`, `tokio`, `serde`. |
 | `src/main.rs` | Every 10s collects CPU, memory, disk, network → publishes `agnetic.telemetry`. |
 
-### 2.16 `docs/`
+### 2.15 `docs/`
 
 | File | Purpose |
 |---|---|
 | `ARCHITECTURE.md` | Original architecture doc (predecessor to this file). |
 
-### 2.17 `.github/workflows/`
+### 2.16 `.github/workflows/`
 
 | File | Purpose |
 |---|---|
@@ -693,7 +681,6 @@ Or use the Makefile: `make run-all`
 | `nats/server.conf` | NATS config | Production NATS: port, auth token, JetStream limits, accounts, subject permissions | nats-server |
 | `nats/fleet-accounts.conf.tmpl` | NATS config | Multi-tenant accounts bus: OPS/EDGE/RANGE/TELEM + nkeys (default, H-001) | nats-server |
 | `systemd/*.service` | systemd unit | ExecStart, After, BindsTo, User, Restart policy | systemd |
-| `deploy/*.target` / `.service` | systemd unit | Mesh deployment: targets, template units, chained dependencies | systemd |
 | `cinnamon/settings-schema.json` | JSON | Desklet refresh interval (1–60s, default 5) | Cinnamon |
 | `conky/agnetic.conkyrc` | Lua | Conky: position, size, update interval, data sources, colors | conky |
 | `.github/workflows/ci.yml` | YAML | CI: lint, gitleaks, trivy, pytest | GitHub Actions |
@@ -768,18 +755,18 @@ multi-user.target
               └── agnetic-dashboard.service  (After=agents)
 ```
 
-### 8.3 Systemd Service Graph (Mesh/Advanced)
+### 8.3 Systemd Service Graph (Mesh)
 
 ```
-agnetic-agent-mesh.target
-  ├── nats.service (Required)
-  ├── staragent.service (Required)
+agnetic-mesh.target (WantedBy=multi-user.target)
+  ├── agnetic-nats.service (Required)
+  ├── agnetic-staragent.service
   ├── agnetic-agent@proxy.service (Template)
   ├── agnetic-agent@romi.service (Template)
   ├── agnetic-agent@ergo.service (Template)
-  └── agnetic-dashboard.target (BindsTo=mesh)
-        ├── agnetic-status-bridge.service
-        └── agnetic-dashboard-web.service
+  ├── agnetic-status-bridge.service
+  ├── agnetic-message-history.service
+  └── agnetic-dashboard.service
 ```
 
 ### 8.4 Process Ownership

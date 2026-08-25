@@ -4,8 +4,8 @@ set -e
 
 echo "=== Starship OS ISO — Custom Hook ==="
 
-# Install Ollama
-curl -fsSL https://ollama.com/install.sh | sh
+# Install Ollama (pinned; install.sh honors OLLAMA_VERSION)
+curl -fsSL https://ollama.com/install.sh | OLLAMA_VERSION="0.31.2" sh
 
 # Install NATS
 NATS_VERSION="2.14.3"
@@ -15,19 +15,27 @@ curl -fsSL "https://github.com/nats-io/nats-server/releases/download/v${NATS_VER
 useradd --system --no-create-home --shell /usr/sbin/nologin --comment "Starship OS" agnetic || true
 useradd --system --no-create-home --shell /usr/sbin/nologin --comment "NATS" nats || true
 
-# Create directories
-mkdir -p /opt/agnetic/{bin,lib/agnetic,venv}
-mkdir -p /etc/agnetic/nats
-mkdir -p /var/lib/agnetic/{nats,message-history}
-mkdir -p /var/log/agnetic
+# Create directories (starship primary, legacy agnetic compat symlinks)
+# NB: plain sh (no brace expansion) — hook runs under dash in live-build
+mkdir -p /opt/starship/bin /opt/starship/lib/starship /opt/starship/venv
+mkdir -p /etc/starship/nats
+mkdir -p /var/lib/starship/nats /var/lib/starship/message-history
+mkdir -p /var/log/starship
+
+# Transitional Alpha 2.1 dual-root (legacy agnetic paths), mirrors install-daemon.sh
+ln -sfn /opt/starship /opt/agnetic
+ln -sfn /opt/starship/lib/starship /opt/starship/lib/agnetic
+ln -sfn /etc/starship /etc/agnetic
+ln -sfn /var/lib/starship /var/lib/agnetic
+ln -sfn /var/log/starship /var/log/agnetic
 
 # Create Python venv
-python3 -m venv /opt/agnetic/venv
-/opt/agnetic/venv/bin/pip install --upgrade pip -q
-/opt/agnetic/venv/bin/pip install nats-py aiohttp httpx PyYAML -q
+python3 -m venv /opt/starship/venv
+/opt/starship/venv/bin/pip install --upgrade pip -q
+/opt/starship/venv/bin/pip install nats-py aiohttp httpx PyYAML -q
 
 # Set ownership
-chown -R agnetic:agnetic /opt/agnetic /etc/agnetic /var/lib/agnetic /var/log/agnetic
-chown -R nats:nats /var/lib/agnetic/nats
+chown -R agnetic:agnetic /opt/starship /etc/starship /var/lib/starship /var/log/starship
+chown -R nats:nats /var/lib/starship/nats
 
 echo "=== Starship OS ISO — Hook Complete ==="
