@@ -34,7 +34,7 @@ _args = _parser.parse_args()
 
 REPO_DIR = Path(_args.repo_root).resolve() if _args.repo_root else (
     Path(os.environ.get("ASPEN_REPO_ROOT")) if os.environ.get("ASPEN_REPO_ROOT") else
-    Path(__file__).resolve().parent
+    Path(__file__).resolve().parent.parent
 )
 ASPEN_OS = REPO_DIR
 SWARM_DIR = REPO_DIR.parent / "aspen-swarm-manager"

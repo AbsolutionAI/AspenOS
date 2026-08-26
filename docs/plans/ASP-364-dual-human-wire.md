@@ -16,6 +16,20 @@ proposals hold at `propose_act` until two distinct human principals authorize; t
 propose_act→act transition verifies the two-principal record immediately before act.
 No physical motion, no `ASPEN_SIM=0` drivers, cell stays `status: sim_only`.
 
+## Disposition
+
+**COMPLETE** (2026-08-25) — All acceptance criteria verified:
+- All 17 pytest tests pass in `aspen-edge-rrm` (gate + RRM wiring + estop-clear hardening)
+- `scripts/sim_dual_human_gate.py` exit 0 — 5 refuse cases + happy path
+- `scripts/sim_estop_range_cell.py` exit 0 — G7 regression green
+- `scripts/sim_act_gate_wire.py` exit 0 — full end-to-end drill + verify_audit ok (31 events)
+- Compound learning archived at `docs/solutions/asp-364-dual-human-act-gate.md`
+- Cell profile `config/cells/plant-range-d1.yaml` tracks live-wire as `ASP-364`
+- Doc artifacts all updated: SECURITY.md checklist, ACT_GATE_CONTRACT.md, robotics README/runbook/cell-profile
+
+Implementation lives on `hermes/asp-364-dual-human-wire` in both `aspen-os` and
+`aspen-edge-rrm`, merged forward into `hermes/asp-459-packaging-forward-port`.
+
 ## Threat model (F-017)
 
 A single principal — even a privileged one or the proposing agent's own operator —
