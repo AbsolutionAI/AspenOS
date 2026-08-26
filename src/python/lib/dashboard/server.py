@@ -38,7 +38,6 @@ _CANDIDATES = [
     Path(os.getenv("AGNETIC_ROOT", "")),
     Path(os.getenv("STARSHIP_ROOT", "")),
     _HERE.parent if (_HERE.parent / "agents").is_dir() else None,
-    Path("/opt/starship-os-build/starship-os"),
     Path("/opt/starship/lib/starship"),
     Path("/opt/agnetic"),
 ]
