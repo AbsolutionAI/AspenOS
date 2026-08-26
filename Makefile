@@ -3,7 +3,7 @@ CARGO := $(shell command -v cargo 2>/dev/null || echo "$(HOME)/.cargo/bin/cargo"
 GO := go
 export PATH := $(HOME)/.cargo/bin:$(HOME)/.local/bin:$(PATH)
 
-.PHONY: all build build-agent cli install uninstall run dev stop clean status profile sandbox smoke fleet-smoke bench iso-smoke policyexec starshipd heald c11 iso-boot
+.PHONY: all build build-agent cli install uninstall run dev stop clean status profile sandbox smoke fleet-smoke bench iso-smoke policyexec starshipd heald c11 iso-boot nightly nightly-clean
 
 all: build build-agent
 
@@ -138,6 +138,13 @@ iso: build build-agent
 	@command -v lb >/dev/null 2>&1 || { echo "  SKIP  ISO build — live-build (lb) not installed. This is a control-plane host."; echo "        See docs/ops/ISO_BUILDER.md"; exit 0; }
 	@echo "Building ISO (requires root)..."
 	sudo bash scripts/build-iso.sh
+
+# ─── Nightly packaging (CI-simulated build + validation) ─────────────
+nightly: build build-agent sandbox deb
+	@bash scripts/nightly-check.sh
+
+nightly-clean: clean
+	rm -f dist/*.deb
 
 docker:
 	docker build -t agnetic-os .
