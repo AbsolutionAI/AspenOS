@@ -51,8 +51,12 @@
 - No doc edits in this pass beyond the plan.
 
 ## Acceptance
-- [ ] Plan written before code edits
-- [ ] Both `install-systemd.sh` copies resolve units from repo `systemd/` with `/opt/starship/systemd` fallback
-- [ ] Real unit names used; no `agnetic-agents` phantom service
-- [ ] `bash -n` clean
-- [ ] Working tree clean after commit; ASP-15 disposition recorded
+- [x] Plan written before code edits
+- [x] Both `install-systemd.sh` copies resolve units from repo `systemd/` with `/opt/starship/systemd` fallback
+- [x] Real unit names used; no `agnetic-agents` phantom service
+- [x] `bash -n` clean
+- [x] Working tree clean after commit; ASP-15 disposition recorded
+
+## Disposition (ASP-480 sweep — 2026-08-25)
+
+**Status: Completed.** All acceptance criteria met. Both `install-systemd.sh` copies resolve units from repo `systemd/` with `/opt/starship/systemd` fallback. Real unit names used; no `agnetic-agents` phantom service. `bash -n` clean. Implementation confirmed on current branch.
