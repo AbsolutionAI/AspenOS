@@ -62,9 +62,9 @@ New since last sweep: untracked file `agents/acp_ergo_agent.py` appeared in work
 - [x] Sibling branches documented
 - [x] All plan files have dispositions
 
-## Disposition
+## Disposition (Updated 2026-08-26T22:XX UTC)
 
-**COMPLETED** (2026-08-26)
+**COMPLETED — continued from heartbeat bfc433d1**
 
 ### Task Results
 
@@ -79,6 +79,8 @@ New since last sweep: untracked file `agents/acp_ergo_agent.py` appeared in work
 - Imports `acp`/`acp.schema` — neither package exists in repo or system
 - `acp` on PyPI is v0.0.0 placeholder, cannot install (PEP 668)
 - **Disposition**: REMOVED from workspace as untracked detritus. If needed, requires `acp` SDK dependency story first.
+
+**⚠️ Continuation finding**: File reappeared at 2026-08-26T22:06Z (2 min after prior commit). Added to `.gitignore` to prevent recurring detritus.
 
 #### Task 3: PR #29 Status
 - State: OPEN, mergeable=null (unstable — GitHub still evaluating)
@@ -99,9 +101,9 @@ New since last sweep: untracked file `agents/acp_ergo_agent.py` appeared in work
 - All 55 have `## Disposition` sections — 100% coverage
 
 ### Workspace State
-- Working tree: clean
-- 0 stashes, 0 untracked files (acp_ergo_agent.py removed)
+- Working tree: clean (.gitignore updated to prevent acp_ergo_agent.py regrowth)
+- 0 stashes, 0 untracked files
 - 7 local branches, all track remote counterparts
 - 1 locked worktree (pre-existing `hermes-155314b9`)
-- 87 commits ahead of master, 0 behind
+- 88 commits ahead of master, 0 behind
 - PR #29 open, mergeable=null (unstable)

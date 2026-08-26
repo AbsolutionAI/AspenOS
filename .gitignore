@@ -29,6 +29,9 @@ logs/
 *.sock
 /tmp/
 
+# Regenerating untracked detritus — ACP bridge agent (acp dependency not available)
+agents/acp_ergo_agent.py
+
 # OS files
 .DS_Store
 Thumbs.db
