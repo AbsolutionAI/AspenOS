@@ -2,6 +2,7 @@
 
 **Created**: 2026-08-26
 **Status**: Completed
+**Last Heartbeat**: 2026-08-26T18:53Z
 
 ## Objective
 
@@ -102,10 +103,10 @@ The three sibling branches (`asp-365`, `asp-381`, `asp-424`) each carry 1-2 comm
 - 100% of 51 plan files have dispositions
 - No stale references or orphaned file references
 
-#### Sibling Branch Note
-- `hermes/asp-365-scrub-nats-creds`: 1 commit behind forward-port (`8b1ff9a` — NATS cred scrub) — consider cherry-picking into PR #29
+#### Sibling Branch Note (Updated 2026-08-26T18:53Z)
+- `hermes/asp-365-scrub-nats-creds`: ✅ Already forward-ported — cherry-pick produced 0 net changes; all H-017 security markers present in HEAD
 - `hermes/asp-381-phase-d-prep`: 2 commits behind forward-port (cell profile feature + docs) — separate PR after forward-port merges
-- `hermes/asp-424-nightly-runbook`: 1 commit behind (runbook doc) — docs, trivial
+- `hermes/asp-424-nightly-runbook`: ✅ Already forward-ported — commit `7879c4c` matches `1bff394`; file already on forward-port branch
 
 ### Workspace State
 - Working tree: clean
