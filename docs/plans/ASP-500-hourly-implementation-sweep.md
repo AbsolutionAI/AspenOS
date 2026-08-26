@@ -24,7 +24,7 @@ Last sweep added `agents/acp_ergo_agent.py` to `.gitignore` to prevent recurring
 
 - Working tree: clean, no stashes, no untracked files
 - `.gitignore` entry for `agents/acp_ergo_agent.py` in place — file not present
-- Branch: `hermes/asp-459-packaging-forward-port`, 89 ahead of master, 0 behind
+- Branch: `hermes/asp-459-packaging-forward-port`, 90 ahead of master, 0 behind
 - No new commits on master since last sweep
 
 ### Task 2: Build Verification
@@ -34,8 +34,8 @@ Last sweep added `agents/acp_ergo_agent.py` to `.gitignore` to prevent recurring
 
 ### Task 3: PR #29 Status
 
-- PR #29: OPEN (HTTP 200 on GitHub URL)
-- Head: `hermes/asp-459-packaging-forward-port` (89 ahead of master)
+- PR #29: OPEN (HTTP 200 confirmed)
+- Head: `hermes/asp-459-packaging-forward-port` (90 ahead of master)
 - No action required this heartbeat
 
 ### Task 4: Sibling Branch Forward-Port Audit
@@ -56,15 +56,15 @@ Last sweep added `agents/acp_ergo_agent.py` to `.gitignore` to prevent recurring
 - [x] Sibling branches documented
 - [x] All plan files have dispositions
 
-## Disposition (Updated 2026-08-26T23:XX UTC)
+## Disposition (Updated 2026-08-26T23:55 UTC)
 
-**COMPLETED — continued from heartbeat ce787ccc**
+**COMPLETED — continued from run 6007f82c (liveness continuation)
 
 ### Task Results
 
 #### Task 1: Workspace Verification
 - Working tree: clean — 0 dirty, 0 staged, 0 untracked, 0 stashes
-- Branch: `hermes/asp-459-packaging-forward-port`, 89 ahead of master, 0 behind
+- Branch: `hermes/asp-459-packaging-forward-port`, 90 ahead of master, 0 behind
 - `.gitignore` entry for `agents/acp_ergo_agent.py` holding — file not present
 - No new commits on master since last sync
 
@@ -74,7 +74,7 @@ Last sweep added `agents/acp_ergo_agent.py` to `.gitignore` to prevent recurring
 
 #### Task 3: PR #29 Status
 - State: OPEN (HTTP 200 confirmed)
-- 89 commits ahead of master, 0 behind
+- 90 commits ahead of master, 0 behind
 - URL: https://github.com/AbsolutionAI/AspenOS/pull/29
 - No action required this heartbeat
 
@@ -89,5 +89,5 @@ Last sweep added `agents/acp_ergo_agent.py` to `.gitignore` to prevent recurring
 ### Workspace State
 - Working tree: clean, 0 untracked, 0 stashes
 - 8 local branches, all track remote counterparts
-- 89 commits ahead of master, 0 behind
+- 90 commits ahead of master, 0 behind
 - PR #29 open
