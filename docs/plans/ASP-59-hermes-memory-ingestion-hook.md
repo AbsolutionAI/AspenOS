@@ -73,3 +73,7 @@ Record `docs/solutions/asp-59-hermes-memory-ingestion-hook.md`: the "writer exis
 - `ProspectiveMemoryManager` — architect decision pending (escalated ASP-53).
 - `src/python/` orphaned mirror drift (`emit_event`/`load_hooks_from_directory` missing in `src/python/services/event_hooks.py`) — noted; that tree is referenced by nothing in the repo and the root `agents/` daemon does not use it. Escalation candidate for the Architect if the mirror is meant to be maintained.
 - ABS mirror deliverables owned by [ASP-36](/ASP/issues/ASP-36) — left uncommitted.
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — Hermes daemon memory ingestion hook landed. Helper-seam test pattern, `sys.path` insert for daemon runtime. Compound learning: `docs/solutions/asp-59-hermes-memory-ingestion-hook.md`.

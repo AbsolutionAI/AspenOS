@@ -91,3 +91,7 @@ one final proof line. Self-tests also prove the must-fail cases:
 ## Forbidden
 
 Free motion, production plant, skip dual-auth on live act. This issue performs sim-only work; nothing here touches live hardware or the production plant.
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — Estop range cell (G7) landed. Estop latch + audit verify chain implemented. `scripts/sim_estop_range_cell.py` exit 0 — all refuse cases + happy path proven. Audit hash chain verified via `verify_audit()`.

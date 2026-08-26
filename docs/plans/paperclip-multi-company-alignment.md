@@ -21,3 +21,7 @@ Only one Paperclip company exists while Linear has 13 projects + 1 initiative. C
 - Full agent mesh per deferred project
 - Family companies before cash flow
 - Auto social posting without human approval
+
+## Disposition
+
+**IN PROGRESS** (ASP-482 sweep — 2026-08-26) — Paperclip multi-company alignment is a live planning document. Core multi-tenant scoping (ASP/DIG/CNT prefix mirrors) documented. Implementation pending Paperclip control plane changes and cash-flow validation. No changes to this document needed this sweep.

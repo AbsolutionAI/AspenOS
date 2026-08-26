@@ -82,3 +82,7 @@ This is **not** a no-go on architecture. It is a go to **prepare** the range cel
 **G5 CONDITIONAL GO** — architecture approved for plant-range D1 **preparation**.  
 **Physical motion:** NO until G6+G7 green **and** dual-auth usable on path.  
 **Spend:** NO until captain scope + $ ceiling on record.
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — G5 architecture conditional go approved. Architecture approved for plant-range D1 preparation. Gate dependencies (G6 ASP-416, G7 ASP-417, H-016 ASP-364) tracked separately. Physical motion and spend remain gated.

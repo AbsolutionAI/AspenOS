@@ -74,3 +74,7 @@ key possession, same trust as issuing tokens); remote nodes use the protocol.
 - `pytest tests/test_fleet_enrollment.py tests/test_nats_tls_default.py tests/test_nats_accounts_default.py`
 - `bash -n scripts/fleet-enroll.sh`
 - Manual end-to-end: issue-token → request → sign → `openssl verify` chain
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — Fleet node enrollment landed. NATS leaf-node trust chain, `scripts/fleet-enroll.sh` with TLS. `pytest tests/test_fleet_enrollment.py` + related suites green. `bash -n` clean.

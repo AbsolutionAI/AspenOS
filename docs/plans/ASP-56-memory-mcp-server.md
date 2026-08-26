@@ -107,3 +107,7 @@ server with OpenCode/Aider.
 - `ProspectiveMemoryManager` — architect decision pending (escalated ASP-53).
 - ABS mirror deliverables owned by [ASP-36](/ASP/issues/ASP-36) — left
   uncommitted.
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — Memory MCP server (`mcp/aspen-memory-mcp`) landed. `MCPServer.tool()` decorator and `run_stdio_async()` implemented. Thin-wrapper-over-`MemoryClient` pattern with argument marshalling. Compound learning recorded.

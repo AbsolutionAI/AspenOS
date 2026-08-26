@@ -94,3 +94,7 @@ Live runtime wiring: H-016 / ASP-364 (backlog). **First physical `act` must not 
 - Master Spec safety / ADR layering: skill `aspen-fleet-edge`
 - FLEET ACL: `docs/FLEET.md` (`plant-range: []`)
 - Paperclip: ASP-381 · ASP-380 (done) · ASP-384 (done) · ASP-364 (H-016 open)
+
+## Disposition
+
+**IN PROGRESS** (ASP-482 sweep — 2026-08-26) — Phase D physical cell gate is a live tracking document, not a completed work item. G3 (spec+refuse proofs), G5 (architecture conditional go), G6 (cell profile), G7 (estop latch), G8 (dual-human wire) have landed. Remaining trackers: G9 captain scope/$ ceiling, physical motion gate, production plant (all intentionally unchecked). Left as-is.

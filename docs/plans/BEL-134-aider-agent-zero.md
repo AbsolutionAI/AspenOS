@@ -37,3 +37,7 @@ Need specialized coding workers beyond OpenCode/Hermes: Aider (repo-native pair 
 - process adapter may not inject PAPERCLIP_TASK_ID → wrappers use inbox-lite fallback
 - Ollama model quality/latency for Aider
 - Docker image size for Agent Zero
+
+## Disposition
+
+**DEFERRED** (ASP-482 sweep — 2026-08-26) — Aider/Agent Zero integration deferred. Key blockers: Docker image size (~12GB disk), Ollama model quality/latency, fiscal freeze. Revisit when budget and infra constraints are resolved.

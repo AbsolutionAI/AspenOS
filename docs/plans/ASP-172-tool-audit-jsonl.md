@@ -49,3 +49,7 @@ the audit module reads it (`unknown` fallback for out-of-band use).
 `tests/test_tool_audit.py`: field completeness, args-hash stability +
 no-raw-args, mode enforcement, retention pruning, and an `execute_tool`
 integration case proving one line per call including error paths.
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — Tool audit JSONL landed. `agents/tool_audit.py` with JSONL audit at `/var/log/starship/audit/`. Fields: agent_id, tool_name, args_hash, timestamps, duration, exit_code, redacted. Rotation via date-stamped files + `prune_old_logs`. Mode 640 enforcement. `tests/test_tool_audit.py` green.

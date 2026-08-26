@@ -97,3 +97,7 @@ ASP-60/61 delivery:
 - AppFlowy bidirectional sync (Component 5) — larger scope, future cycle.
 - `src/python/` orphaned mirror drift — still an Architect-routing candidate.
 - Live runtime hook (plugin/`post_edit`) — no stable hook schema to target.
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — Paperclip memory ingestion hook landed. `paperclip_memory.py` CLI with UTF-8 encoding fix. Full memory suite (ingest + hermes + promote + client + opencode + aider + paperclip) green. End-to-end smoke verified.

@@ -66,3 +66,7 @@ suitable for linking on BEL-192 and the Phase D gate review.
 - Documented flow → this document.
 - Automated/scripted refuse path for single auth → `scripts/sim_dual_human_gate.py` (refuse-case suite).
 - Audit/event evidence two principals required → JSONL events emitted by the simulator; live-wiring evidence deferred to H-016.
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — G3 dual-human auth gate (spec + refuse proofs) landed. `scripts/sim_dual_human_gate.py` exit 0 — all refuse-case suites + happy path. JSONL audit evidence emitted. Live-wiring to H-016 tracked separately (ASP-364).

@@ -83,3 +83,7 @@ Top-level `commands.blocklist` expanded with non-essential system tools
   intended fail-closed posture.
 
 Contract version bumped 2.1 → 2.2.
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — Ops tool allowlist landed. `agents/policy_native.py` with `STARSHIP_FLEET_ROLES=ops` deny/allow semantics. `make policyexec` CLI smoke extended with ops-role assertions. Contract version 2.1→2.2.

@@ -59,3 +59,7 @@ under dash, which would create literal `{bin,lib/starship,venv}` directories.
 Reconciliation ports the dash-safe explicit-path `mkdir -p` form from the
 main-checkout fix (`2527823`). Verification adds a dash replay proving no
 literal `{...}` paths are created.
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — ISO hook chroot migration to `/opt/starship` roots completed. Ollama installer pinned via `OLLAMA_VERSION`. Dash-safe `mkdir -p` form verified. Compound learning: `docs/solutions/asp-120-iso-hook-starship-roots.md`.

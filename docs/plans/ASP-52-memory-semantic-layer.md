@@ -54,3 +54,7 @@ existing behavior.
 
 - Installing `sentence-transformers` / `lancedb` (not present; optional).
 - AppFlowy sync, MCP server, promotion pipeline (separate BEL-154 work items).
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — Memory semantic layer with embedding provider + LanceDB vector store landed. `MemoryManager` store/search functional in fallback mode. `memory-api.py` imports cleanly. Compound learning: `docs/solutions/asp-52-memory-semantic-layer.md`.

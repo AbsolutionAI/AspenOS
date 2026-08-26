@@ -22,3 +22,7 @@ No further code change was required for ASP-352; this ticket closes as satisfied
 - `git grep -n 'deploy/' -- ':!docs' ':!*.md'` → no matches across code, scripts, packaging, debian, iso, and CI.
 - Remaining `docs/plans/*` / `docs/solutions/*` mentions are historical decision records (intentionally kept).
 - Canonical units intact under `systemd/`; consumers (`install-daemon.sh`, `build-deb.sh`, `install-systemd.sh`, `smoke-test.sh`) unaffected.
+
+## Disposition
+
+**SUPERSEDED** (ASP-482 sweep — 2026-08-26) — Ticket closed as satisfied by ASP-192 work. `deploy/` directory removed. Zero code/script/packaging references to `deploy/` remain. Canonical learning: `docs/solutions/asp-192-deploy-stale-units.md`.

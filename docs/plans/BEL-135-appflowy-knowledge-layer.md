@@ -37,3 +37,7 @@ After deploy approval, re-open ASP-79-class routing for either **Scoped v1** (of
 - Agent Zero image already ~12GB disk  
 - Fiscal freeze — avoid always-on heavy apps without revenue need  
 - Human choice: full AppFlowy vs vault-only until Gumroad cash flow  
+
+## Disposition
+
+**DEFERRED** (ASP-482 sweep — 2026-08-26) — AppFlowy knowledge layer deferred. Blockers: Agent Zero disk footprint, fiscal freeze, human choice on sync direction. Revisit after memory layer stabilization and budget resolution.  

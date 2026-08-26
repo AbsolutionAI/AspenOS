@@ -42,3 +42,7 @@ starting unauthenticated.
 - `pytest tests/test_nats_accounts_default.py` (new) + existing suites green
 - `bash -n` on every modified shell script
 - grep proves zero remaining functional references to agent-bus
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — NATS accounts default configuration landed. `pytest tests/test_nats_accounts_default.py` + existing suites green. `bash -n` clean on all modified shell scripts. Zero remaining functional references to `agent-bus`.

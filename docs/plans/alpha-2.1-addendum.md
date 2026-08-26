@@ -45,3 +45,7 @@ See `config/models.yaml`. Required: nomic-embed-text + Eve (server). Others hard
 - Legacy archive: `andromi-hash/agnetic-os` (README points here)
 - Tags: `v2.1.0-alpha.1`, …
 - Auth: `gh auth login` only; never commit tokens
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — Alpha 2.1 addendum superseded by the 2.1.0 release. OpenCode integration, model config, and GitHub workflow all landed on the `hermes/asp-459-packaging-forward-port` branch. Verified: `config/models.yaml` present, GitHub workflow canonical, release tags v2.1.0-alpha.1+ created.
