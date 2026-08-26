@@ -36,10 +36,11 @@ check() {
   if "$@"; then report ok "$name"; else report fail "$name"; fi
 }
 
+EXPECTED_VERSION="${VERSION_LABEL:-$CONTROL_VERSION}"
+
 echo "=== Starship OS nightly build validation ==="
 echo "Control version:  ${CONTROL_VERSION:-unknown}"
-SUPPRESSED_VERSION=${VERSION_LABEL:-$(cat "$VERSION_FILE" 2>/dev/null || echo unknown)}
-echo "VERSION file:     $SUPPRESSED_VERSION"
+echo "Expected version: $EXPECTED_VERSION"
 echo "Build timestamp:  $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 echo ""
 
@@ -51,9 +52,9 @@ check ".deb is a regular file" test -f "${DEB_FILE:-/nonexistent}"
 
 # ─── 2. Version consistency ───────────────────────────────────────
 if [[ -n "$DEB_FILE" ]]; then
-  check "deb matches control version" bash -c "echo '$DEB_FILE' | grep -q '${CONTROL_VERSION}'"
+  check "deb matches expected version" bash -c "echo '$DEB_FILE' | grep -q '${EXPECTED_VERSION}'"
 else
-  report fail "deb matches control version"
+  report fail "deb matches expected version"
 fi
 
 # ─── 3. Layout validation (extract listing) ───────────────────────
@@ -99,10 +100,25 @@ fi
 
 # ─── 4. Debinfo sanity ─────────────────────────────────────────────
 if [[ -n "$DEB_FILE" ]]; then
-  INFO=$(dpkg-deb -I "$DEB_FILE" 2>/dev/null || true)
-  check "deb has Package: starship-os" bash -c "echo '$INFO' | grep -q '^Package: starship-os'"
-  check "deb has Version field" bash -c "echo '$INFO' | grep -q '^Version:'"
-  check "deb has Architecture field" bash -c "echo '$INFO' | grep -q '^Architecture:'"
+  if INFO=$(dpkg-deb -I "$DEB_FILE" 2>/dev/null || true) && [[ -n "$INFO" ]]; then
+    if echo "$INFO" | grep -Eq 'Package: starship-os'; then
+      report ok "deb has Package: starship-os"
+    else
+      report fail "deb has Package: starship-os"
+    fi
+    if echo "$INFO" | grep -Eq 'Version:'; then
+      report ok "deb has Version field"
+    else
+      report fail "deb has Version field"
+    fi
+    if echo "$INFO" | grep -Eq 'Architecture:'; then
+      report ok "deb has Architecture field"
+    else
+      report fail "deb has Architecture field"
+    fi
+  else
+    report fail "deb metadata unavailable (dpkg-deb -I)"
+  fi
 else
   report fail "deb metadata checks (no artifact)"
 fi

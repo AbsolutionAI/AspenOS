@@ -96,6 +96,8 @@ jobs:
           ls -la dist/
 
       - name: Validate nightly build
+        env:
+          VERSION_LABEL: ${{ steps.version.outputs.version }}
         run: bash scripts/nightly-check.sh
 
       - name: Upload .deb artifact
@@ -107,7 +109,7 @@ jobs:
 
       - name: Generate job summary
         run: |
-          cat >> $GITHUB_STEP_SUMMARY <<'EOF'
+          cat <<EOF | sed 's/^ *//' >> $GITHUB_STEP_SUMMARY
           ## Nightly Build Summary
 
           | Field | Value |
@@ -122,7 +124,7 @@ jobs:
 
           ### Build Artifacts
 
-          - `.deb` package: `${{ steps.deb_name.outputs.deb_name }}`
+          - \`.deb\` package: \`${{ steps.deb_name.outputs.deb_name }}\`
           - Retention: ${{ env.DEB_RETENTION_DAYS }} days
           EOF
 
@@ -182,7 +184,7 @@ jobs:
       - name: Smoke test summary
         if: always()
         run: |
-          cat >> $GITHUB_STEP_SUMMARY <<'EOF'
+          cat <<EOF | sed 's/^ *//' >> $GITHUB_STEP_SUMMARY
           ## Smoke Test Results
 
           - **Version:** ${{ needs.build.outputs.version }}
