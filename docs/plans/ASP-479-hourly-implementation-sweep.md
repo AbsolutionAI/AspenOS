@@ -42,6 +42,7 @@
 2. **Plan drift assessment** — Reviewed 7 plan files (ASP-11, ASP-13, ASP-15, ASP-16, ASP-192, ASP-352, ASP-364) for stale checkboxes / dispositions. All are substantively completed or superseded: the code changes landed via `ox/packaging-hygiene` and the canonical root migration.
 
 3. **Compound learning coverage** — All 5 non-docs commits on this branch have matching solution docs. No gaps.
+   - **Updated:** Added `docs/solutions/asp-479-stale-starship-os-build-path.md` for the stale path fix commit.
 
 4. **Workspace hygiene** — Repo clean. No untracked files, no stale worktrees, no branches with gone remotes. Forward-port branch is synced with origin/master.
 
