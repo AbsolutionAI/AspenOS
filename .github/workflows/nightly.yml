@@ -1,0 +1,54 @@
+name: Nightly Packaging & Deployment Check
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # daily at 02:00 UTC
+  workflow_dispatch:        # allow manual trigger
+
+jobs:
+  nightly-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libseccomp-dev gcc pkg-config
+          pip install pyyaml nats-py
+
+      - name: Install Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Restore Rust cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            agent/target/release/.fingerprint
+            agent/target/release/build
+            agent/target/release/deps
+            agent/target/release/*.d
+            agent/target/release/staragent
+          key: nightly-agent-${{ runner.os }}-${{ hashFiles('agent/Cargo.lock', 'agent/Cargo.toml') }}
+          restore-keys: |
+            nightly-agent-${{ runner.os }}-
+
+      - name: Install nats-server (for accounts conf validation)
+        run: |
+          curl -sL https://github.com/nats-io/nats-server/releases/download/v2.14.3/nats-server-v2.14.3-linux-amd64.tar.gz | tar xz
+          sudo cp nats-server-v2.14.3-linux-amd64/nats-server /usr/local/bin/
+
+      - name: Run nightly check
+        run: |
+          export PATH="$(go env GOPATH)/bin:${HOME}/.cargo/bin:$PATH"
+          bash scripts/check-nightly.sh
