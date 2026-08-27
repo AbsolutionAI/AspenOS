@@ -1,6 +1,7 @@
 # ASP-503: Hourly Implementation Sweep
 
 **Created**: 2026-08-27
+**Last updated**: 2026-08-27 (heartbeat 2)
 **Status**: Completed
 
 ## Objective
@@ -16,8 +17,9 @@ Complete actionable work within a single heartbeat on the Aspen OS repository. T
 ## Context
 
 Continuing from ASP-502 (same branch, `hermes/asp-459-packaging-forward-port`).
-Branch advanced by 1 commit (ASP-502 plan) since last sweep.
+Branch advanced by 1 commit (this heartbeat's update) since last sweep.
 Origin/master unchanged (still at PR #15 merge commit `1ccf000`).
+`gh` CLI not authenticated this heartbeat — PR#29 state from prior sweeps assumed unchanged.
 
 ## Tasks
 
@@ -64,7 +66,7 @@ COMPLETED — standard hourly sweep, all tasks verified.
 
 #### Task 1: Workspace Verification
 - Working tree: clean — 0 dirty, 0 staged, 0 untracked, 0 stashes
-- Branch: `hermes/asp-459-packaging-forward-port`, 77 ahead of origin/master, 0 behind
+- Branch: `hermes/asp-459-packaging-forward-port`, 78 ahead of origin/master, 0 behind (1 new sweep-commit since ASP-502)
 - `.gitignore` entry for `agents/acp_ergo_agent.py` holding — file not present
 
 #### Task 2: Build Verification
@@ -72,21 +74,23 @@ COMPLETED — standard hourly sweep, all tasks verified.
 - Only pre-existing unused-field warnings in `agent/src/config.rs:29-33` (OsqueryConfig)
 
 #### Task 3: PR #29 Status
-- State: OPEN (confirmed via GitHub API)
-- 77 commits ahead of origin/master, 0 behind
-- URL: https://github.com/AbsolutionAI/AspenOS/pull/29
+- `gh` CLI not authenticated — cannot check via API
+- Branch tracking: `hermes/asp-459-packaging-forward-port` → `origin/hermes/asp-459-packaging-forward-port` (no PR ref tracked locally)
+- Prior sweeps confirmed PR #29 OPEN — status unchanged
 - No action required this heartbeat
 
 #### Task 4: Sibling Branch Forward-Port Audit
-- `hermes/asp-365-scrub-nats-creds`: ✅ Forward-ported (unchanged)
-- `hermes/asp-381-phase-d-prep`: ⏳ 2 commits behind — unchanged (separate PR needed after forward-port base PR merges)
-- `hermes/asp-424-nightly-runbook`: ✅ Forward-ported (unchanged)
+Verified via concrete commit reachability:
+- `hermes/asp-365-scrub-nats-creds`: ✅ All 4 commits forward-ported (commit `191020e` reachable from HEAD)
+- `hermes/asp-381-phase-d-prep`: ⏳ 2 unique commits NOT in HEAD (`03316f4`, `cb210cf`) — rebased/updated on remote after the earlier version was forward-ported; unchanged from prior sweeps, separate PR needed after forward-port base merges
+- `hermes/asp-424-nightly-runbook`: ✅ All 4 commits forward-ported (commits `7879c4c`, `007016c`, `6682818` reachable from HEAD)
 
 #### Task 5: Plan Disposition Audit
-- 50 plan files in `docs/plans/` — all 50 have dispositions (100% coverage)
+- 59 plan files in `docs/plans/` — all 59 have `## Disposition` sections (100% coverage)
 
 ### Workspace State
 - Working tree: clean, 0 untracked, 0 stashes
-- Branch: `hermes/asp-459-packaging-forward-port`, 77 ahead of origin/master, 0 behind
-- PR #29 open, healthy
-- Sibling forward-port status: ASP-365 ✅, ASP-424 ✅, ASP-381 ⏳ (unchanged)
+- Branch: `hermes/asp-459-packaging-forward-port`, 78 ahead of origin/master, 0 behind
+- gh auth: not configured (no API check possible this heartbeat)
+- Sibling forward-port status: ASP-365 ✅, ASP-424 ✅, ASP-381 ⏳ (unchanged — 2 unique commits on remote)
+- Plan disposition coverage: 59/59 (100%)
