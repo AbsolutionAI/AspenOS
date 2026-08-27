@@ -38,6 +38,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+.serena/
 
 # Secrets - NEVER commit
 *.key
@@ -50,6 +51,8 @@ credentials.json
 *.token
 .gh_token
 ghp_*
+nats/nats.env
+docs/COMPANY_CREDENTIALS.md
 
 # Local model blobs / large artifacts
 *.gguf
@@ -69,3 +72,4 @@ nats/tls/
 **/fleet-accounts.conf
 !nats/fleet-accounts.conf.tmpl
 .aider*
+.worktrees/

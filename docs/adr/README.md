@@ -20,7 +20,7 @@ Aspen OS / AspenGrove architecture decisions. Prefer short, statused markdown in
 | [ADR-0003](./ADR-0003-fleet-edge-safety-contracts.md) | Fleet / edge safety contracts | Accepted | Bus + arm/e-stop + G8 authz |
 | [ADR-0004](./ADR-0004-light-core-plugins.md) | Light core + plugins | Accepted | Optional deps |
 | [ADR-0005](./ADR-0005-langgraph-execution-plugin.md) | LangGraph as execution plugin | Accepted | Paperclip remains org SoR |
-| [ADR-0006](./ADR-0006-memory-store-tiering.md) | Tiered memory store (LanceDB vs PG+AGE) | **Proposed** | BEL-154 + Master Spec §3.1 — accept candidate |
+| [ADR-0006](./ADR-0006-memory-store-tiering.md) | Tiered memory store (LanceDB vs PG+AGE) | **Accepted** | BEL-154 + Master Spec §3.1 — accepted ASP-426 |
 | [ADR-0010](./0001-c11-agent-runtime.md) | C11 agent runtime (legacy file `0001-…`) | Accepted | Logical **0010**; file keeps historic name |
 
 ### Open candidates (not yet filed)
