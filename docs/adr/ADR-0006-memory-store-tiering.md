@@ -1,7 +1,8 @@
 # ADR-0006: Tiered memory store (edge LanceDB + plant PG+AGE)
 
 ## Status
-Proposed — 2026-08-23  
+Accepted — 2026-08-27  
+**ASP-514:** Acceptance per ASP-426 Weekly Architecture Review recommendation  
 **Paperclip:** ASP-361 (parent ASP-166 Weekly Architecture Review)  
 **Linear:** BEL-154 (Shared Local Memory & Conversation Caching)  
 **SoR:** `docs/sor/MASTER_SPEC.md` §3.1 · `docs/architecture/MEMORY_LAYER.md`
@@ -162,3 +163,4 @@ memory:
 | Date | Event |
 |------|--------|
 | 2026-08-23 | Drafted under ASP-361 / ASP-166; status **Proposed** pending architecture review acceptance |
+| 2026-08-27 | **Accepted** per ASP-426 Weekly Architecture Review recommendation; no PG required under freeze |
