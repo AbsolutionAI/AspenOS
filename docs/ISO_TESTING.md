@@ -1,5 +1,13 @@
 # ISO Testing Guide
 
+## Host setup
+
+ISO build and boot testing require the live-build + qemu toolchain.
+**BT-ASP-SRV (control plane) does NOT carry this toolchain.** Use a dedicated
+ISO builder host or a local development machine.
+
+See `docs/ops/ISO_BUILDER.md` for builder host setup instructions.
+
 ## Prerequisites
 
 Install QEMU for x86_64 emulation:

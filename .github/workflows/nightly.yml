@@ -1,0 +1,193 @@
+name: Starship OS Nightly Build
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      version_label:
+        description: 'Override version label for the nightly build'
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DEB_RETENTION_DAYS: 30
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      deb_name: ${{ steps.deb_name.outputs.deb_name }}
+      build_timestamp: ${{ steps.timestamp.outputs.build_timestamp }}
+      sha_short: ${{ steps.sha_short.outputs.sha_short }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Install Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libseccomp-dev gcc pkg-config dpkg-dev
+
+      - name: Set build timestamp
+        id: timestamp
+        run: echo "build_timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
+      - name: Set short SHA
+        id: sha_short
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Read version
+        id: version
+        run: |
+          BASE_VERSION=$(cat VERSION)
+          if [[ -n "${{ inputs.version_label }}" ]]; then
+            echo "version=${{ inputs.version_label }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=$BASE_VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Go CLI
+        run: |
+          export PATH="$(go env GOPATH)/bin:$PATH"
+          make build
+
+      - name: Build Rust agent
+        run: ~/.cargo/bin/cargo build --release --manifest-path agent/Cargo.toml
+
+      - name: Build C11 sandbox
+        run: |
+          make -C src/c/sandbox_spike all test
+          make -C src/c/policyexec all
+
+      - name: Build .deb package
+        id: deb_name
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA="${{ steps.sha_short.outputs.sha_short }}"
+          DATE=$(date -u +'%Y%m%d')
+          DEB_NAME="starship-os_${VERSION}-nightly-${DATE}-${SHA}.deb"
+          echo "deb_name=$DEB_NAME" >> $GITHUB_OUTPUT
+          make deb
+
+      - name: Rename .deb for nightly tag
+        run: |
+          OLD_DEB=$(ls dist/starship-os_*.deb 2>/dev/null | head -1)
+          if [[ -n "$OLD_DEB" && -f "$OLD_DEB" ]]; then
+            mv "$OLD_DEB" "dist/${{ steps.deb_name.outputs.deb_name }}"
+          fi
+          ls -la dist/
+
+      - name: Validate nightly build
+        env:
+          VERSION_LABEL: ${{ steps.version.outputs.version }}
+        run: bash scripts/nightly-check.sh
+
+      - name: Upload .deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.deb_name.outputs.deb_name }}
+          path: dist/${{ steps.deb_name.outputs.deb_name }}
+          retention-days: ${{ env.DEB_RETENTION_DAYS }}
+
+      - name: Generate job summary
+        run: |
+          cat <<EOF | sed 's/^ *//' >> $GITHUB_STEP_SUMMARY
+          ## Nightly Build Summary
+
+          | Field | Value |
+          |-------|-------|
+          | **Version** | ${{ steps.version.outputs.version }} |
+          | **Build Timestamp** | ${{ steps.timestamp.outputs.build_timestamp }} |
+          | **Commit SHA** | ${{ github.sha }} |
+          | **Short SHA** | ${{ steps.sha_short.outputs.sha_short }} |
+          | **Branch** | ${{ github.ref_name }} |
+          | **Workflow Run** | [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+          | **Artifact** | ${{ steps.deb_name.outputs.deb_name }} |
+
+          ### Build Artifacts
+
+          - \`.deb\` package: \`${{ steps.deb_name.outputs.deb_name }}\`
+          - Retention: ${{ env.DEB_RETENTION_DAYS }} days
+          EOF
+
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Download .deb artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.deb_name }}
+          path: dist/
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libseccomp-dev gcc pkg-config
+          pip install pyyaml nats-py
+
+      - name: Install nats-server
+        run: |
+          if ! command -v nats-server >/dev/null 2>&1; then
+            curl -sL https://github.com/nats-io/nats-server/releases/download/v2.14.3/nats-server-v2.14.3-linux-amd64.tar.gz | tar xz
+            sudo cp nats-server-v2.14.3-linux-amd64/nats-server /usr/local/bin/
+            command -v nats-server
+          fi
+
+      - name: Checkout pinned sibling repos for fleet-bus smoke
+        run: |
+          RRM_COMMIT=$(python3 -c "import json;print(json.load(open('third_party/pins.json'))['components']['aspen-edge-rrm']['commit'])")
+          SWARM_COMMIT=$(python3 -c "import json;print(json.load(open('third_party/pins.json'))['components']['aspen-swarm-manager']['commit'])")
+          git clone -q --filter=blob:none "$(python3 -c "import json;print(json.load(open('third_party/pins.json'))['components']['aspen-edge-rrm']['github'])")" ../aspen-edge-rrm
+          git -C ../aspen-edge-rrm checkout -q "$RRM_COMMIT"
+          git clone -q --filter=blob:none "$(python3 -c "import json;print(json.load(open('third_party/pins.json'))['components']['aspen-swarm-manager']['github'])")" ../aspen-swarm-manager
+          git -C ../aspen-swarm-manager checkout -q "$SWARM_COMMIT"
+
+      - name: Run smoke tests
+        env:
+          PATH: /usr/local/go/bin:/home/runner/go/bin:/usr/local/bin:/usr/bin:/bin
+        run: |
+          export PATH="$(go env GOPATH)/bin:$(pwd)/starshipctl:/usr/local/bin:$PATH"
+          go install github.com/nats-io/nkeys/nk@latest || true
+          export PATH="$(go env GOPATH)/bin:/usr/local/bin:$PATH"
+          bash scripts/smoke-test.sh
+          bash scripts/iso-firstboot-smoke.sh
+
+      - name: Smoke test summary
+        if: always()
+        run: |
+          cat <<EOF | sed 's/^ *//' >> $GITHUB_STEP_SUMMARY
+          ## Smoke Test Results
+
+          - **Version:** ${{ needs.build.outputs.version }}
+          - **Build:** ${{ needs.build.outputs.deb_name }}
+          - **Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EOF

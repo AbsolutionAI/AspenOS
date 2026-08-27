@@ -104,3 +104,7 @@ the ASP-60 delivery:
 - AppFlowy bidirectional sync (Component 5).
 - `src/python/` orphaned mirror drift — still an Architect-routing candidate.
 - Live Aider/OpenCode runtime hook (plugin) — no stable hook schema to target.
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — Aider memory ingestion hook landed. `aider_memory.py` CLI with `ingest_dir=None` bug fixed (backported to `opencode_memory.py`). Full memory suite green. Compound learning recorded.

@@ -1,0 +1,98 @@
+# =============================================================================
+# Cell Profile: plant-range (Training Range)
+# BEL-192 / ASP-416 — G6 deliverable
+# =============================================================================
+# This profile defines the robotic cell configuration for plant-range in the
+# Starship fleet topology. plant-range is an isolated training/exercise zone
+# with no hardware commitment until G7 green.
+#
+# CONDITIONS FOR LIVE USE (G9 gate):
+#   - G7 green (estop latch + audit chain complete) — ASP-417 done
+#   - G8 green: dual-human authorize wired in control path — ASP-364 / H-016 done (sim)
+#   - G9: Captain $ ceiling approved (still open)
+
+cell:
+  name: plant-range-cell
+  plant: plant-range
+  version: "0.1.0"
+  status: sim_only
+  description: >
+    First physical cell profile for the isolated training range.
+    Sim/dry-run only — no hardware PO, no joint motion, no ASPEN_SIM=0
+    with drivers.
+
+  # ── Isolation ──
+  isolation: true
+  acl_outbound: []                          # range never leaves
+  can_schedule_into: ["plant-range"]        # may_schedule_into = self only
+
+  # ── Operator ──
+  arm_operator:
+    mode: human_required                    # never sim; human arm operator only
+    allow_sim_operator: false               # operator string must NOT be "sim"
+    allowed_operator_ids: []                # TBD at G7; empty = any authenticated human
+    require_human_arm: true                 # enforces human-in-the-loop for arm
+
+  # ── Arm Spec (sim-only) ──
+  arm:
+    type: cobot_6dof_sim                    # UR/FRANKA simulation placeholder
+    dof: 6
+    max_joint_speed_deg_s: 0                # no live joints until G7
+    controller: hold_to_enable              # must hold enable to actuate
+    forbidden_actions:
+      - "live_joint_motion"                 # G7 gate blocks this
+      - "cross_plant_mission"               # isolation ACL blocks this
+      - "hardware_po"                       # no procurement
+      - "aspensim0_driver_start"            # no real drivers without clearance
+
+  # ── Capabilities ──
+  allowed_caps: ["mock_cobot", "arm_6dof", "mobile_base", "vision", "red_team", "blue_team"]
+
+  # ── Safety ──
+  safety:
+    hold_to_enable:
+      required: true                        # hold-to-enable mandatory
+      max_interval_s: 0.5                   # max gap before enable drops
+      audit_event: "cell.hold_to_enable"
+    dual_auth:
+      required: true                        # H-016 / ASP-364 (G8): no single-principal act
+      principals: 2                         # two DISTINCT stable human ids
+      distinct_from_proposer_operator: true # operator-of-record cannot approve
+      enable_window_s: 600                  # new propose_act required after expiry
+      library: "aspen_edge.gate.DualHumanGate"
+      authorize_channel: "aspen.edge.<node>.authorize"   # payload {proposal_id, human_id, note}
+      front_ends: ["matrix:#aspen-authz", "sentinel-ui"] # documented contract; bridge optional
+      refuse_reasons:
+        - insufficient_principals
+        - duplicate_principal
+        - self_approval
+        - expired
+        - unknown_proposal
+      audit_event_prefix: "gate."           # propose_act|authorize|enable_act|execute_act|refuse
+    estop:
+      requires_clear: true
+      clear_requires_dual_human: true       # stop-causer cannot authorize the clear
+      audit_event: "aspen.safety.estop"
+
+  # ── Scheduling ──
+  scheduling:
+    audit_all_attempts: true                # log every propose_act even if refused
+    refuse_reasons:
+      - "isolated_plant"
+      - "cross_plant_denied"
+      - "no_hardware_until_g7"
+      - "sim_only"
+      - "hold_to_enable_not_engaged"
+      - "estop_latched"                     # G7
+      - "held_dual_auth"                    # G8: safety_adjacent holds at propose_act
+      - "refused_insufficient_principals"
+      - "refused_duplicate_principal"
+      - "refused_self_approval"
+      - "refused_expired"
+
+  # ── Lifecycle ──
+  lifecycle:
+    g6: sim_only_profile
+    g7: estop_latch_and_audit               # ASP-417 (done)
+    g8: dual_auth_wired_sim                 # ASP-364 / H-016 — wired in sim control path
+    g9: captain_ceiling_approved

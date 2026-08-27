@@ -18,7 +18,11 @@ Demonstrate that Aspen stack enforces plan-before-code for coding tickets (BEL-1
 - No dependency installs
 
 ## Test / acceptance
-- [ ] Plan file committed/written before COMPOUND_ENGINEERING.md edit timestamp
-- [ ] Proof section present
-- [ ] Issue comments show ordered Plan → Implement → Done
-- [ ] CE policy referenced for future coding agents
+- [x] Plan file committed/written before COMPOUND_ENGINEERING.md edit timestamp
+- [x] Proof section present
+- [x] Issue comments show ordered Plan → Implement → Done
+- [x] CE policy referenced for future coding agents
+
+## Disposition (ASP-480 sweep — 2026-08-25)
+
+**Status: Completed.** All acceptance criteria met. Plan file existed before COMPOUND_ENGINEERING.md edit. Proof section present with timestamp. Issue comments show Plan → Implement → Done order. CE policy referenced in all agent AGENTS.md files.

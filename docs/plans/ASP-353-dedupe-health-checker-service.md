@@ -31,7 +31,11 @@
 - `config/starship-health-checker.service` (delete)
 
 ## Acceptance
-- [ ] Only one unit file in repo; installer still points at it
-- [ ] `rg "config/starship-health-checker.service"` returns no runtime hits
+- [x] Only one unit file in repo; installer still points at it
+- [x] `rg "config/starship-health-checker.service"` returns no runtime hits
       (historical plan/solution docs may keep mentions)
-- [ ] Committed with disposition recorded on ASP-353
+- [x] Committed with disposition recorded on ASP-353
+
+## Disposition (ASP-480 sweep — 2026-08-25)
+
+**Status: Completed.** All acceptance criteria met. Only one unit file (`systemd/starship-health-checker.service`) remains in the repo. `config/starship-health-checker.service` was deleted. No runtime references remain. Implementation confirmed on current branch.

@@ -58,3 +58,7 @@ Out of scope (historical records, kept as-is):
 - `deploy/` stale units + ISO `runcmd` dev path → [ASP-17](/ASP/issues/ASP-17) (Architect-owned, blocked).
 - `src/python/lib/` duplicate tree drift (older `agnet-os`-named scripts) → note, not restructured here.
 - GitHub push auth remains a FOUNDATION follow-up (aspen-owned).
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — All acceptance criteria met. Canonical URL migration completed: `grep -rn "andromi-hash"` returns no hits in code/scripts/packaging paths. Shell scripts `bash -n` clean. Remaining out-of-scope items (deploy/ stale units, src/python/ drift, push auth) tracked separately.

@@ -1,5 +1,5 @@
 {
-  "version": "2.1",
+  "version": "2.2",
   "description": "Shared policy contract — Python PolicyManager + C11 policyexec",
   "tools": {
     "deny": [
@@ -17,7 +17,24 @@
       "mkfs",
       "dd",
       "iptables",
-      "nft"
+      "nft",
+      "fdisk",
+      "sfdisk",
+      "parted",
+      "blockdev",
+      "losetup",
+      "swapon",
+      "swapoff",
+      "insmod",
+      "rmmod",
+      "modprobe",
+      "kexec",
+      "useradd",
+      "userdel",
+      "usermod",
+      "passwd",
+      "visudo",
+      "crontab"
     ],
     "allowlist": []
   },
@@ -42,8 +59,44 @@
     },
     "ops": {
       "tools": {
-        "allow": [],
-        "deny": []
+        "allow": [
+          "read_file",
+          "write_file",
+          "list_dir",
+          "search_files",
+          "shell",
+          "http_get",
+          "http_post",
+          "delegate_to_agent",
+          "delegate",
+          "memory_note",
+          "user_profile",
+          "archive_search",
+          "temporal_graph",
+          "temporal_chain",
+          "temporal_snapshot",
+          "kg_query",
+          "kg_store",
+          "preference_note",
+          "preference_query",
+          "create_schedule",
+          "list_schedules",
+          "remove_schedule",
+          "goal_create",
+          "goal_list",
+          "goal_update",
+          "mission_create",
+          "mission_list",
+          "task_create",
+          "task_list",
+          "task_complete"
+        ],
+        "deny": [
+          "opencode",
+          "opendesign",
+          "vault_approve",
+          "vault_deny"
+        ]
       }
     }
   }

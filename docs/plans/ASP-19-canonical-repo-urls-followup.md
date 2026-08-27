@@ -53,3 +53,7 @@ Out of scope (unchanged, per ASP-18):
 After implementation, record the follow-up gap (ASP-18 left shipped .deb/.go
 artifacts stale) in `docs/solutions/` so future URL sweeps include `debian/`
 and Go module metadata.
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — Follow-up canonical URL fixes completed. Shipped `.deb` and Go module metadata updated. Compound learning recorded at `docs/solutions/asp-19-canonical-repo-urls-followup.md`.

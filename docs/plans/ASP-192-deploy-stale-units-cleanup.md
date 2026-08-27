@@ -26,3 +26,7 @@
 ## History
 
 - Previously deferred by ASP-10 #9 / ASP-15 / ASP-16 / ASP-18 as "Architect decision"; ASP-187 nightly check flagged it again → cleanup now assigned here ([ASP-152](/ASP/issues/ASP-152), [ASP-352](/ASP/issues/ASP-352) track sibling packaging hygiene).
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — Stale `deploy/` units cleaned up. `grep -r "deploy/"` over code/scripts/packaging paths returns no live references. `git grep -l "agnetic-agent-mesh"` empty. Compound learning: `docs/solutions/asp-192-deploy-stale-units.md`.

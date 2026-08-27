@@ -3,7 +3,7 @@
 ## FISCAL FREEZE (active)
 **Hard company ceiling: $100/mo** until Gumroad cash flow is verified.
 Priority order: (1) profitable marketing/Gumroad ship (2) sustain ops (3) Aspen OS build only when it unblocks revenue.
-- Prefer **free** OpenCode DeepSeek Flash path and OpenRouter Flash.
+- Prefer OpenRouter DeepSeek Flash for OpenCode (Zen free id retired); Zen free fallbacks: big-pickle / mimo-v2.5-free.
 - **Grok 4.5 only** for aspen architecture gates / failed CE — not default volume.
 - **No scheduled heartbeats** — wake-on-demand only (timers disabled).
 - Per-agent caps sum to ~$79; ~$21 company reserve for spikes/marketing agents.
@@ -13,7 +13,8 @@ Local Ollama on Quadro P2000 (5 GB) is **not** used for Paperclip heartbeats or 
 Local models remain optional for offline experiments only.
 
 ## Defaults
-- **Primary volume model:** DeepSeek V4-Flash (`deepseek/deepseek-v4-flash` via OpenRouter; OpenCode `opencode/deepseek-v4-flash-free`)
+- **Primary volume model:** DeepSeek V4-Flash (`deepseek/deepseek-v4-flash` via OpenRouter; OpenCode `openrouter/deepseek/deepseek-v4-flash` + `OPENROUTER_API_KEY`)
+- **Do not use** retired Zen id `opencode/deepseek-v4-flash-free` (adapter_failed). Zen free fallbacks: `opencode/big-pickle`, `opencode/mimo-v2.5-free`, `opencode/nemotron-3.5-lightning-free`.
 - **Aspen Paperclip / architect:** Grok 4.5 (`xai-oauth`)
 - **Escalate to Grok 4.5** when: architecture, hard review, brand voice, or cheap model fails CE acceptance
 - **Escalate to Claude Sonnet** only for rare high-stakes curriculum/brand work (future agents)
@@ -29,8 +30,9 @@ Local models remain optional for offline experiments only.
 | packndeploy | hermes `-p packndeploy` | deepseek/deepseek-v4-flash | $50 |
 | Dashboard | hermes `-p dashboard` | deepseek/deepseek-v4-flash | $50 |
 | Compliance | hermes `-p compliance` | deepseek/deepseek-v4-flash | $50 |
-| Opencode | opencode_local | opencode/deepseek-v4-flash-free | $150 |
-| Aspen Fast Coder | opencode_local | opencode/deepseek-v4-flash-free | $100 |
+| Opencode | opencode_local | openrouter/deepseek/deepseek-v4-flash | $150 |
+| Aspen Fast Coder | opencode_local | openrouter/deepseek/deepseek-v4-flash | $100 |
+| Digital Packager (ABSA) | opencode_local | openrouter/deepseek/deepseek-v4-flash | (ABSA) |
 | Aider | process | openrouter/deepseek/deepseek-v4-flash | $75 |
 | Agent Zero | process + Docker UI | configure Flash in A0 UI | $75 |
 | Summarizer | claude_local | claude-haiku-4-5 | $25 |

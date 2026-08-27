@@ -42,8 +42,12 @@
 - No push/PR (open `[ ] GitHub auth` follow-up owned by aspen).
 
 ## Acceptance
-- [ ] Plan written before code edits
-- [ ] `prerm` upgrade case skips stop/disable
-- [ ] `postinst` version comparison + config backup + service restart on upgrade
-- [ ] `scripts/update.sh` present and `bash -n` clean
-- [ ] Working tree clean after commit; sweep issue updated
+- [x] Plan written before code edits
+- [x] `prerm` upgrade case skips stop/disable
+- [x] `postinst` version comparison + config backup + service restart on upgrade
+- [x] `scripts/update.sh` present and `bash -n` clean
+- [x] Working tree clean after commit; sweep issue updated
+
+## Disposition (ASP-480 sweep — 2026-08-25)
+
+**Status: Completed.** All acceptance criteria met. `prerm` handles `upgrade|failed-upgrade` without stopping/disabling. `postinst` has version comparison + config backup + service restart. `scripts/update.sh` present and `bash -n` clean. Implementation confirmed on current branch.

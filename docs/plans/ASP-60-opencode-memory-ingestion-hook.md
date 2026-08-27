@@ -94,3 +94,7 @@ documented in the solution doc:
 - AppFlowy bidirectional sync (Component 5).
 - `src/python/` orphaned mirror drift — still an Architect-routing candidate.
 - Live OpenCode runtime hook wiring (plugin) — no stable hook schema to target.
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — OpenCode memory ingestion hook landed. `opencode_memory.py` CLI with `--ingest-dir` support. Full memory suite (31 tests + 6) green. End-to-end smoke: CLI writes → `memory-promote` promotes → `MemoryClient.search()` returns promoted fact.

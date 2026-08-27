@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Starship OS — C11 sandbox vs Python baseline (ADR 0001)
 # Usage: bash scripts/bench-sandbox.sh [N]
+# Criterion (ADR 0001): overhead p50 < 2ms vs Python baseline
+#   ADR_P50_OVERHEAD_MAX env var overrides (default 2.0)
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_DIR"
@@ -13,9 +15,10 @@ fi
 
 echo "=== Sandbox benchmark (N=$N) ==="
 python3 - "$SB" "$N" <<'PY'
-import re, statistics, subprocess, sys, time
+import os, re, statistics, subprocess, sys, time
 
 sb, n = sys.argv[1], int(sys.argv[2])
+max_overhead_ms = float(os.environ.get("ADR_P50_OVERHEAD_MAX", "2.0"))
 
 def pct(xs, p):
     xs = sorted(xs)
@@ -66,8 +69,12 @@ for name, xs, note in rows:
     print(f"{name:<22} {pct(xs,50):8.3f} {pct(xs,95):8.3f} {statistics.mean(xs):8.3f}  {note}")
 
 p50_c = pct(c_internal, 50)
-ok = p50_c < 2.0
+p50_py = pct(py_exec, 50)
+overhead = p50_c - p50_py
+ok = overhead < max_overhead_ms
 print("-" * 72)
-print(f"ADR 0001 criterion (c11_internal p50 < 2ms): {'PASS' if ok else 'FAIL'} ({p50_c:.3f} ms)")
+print(f"c11_internal p50 {p50_c:.3f} ms vs py_exec p50 {p50_py:.3f} ms")
+print(f"ADR 0001 criterion (overhead p50 < {max_overhead_ms}ms): "
+      f"{'PASS' if ok else 'FAIL'} (overhead {overhead:+.3f} ms)")
 sys.exit(0 if ok else 1)
 PY

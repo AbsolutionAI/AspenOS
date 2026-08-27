@@ -54,11 +54,17 @@ Minimal compile targets under `src/c/`:
 - [x] `sandbox_run` builds on Ubuntu 24.04
 - [x] Allowed command exits 0 with captured stdout
 - [x] Denied syscall/path fails closed (non-zero) — `mount` → exit 126
-- [x] Overhead p50 < 2ms for trivial command (vs Python baseline)
+- [x] **Overhead** p50 < 2ms for trivial command **vs Python baseline**
+  (`overhead = c11_internal_wall_p50 − py_exec_p50`). Absolute internal
+  latency is diagnostic only — it tracks host fork/exec floor and must not
+  be the CI gate (ratified ASP-354 / ASP-189 / ASP-389, 2026-08-23).
 
-## Benchmark (2026-07-15, N=200, `/bin/echo ok`)
+## Benchmark
 
-Run: `make bench` or `bash scripts/bench-sandbox.sh 200`
+Run: `make bench` or `bash scripts/bench-sandbox.sh 200`  
+Gate: `ADR_P50_OVERHEAD_MAX` (default `2.0`) on **overhead**, not absolute p50.
+
+### Historical (2026-07-15, N=200, `/bin/echo ok`)
 
 | Metric | p50 (ms) | p95 (ms) | Notes |
 |--------|----------|----------|-------|
@@ -67,7 +73,15 @@ Run: `make bench` or `bash scripts/bench-sandbox.sh 200`
 | py_exec | ~0.51 | ~0.80 | `subprocess.run` argv |
 | py_shell | ~0.98 | ~1.55 | shell path (CommandExecutor-like) |
 
-**Verdict:** C11 internal p50 **≪ 2ms** — criterion met. Outer spawn adds ~0.6ms for process bootstrap; still acceptable for Alpha 2.1 optional path.
+**Verdict (historical host):** overhead p50 ≈ 0.51 − 0.51 = **~0 ms** ≪ 2 ms — criterion met.
+Absolute internal p50 happened to also be ≪ 2 ms on that kernel; that coincidence is **not** the gate.
+Outer spawn adds ~0.6 ms bootstrap vs bare py_exec; still acceptable for Alpha 2.1 optional path.
+
+### Revalidation (2026-08-23, BT-ASP-SRV, N=300)
+
+Environmental fork/exec floor rose (~2.9 ms bare). Seccomp ≈ +0.46 ms; unprivileged ns soft-fail ≈ 0.
+Measured overhead p50 ≈ **+0.51 ms** → PASS under the same ADR overhead gate. See
+`docs/solutions/asp-354-c11-sandbox-perf-regression.md`.
 
 ## Seccomp (Phase 3)
 
@@ -86,7 +100,7 @@ Run: `make bench` or `bash scripts/bench-sandbox.sh 200`
 ## Optional Python bridge
 
 - `agents/sandbox_native.py` — subprocess bridge to `sandbox_run`
-- Enable: `STARSHIP_SANDBOX_NATIVE=1` (used by `CommandExecutor` in `agents/tools.py`)
+- Mandatory by default since H-003: `STARSHIP_SANDBOX_NATIVE=0` opts out (deprecated). Used by `CommandExecutor` in `agents/tools.py`; startup gate `agents/native_check.py` fails closed if the binary is missing.
 - Binary discovery: `STARSHIP_SANDBOX_RUN`, `PATH`, `/opt/starship/bin/sandbox_run`, repo spike path
 
 ## policyexec (Phase 4)
@@ -95,7 +109,7 @@ Run: `make bench` or `bash scripts/bench-sandbox.sh 200`
 - Shared JSON: `config/policy.default.json` → `/etc/starship/policy.json`
 - CLI: `check-tool` · `check-command` · `run` · `list`
 - Role overlay: `--role red-team` (or `STARSHIP_FLEET_ROLES`)
-- Python: `agents/policy_native.py` via `STARSHIP_POLICY_NATIVE=1`
+- Python: `agents/policy_native.py` — mandatory by default since H-003 (`STARSHIP_POLICY_NATIVE=0` opts out, deprecated)
 - Contract: same deny/allow/blocklist arrays as Python `PolicyManager` / fleet roles
 
 ## starshipd / heald (Phase 5 spikes)

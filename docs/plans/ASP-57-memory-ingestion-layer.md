@@ -81,3 +81,7 @@ approach), schema parity with the promotion pipeline, validation-at-boundary.
 - `ProspectiveMemoryManager` — architect decision pending (escalated ASP-53).
 - ABS mirror deliverables owned by [ASP-36](/ASP/issues/ASP-36) — left
   uncommitted.
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — Memory ingestion layer (`scripts/memory_ingest.py`) landed. Validation-at-boundary approach, schema parity with promotion pipeline. Compound learning recorded.

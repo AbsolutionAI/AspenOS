@@ -91,3 +91,7 @@
   independently redone as an archive by `4a019fd`. Flagged for the hermes/ASP-36 owner to drop
   when convenient — do not reset while their worktree has uncommitted work.
 
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — Health checker unit deployment lifecycle completed. postinst enable/upgrade-restart, prerm stop/disable, uninstall-daemon cleanup, install-daemon start + status-loop entry, build-deb layout-validation guards. Verified via commit `48d5b57` (packaging forward-port branch).
+

@@ -1,6 +1,6 @@
-"""Optional C11 policyexec bridge — shared policy JSON with Python.
+"""C11 policyexec bridge — shared policy JSON with Python. Mandatory by default (H-003).
 
-Enable: STARSHIP_POLICY_NATIVE=1
+Default: STARSHIP_POLICY_NATIVE unset (native on); explicit 0/false/no/off opts out.
 Binary: STARSHIP_POLICYEXEC or PATH / /opt/starship/bin/policyexec
 Policy: STARSHIP_POLICY or /etc/starship/policy.json or config/policy.default.json
 """
@@ -32,11 +32,26 @@ def policyexec_binary() -> Optional[str]:
     return None
 
 
-def native_enabled() -> bool:
+def native_opted_out() -> bool:
+    """True only when the operator explicitly disabled native policy enforcement."""
     flag = os.getenv("STARSHIP_POLICY_NATIVE", "").strip().lower()
-    if flag not in ("1", "true", "yes", "on"):
-        return False
-    return policyexec_binary() is not None
+    return flag in ("0", "false", "no", "off")
+
+
+def native_enabled() -> bool:
+    """Native enforcement is default-on; only an explicit opt-out disables it."""
+    return not native_opted_out()
+
+
+def require_native() -> str:
+    """Fail closed: return the policyexec binary path or raise RuntimeError."""
+    binary = policyexec_binary()
+    if not binary:
+        raise RuntimeError(
+            "policyexec binary not found (required by default since H-003). "
+            "Install it at /opt/starship/bin/policyexec or set STARSHIP_POLICYEXEC."
+        )
+    return binary
 
 
 def policy_path() -> Optional[str]:

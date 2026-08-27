@@ -49,7 +49,7 @@ BACKOFF_RESET_SECONDS = 300  # 5 minutes
 DEFAULT_SERVICES = {
     "nats": {
         "check": ["process", "port:4222"],
-        "command": "nats-server -c /etc/agnetic/nats/agent-bus.conf",
+        "command": "nats-server -c /etc/starship/nats/active.conf",
         "process_name": "nats-server",
     },
     "staragent": {

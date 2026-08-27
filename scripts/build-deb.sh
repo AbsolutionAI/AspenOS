@@ -124,14 +124,15 @@ cp "$REPO_DIR/scripts/gen-nats-tls.sh" "$PKG_ROOT/opt/starship/lib/starship/scri
 cp -r "$REPO_DIR/skills/"* "$PKG_ROOT/opt/starship/lib/starship/skills/" 2>/dev/null || true
 cp -r "$REPO_DIR/souls/"* "$PKG_ROOT/opt/starship/lib/starship/souls/" 2>/dev/null || true
 
-# Configs
-cp "$REPO_DIR/nats/agent-bus.conf" "$PKG_ROOT/etc/starship/nats/"
+# Configs (H-001: no-auth agent-bus.conf removed from the package)
 cp "$REPO_DIR/nats/fleet-bus.conf" "$PKG_ROOT/etc/starship/nats/" 2>/dev/null || true
 cp "$REPO_DIR/nats/fleet-auth.yaml" "$PKG_ROOT/etc/starship/nats/" 2>/dev/null || true
 cp "$REPO_DIR/nats/fleet-accounts.conf.tmpl" "$PKG_ROOT/etc/starship/nats/" 2>/dev/null || true
-cp "$REPO_DIR/nats/server.conf" "$PKG_ROOT/etc/starship/nats/" 2>/dev/null || true
+# H-017: ship placeholder-only legacy conf under .deprecated — never as active secrets
+cp "$REPO_DIR/nats/server.conf" "$PKG_ROOT/etc/starship/nats/server.conf.deprecated" 2>/dev/null || true
 cp "$REPO_DIR/nats/subjects.yaml" "$PKG_ROOT/etc/starship/nats/" 2>/dev/null || true
-ln -sfn /etc/starship/nats/agent-bus.conf "$PKG_ROOT/etc/starship/nats/active.conf"
+# Default active bus = accounts conf (materialized by firstboot/postinst)
+ln -sfn /etc/starship/nats/fleet-accounts.conf "$PKG_ROOT/etc/starship/nats/active.conf"
 cp "$REPO_DIR/config/fleet.yaml" "$PKG_ROOT/etc/starship/" 2>/dev/null || true
 cp "$REPO_DIR/config/profiles.yaml" "$PKG_ROOT/etc/starship/" 2>/dev/null || true
 for f in config.yaml proxy.yaml romi.yaml ergo.yaml orchestrator.yaml; do
@@ -170,7 +171,7 @@ for need in \
     "opt/starship/lib/starship/services/fleet.py" \
     "opt/starship/lib/starship/scripts/agent-health-checker.py" \
     "etc/starship/fleet.yaml" \
-    "etc/starship/nats/agent-bus.conf" \
+    "etc/starship/nats/fleet-accounts.conf.tmpl" \
     "lib/systemd/system/starship-fleet.service" \
     "lib/systemd/system/starship-health-checker.service" \
     "usr/local/bin/starshipctl"; do

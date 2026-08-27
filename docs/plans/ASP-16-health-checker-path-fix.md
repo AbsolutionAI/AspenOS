@@ -65,9 +65,13 @@
 - No changes to dashboard `_CANDIDATES` fallback list.
 
 ## Acceptance
-- [ ] Plan written before code edits
-- [ ] `grep -rn 'opt/starship-os'` in runtime dirs returns nothing
-- [ ] `install-health-checker.sh` installs the script to the canonical path
-- [ ] `bash -n` clean on all edited shell scripts
-- [ ] Python file compiles
-- [ ] Working tree clean after commit; ASP-16 disposition recorded
+- [x] Plan written before code edits
+- [x] `grep -rn 'opt/starship-os'` in runtime dirs returns nothing
+- [x] `install-health-checker.sh` installs the script to the canonical path
+- [x] `bash -n` clean on all edited shell scripts
+- [x] Python file compiles
+- [x] Working tree clean after commit; ASP-16 disposition recorded
+
+## Disposition (ASP-480 sweep — 2026-08-25)
+
+**Status: Completed.** All acceptance criteria met. `grep -rn 'opt/starship-os'` in `systemd/ config/ scripts/` returns no runtime hits. `install-health-checker.sh` installs to canonical path. `bash -n` clean on all shell scripts. Python file compiles. Implementation confirmed on current branch.

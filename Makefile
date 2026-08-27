@@ -1,9 +1,9 @@
 SHELL := /bin/bash
-CARGO := $(HOME)/.cargo/bin/cargo
+CARGO := $(shell command -v cargo 2>/dev/null || echo "$(HOME)/.cargo/bin/cargo")
 GO := go
 export PATH := $(HOME)/.cargo/bin:$(HOME)/.local/bin:$(PATH)
 
-.PHONY: all build build-agent cli install uninstall run dev stop clean status profile sandbox smoke bench iso-smoke policyexec starshipd heald c11 iso-boot
+.PHONY: all build build-agent cli install uninstall run dev stop clean status profile sandbox smoke fleet-smoke bench iso-smoke policyexec starshipd heald c11 iso-boot nightly nightly-clean
 
 all: build build-agent
 
@@ -32,14 +32,24 @@ uninstall:
 	sudo bash scripts/uninstall-daemon.sh
 
 # ─── Dev mode (user-level, no root) ────────────────────────────────
+# H-001: bus authenticates with multi-tenant accounts even in dev.
 dev: cli
 	@echo "Starting services in dev mode..."
-	setsid nats-server -c nats/agent-bus.conf > /dev/null 2>&1 < /dev/null &
+	@if [ ! -f nats/fleet-accounts.conf ]; then \
+		echo "Generating local NATS accounts creds (H-001)..."; \
+		bash scripts/gen-nats-accounts.sh --out nats >/dev/null; \
+	fi
+	setsid nats-server -c nats/fleet-accounts.conf > /dev/null 2>&1 < /dev/null &
 	sleep 1
+	set -a; . ./nats/nats.env; set +a; \
 	setsid .venv/bin/python3 agents/agent_daemon.py proxy > logs/agents-proxy.log 2>&1 < /dev/null &
+	set -a; . ./nats/nats.env; set +a; \
 	setsid .venv/bin/python3 agents/agent_daemon.py romi > logs/agents-romi.log 2>&1 < /dev/null &
+	set -a; . ./nats/nats.env; set +a; \
 	setsid .venv/bin/python3 agents/agent_daemon.py ergo > logs/agents-ergo.log 2>&1 < /dev/null &
+	set -a; . ./nats/nats.env; set +a; \
 	setsid .venv/bin/python3 tray/agnetic-status.py > logs/status-bridge.log 2>&1 < /dev/null &
+	set -a; . ./nats/nats.env; set +a; \
 	setsid .venv/bin/python3 scripts/message_history.py > logs/message-history.log 2>&1 < /dev/null &
 	DASHBOARD_PORT=8788 setsid .venv/bin/python3 dashboard/server.py > logs/dashboard.log 2>&1 < /dev/null &
 	sleep 2
@@ -58,16 +68,17 @@ status:
 	@echo ""
 	@echo "=== Starship OS — Service Status ==="
 	@echo ""
-	@pgrep nats-server > /dev/null && echo "  ● nats-server     — running" || echo "  ● nats-server     — stopped"
-	@pgrep staragent > /dev/null && echo "  ● staragent       — running" || echo "  ● staragent       — stopped"
-	@pgrep -f "agent_daemon.py proxy" > /dev/null && echo "  ● agent proxy     — running" || echo "  ● agent proxy     — stopped"
-	@pgrep -f "agent_daemon.py romi" > /dev/null && echo "  ● agent romi      — running" || echo "  ● agent romi      — stopped"
-	@pgrep -f "agent_daemon.py ergo" > /dev/null && echo "  ● agent ergo      — running" || echo "  ● agent ergo      — stopped"
-	@pgrep -f "agnetic-status.py" > /dev/null && echo "  ● status-bridge   — running" || echo "  ● status-bridge   — stopped"
-	@pgrep -f "message_history.py" > /dev/null && echo "  ● message-history — running" || echo "  ● message-history — stopped"
-	@ss -tlnp 2>/dev/null | grep -q 8788 && echo "  ● dashboard       — running (:8788)" || echo "  ● dashboard       — stopped"
-	@ss -tlnp 2>/dev/null | grep -q 8790 && echo "  ● dashboard-dev   — running (:8790 fleet UI)" || true
-	@pgrep -f "fleet.py daemon" > /dev/null && echo "  ● fleet-daemon    — running" || echo "  ● fleet-daemon    — stopped"
+	@pgrep nats-server > /dev/null && echo "  ● nats-server        — running" || echo "  ● nats-server        — stopped"
+	@pgrep staragent > /dev/null && echo "  ● staragent          — running" || echo "  ● staragent          — stopped"
+	@pgrep -f "agent_daemon.py proxy" > /dev/null && echo "  ● agent proxy        — running" || echo "  ● agent proxy        — stopped"
+	@pgrep -f "agent_daemon.py romi" > /dev/null && echo "  ● agent romi         — running" || echo "  ● agent romi         — stopped"
+	@pgrep -f "agent_daemon.py ergo" > /dev/null && echo "  ● agent ergo         — running" || echo "  ● agent ergo         — stopped"
+	@pgrep -f "agent_daemon.py robotics" > /dev/null && echo "  ● agent robotics     — running" || echo "  ● agent robotics     — stopped"
+	@pgrep -f "agnetic-status.py" > /dev/null && echo "  ● status-bridge      — running" || echo "  ● status-bridge      — stopped"
+	@pgrep -f "message_history.py" > /dev/null && echo "  ● message-history    — running" || echo "  ● message-history    — stopped"
+	@ss -tlnp 2>/dev/null | grep -q 8788 && echo "  ● dashboard          — running (:8788)" || echo "  ● dashboard          — stopped"
+	@ss -tlnp 2>/dev/null | grep -q 8790 && echo "  ● dashboard-dev      — running (:8790 fleet UI)" || true
+	@pgrep -f "fleet.py daemon" > /dev/null && echo "  ● fleet-daemon       — running" || echo "  ● fleet-daemon       — stopped"
 	@echo ""
 	@echo "=== Ollama Models ==="
 	@$(HOME)/.local/bin/ollama list 2>/dev/null || ollama list 2>/dev/null || echo "  (ollama not available)"
@@ -102,10 +113,14 @@ nats-accounts:
 smoke:
 	@bash scripts/smoke-test.sh
 
+fleet-smoke:
+	@PYTHONPATH=agents:../aspen-swarm-manager:../aspen-edge-rrm ASPEN_SIM=1 python3 scripts/smoke-fleet-bus.py --repo-root "$$(pwd)"
+
 iso-smoke:
 	@bash scripts/iso-firstboot-smoke.sh
 
 iso-boot:
+	@command -v qemu-system-x86_64 >/dev/null 2>&1 || { echo "  SKIP  ISO boot smoke — qemu-system-x86_64 not installed (control-plane host)."; echo "        Static checks only via: make iso-smoke"; exit 0; }
 	@bash scripts/iso-boot-smoke.sh
 
 # ─── Clean ──────────────────────────────────────────────────────────
@@ -118,10 +133,18 @@ clean:
 deb: build build-agent
 	@bash scripts/build-deb.sh
 
-# ─── ISO image ──────────────────────────────────────────────────────
+# ─── ISO image (requires builder host toolchain — SKIP on control plane) ──
 iso: build build-agent
+	@command -v lb >/dev/null 2>&1 || { echo "  SKIP  ISO build — live-build (lb) not installed. This is a control-plane host."; echo "        See docs/ops/ISO_BUILDER.md"; exit 0; }
 	@echo "Building ISO (requires root)..."
 	sudo bash scripts/build-iso.sh
+
+# ─── Nightly packaging (CI-simulated build + validation) ─────────────
+nightly: build build-agent sandbox deb
+	@bash scripts/nightly-check.sh
+
+nightly-clean: clean
+	rm -f dist/*.deb
 
 docker:
 	docker build -t agnetic-os .

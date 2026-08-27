@@ -1,0 +1,66 @@
+name: robotics
+role: robotics_agent
+model: qwen2.5:7b
+provider: ollama
+models:
+  default: qwen2.5:7b
+  available:
+    - qwen2.5:7b
+    - qwen2.5:3b
+  providers:
+    openrouter:
+      - openai/gpt-4o-mini
+      - deepseek/deepseek-chat
+      - anthropic/claude-3.5-haiku
+  switch_logic: "mission coordination|fleet ops|safety -> cloud; heartbeat|telemetry -> local qwen2.5:3b"
+
+capabilities:
+  - fleet_node_lifecycle
+  - mission_execution
+  - safety_monitoring
+  - robot_resource_management
+  - cobot_control_simulation
+  - swarming_coordination
+  - pose_control
+  - action_proposal
+
+skills:
+  - robotics-fleet
+  - system-health
+  - hold-to-enable
+  - software-development/spike
+  - software-development/systematic-debugging
+  - research/arxiv
+  - research/blogwatcher
+
+toolsets:
+  - terminal
+  - file_operations
+  - web_search
+  - memory
+  - coding
+  - nats
+
+nats:
+  subjects:
+    command: "agnetic.agent.robotics.command.>"
+    event: "agnetic.agent.robotics.event.>"
+    status: "agnetic.agent.robotics.status"
+  fleet:
+    register: "starship.fleet.register"
+    heartbeat: "starship.fleet.heartbeat"
+    status: "starship.fleet.status"
+    ops_status: "starship.fleet.ops.status"
+    mission_planned: "starship.fleet.mission.>"
+    mission_armed: "starship.fleet.mission.>"
+    mission_running: "starship.fleet.mission.>"
+    mission_held: "starship.fleet.mission.>"
+    mission_done: "starship.fleet.mission.>"
+    mission_failed: "starship.fleet.mission.>"
+  safety:
+    estop: "starship.safety.estop"
+    clear: "starship.safety.clear"
+  edge:
+    node_register: "starship.fleet.node.register"
+    node_heartbeat: "starship.fleet.node.heartbeat"
+    propose_act: "starship.edge.>.propose_act"

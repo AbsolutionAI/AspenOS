@@ -39,7 +39,11 @@
 - No push/PR.
 
 ## Acceptance
-- [ ] Plan written before code edits
-- [ ] `install-daemon.sh` installs to `/opt/starship` with `/opt/agnetic` aliases
-- [ ] `bash -n` clean
-- [ ] Working tree clean after commit; ASP-11 disposition recorded
+- [x] Plan written before code edits
+- [x] `install-daemon.sh` installs to `/opt/starship` with `/opt/agnetic` aliases
+- [x] `bash -n` clean
+- [x] Working tree clean after commit; ASP-11 disposition recorded
+
+## Disposition (ASP-480 sweep — 2026-08-25)
+
+**Status: Completed.** All acceptance criteria met via the packaging-hygiene forward-port initiative. `install-daemon.sh` installs to `/opt/starship` with `/opt/agnetic` legacy aliases. `bash -n` clean. Implementation confirmed on current branch (69 commits ahead of master).

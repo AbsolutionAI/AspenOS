@@ -77,9 +77,11 @@ cp "$REPO_DIR/scripts/message_history.py" "$INSTALLED/opt/agnetic/lib/agnetic/sc
 cp -r "$REPO_DIR/skills/"* "$INSTALLED/opt/agnetic/lib/agnetic/skills/" 2>/dev/null || true
 cp -r "$REPO_DIR/souls/"* "$INSTALLED/opt/agnetic/lib/agnetic/souls/" 2>/dev/null || true
 
-# Configs
-cp "$REPO_DIR/nats/agent-bus.conf" "$INSTALLED/etc/agnetic/nats/"
-cp "$REPO_DIR/nats/server.conf" "$INSTALLED/etc/agnetic/nats/" 2>/dev/null || true
+# Configs (H-001: no-auth agent-bus.conf removed from the package)
+cp "$REPO_DIR/nats/fleet-bus.conf" "$INSTALLED/etc/agnetic/nats/" 2>/dev/null || true
+cp "$REPO_DIR/nats/fleet-accounts.conf.tmpl" "$INSTALLED/etc/agnetic/nats/" 2>/dev/null || true
+# H-017: ship placeholder-only legacy conf under .deprecated
+cp "$REPO_DIR/nats/server.conf" "$INSTALLED/etc/agnetic/nats/server.conf.deprecated" 2>/dev/null || true
 cp "$REPO_DIR/nats/subjects.yaml" "$INSTALLED/etc/agnetic/nats/" 2>/dev/null || true
 cp "$REPO_DIR/agents/config.yaml" "$INSTALLED/etc/agnetic/" 2>/dev/null || true
 cp "$REPO_DIR/agents/proxy.yaml" "$INSTALLED/etc/agnetic/" 2>/dev/null || true

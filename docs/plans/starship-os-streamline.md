@@ -125,3 +125,7 @@
 - `docs/plans/alpha-2.1-addendum.md` — OpenCode + models + GitHub
 - `docs/FLEET.md` — fleet topology + ACL + NATS auth
 - `config/models.yaml` — model registry
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — Starship OS streamline plan completed. Branding, naming, and documentation updated to AspenOS/Starship. Key files: `SYSTEM_GUIDE.md`, `AGENTS.md`, `PERFORMANCE_PLAN.md`, `FLEET.md`, `config/models.yaml` all current.

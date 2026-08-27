@@ -88,3 +88,7 @@ Add a "Memory Layer" subsection documenting:
 - `ProspectiveMemoryManager` (stale doc claim; escalate to architect).
 - BEL-154 promotion pipeline, AppFlowy sync, `memory_pkg/`, MCP server.
 - Committing the untracked ABS deliverable files (owned by ASP-36, blocked).
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — Memory access layer (ingest/retrieve) landed. `memory_pkg/aspen_memory` Python library available. Functional round-trip verified: ingest → retrieve returns stored memory. ABS test failures reduced with no new regressions.

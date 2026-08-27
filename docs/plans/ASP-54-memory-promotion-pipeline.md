@@ -103,3 +103,7 @@ heuristic extraction limits, confidence calibration, facts-log dedup.
 - `ProspectiveMemoryManager` (architect decision pending).
 - AppFlowy bidirectional sync (Component 5 — larger scope, future cycle).
 - MCP server / `memory_pkg/` Python library (Components 4.1/4.2).
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — Memory promotion pipeline (`scripts/memory_promote.py`) landed. Heuristic extraction, confidence calibration, facts-log dedup all implemented. Compound learning: `docs/solutions/asp-54-memory-promotion-pipeline.md`.

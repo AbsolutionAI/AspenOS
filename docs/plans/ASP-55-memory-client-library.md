@@ -103,3 +103,7 @@ pattern, packaging choice, `json_each` pitfalls, reuse of `_memory_to_dict`.
 - ABS mirror deliverables (`docs/FLEET.md`, `docs/FOUNDATION.md`,
   `services/memory-api.py`, `Dockerfile.memory-api`, `services/__init__.py`,
   ABS test harnesses) owned by [ASP-36](/ASP/issues/ASP-36) — left uncommitted.
+
+## Disposition
+
+**COMPLETED** (ASP-482 sweep — 2026-08-26) — Memory client library landed. `MemoryClient` class with `search()`/`store()`/`list_collections()` implemented. `json_each`-based filtering, `_memory_to_dict` reuse pattern documented. Compound learning recorded.

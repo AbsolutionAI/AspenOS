@@ -184,8 +184,8 @@ Every file in the repository with its purpose.
 
 | File | Purpose |
 |---|---|
-| `server.conf` | Production config: port 4222, JetStream (1GB mem / 10GB file), auth token, account permissions. |
-| `agent-bus.conf` | Dev config: no auth, monitor port 8222, smaller JetStream limits. |
+| `server.conf` | **Deprecated (H-017)** placeholder-only stub — no live secrets; packaging ships as `server.conf.deprecated`. |
+| `fleet-accounts.conf.tmpl` | Default config template: multi-tenant accounts + nkeys (materialized by `scripts/gen-nats-accounts.sh`, H-001). |
 | `subjects.yaml` | NATS subject topology reference. |
 
 ### 2.9 `tray/` — System Tray Components
@@ -370,7 +370,7 @@ staragent (Rust binary)
 
 nats-server
   ├── Binary: /usr/local/bin/nats-server (or system package)
-  ├── Config: nats/server.conf or nats/agent-bus.conf
+  ├── Config: /etc/starship/nats/active.conf (accounts mode default, H-001)
   └── JetStream: AGENTS + TELEMETRY streams
 
 agent_daemon.py (×3: proxy, romi, ergo)
@@ -643,8 +643,9 @@ app.router.add_get("/api/something", handle_something)
 ### 6.8 Development Quick Start
 
 ```bash
-# 1. Start NATS
-nats-server -c nats/agent-bus.conf &
+# 1. Generate accounts creds + start NATS (H-001: authenticated by default)
+bash scripts/gen-nats-accounts.sh --out nats
+nats-server -c nats/fleet-accounts.conf &
 
 # 2. Start StarAgent (telemetry)
 cargo run --release --manifest-path agent/Cargo.toml &
@@ -677,8 +678,8 @@ Or use the Makefile: `make run-all`
 | `agents/config.yaml` | YAML | Master config: agent definitions (model, nats_url, enabled, skills, schedules), NATS settings, dashboard port/host | agent_daemon.py, scheduler.py |
 | `agents/<name>.yaml` | YAML | Per-agent definition (model, role, skills, NATS subjects) | agent_daemon.py |
 | `agents/Modelfile.<name>` | Ollama format | LLM parameters: base model, context size, temperature, system prompt | `ollama create <name> -f ...` |
-| `nats/server.conf` | NATS config | Production NATS: port, auth token, JetStream limits, accounts, subject permissions | nats-server |
-| `nats/agent-bus.conf` | NATS config | Dev NATS: no auth, smaller limits, HTTP monitor on :8222 | nats-server |
+| `nats/server.conf` | NATS config | Deprecated placeholder stub (H-017); never active secrets | reference only |
+| `nats/fleet-accounts.conf.tmpl` | NATS config | Multi-tenant accounts bus: OPS/EDGE/RANGE/TELEM + nkeys (default, H-001) | nats-server (via gen) |
 | `systemd/*.service` | systemd unit | ExecStart, After, BindsTo, User, Restart policy | systemd |
 | `cinnamon/settings-schema.json` | JSON | Desklet refresh interval (1–60s, default 5) | Cinnamon |
 | `conky/agnetic.conkyrc` | Lua | Conky: position, size, update interval, data sources, colors | conky |
@@ -718,7 +719,7 @@ Defined in `agents/config.yaml` under each agent's `schedule:` list.
 
 ```
 1. nats-server (port 4222)
-   └── Config: nats/server.conf (prod) or nats/agent-bus.conf (dev)
+   └── Config: /etc/starship/nats/active.conf (accounts mode default, H-001)
 
 2. staragent (Rust binary)
    └── Publishes agnetic.telemetry every 10s
