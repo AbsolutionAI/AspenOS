@@ -77,6 +77,7 @@ check "fleet.yaml present" test -f config/fleet.yaml
 check "pins.json present" test -f third_party/pins.json
 check "dashboard server syntax" python3 -c "import ast; ast.parse(open('dashboard/server.py').read())"
 check "nats subjects dual" grep -q 'starship.fleet' nats/subjects.yaml
+check "fleet-bus smoke" bash -c 'PYTHONPATH=../aspen-edge-rrm:../aspen-swarm-manager python3 scripts/smoke-fleet-bus.py >/dev/null'
 
 echo ""
 echo "Result: $PASS passed, $FAIL failed"
