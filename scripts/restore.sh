@@ -154,7 +154,7 @@ restore_backup() {
     local archive="$BACKUP_FILE"
 
     # Resolve relative paths
-    if [[ ! - "$archive" = /* ]]; then
+    if [[ ! "$archive" = /* ]]; then
         # Check if it's just a filename in the backup dir
         if [[ -f "${BACKUP_BASE}/${archive}" ]]; then
             archive="${BACKUP_BASE}/${archive}"

@@ -14,11 +14,15 @@ The nightly check runs in 8 sections:
 | 1. Go build | `make build`, `starshipctl version` |
 | 2. Rust build | `cargo build --release` for staragent |
 | 3. C11 components | sandbox_spike, policyexec, starshipd, heald |
-| 4. Smoke tests | Full 59-check suite via `scripts/smoke-test.sh` |
+| 4. Smoke tests | Full suite via `scripts/smoke-test.sh` (includes fleet-bus smoke against pinned sibling repos) |
 | 5. Debian package | `scripts/build-deb.sh`, package size > 1MB |
 | 6. Systemd units | All 9 canonical units exist on disk |
 | 7. Shell syntax | `bash -n` on every `scripts/*.sh` |
 | 8. Key file presence | VERSION, Makefile, configs, NATS configs, pins.json |
+
+## CI infrastructure
+
+The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm-manager`) at pinned commits from `third_party/pins.json` to support the fleet-bus smoke test. Toolchain setup mirrors `ci.yml` (Go 1.22, Python 3.12, Rust stable, libseccomp-dev).
 
 ## Failure handling
 

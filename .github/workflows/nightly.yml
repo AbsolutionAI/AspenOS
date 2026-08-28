@@ -48,6 +48,15 @@ jobs:
           curl -sL https://github.com/nats-io/nats-server/releases/download/v2.14.3/nats-server-v2.14.3-linux-amd64.tar.gz | tar xz
           sudo cp nats-server-v2.14.3-linux-amd64/nats-server /usr/local/bin/
 
+      - name: Checkout pinned sibling repos (for fleet-bus smoke)
+        run: |
+          RRM_COMMIT=$(python3 -c "import json;print(json.load(open('third_party/pins.json'))['components']['aspen-edge-rrm']['commit'])")
+          SWARM_COMMIT=$(python3 -c "import json;print(json.load(open('third_party/pins.json'))['components']['aspen-swarm-manager']['commit'])")
+          git clone -q --filter=blob:none "$(python3 -c "import json;print(json.load(open('third_party/pins.json'))['components']['aspen-edge-rrm']['github'])")" ../aspen-edge-rrm
+          git -C ../aspen-edge-rrm checkout -q "$RRM_COMMIT"
+          git clone -q --filter=blob:none "$(python3 -c "import json;print(json.load(open('third_party/pins.json'))['components']['aspen-swarm-manager']['github'])")" ../aspen-swarm-manager
+          git -C ../aspen-swarm-manager checkout -q "$SWARM_COMMIT"
+
       - name: Run nightly check
         run: |
           export PATH="$(go env GOPATH)/bin:${HOME}/.cargo/bin:$PATH"
