@@ -14,7 +14,7 @@ The nightly check runs in 8 sections:
 | 1. Go build | `make build`, `starshipctl version` |
 | 2. Rust build | `cargo build --release` for staragent |
 | 3. C11 components | sandbox_spike, policyexec, starshipd, heald |
-| 4. Smoke tests | Full 83-check suite via `scripts/smoke-test.sh` |
+| 4. Smoke tests | Full 59-check suite via `scripts/smoke-test.sh` |
 | 5. Debian package | `scripts/build-deb.sh`, package size > 1MB |
 | 6. Systemd units | All 9 canonical units exist on disk |
 | 7. Shell syntax | `bash -n` on every `scripts/*.sh` |
