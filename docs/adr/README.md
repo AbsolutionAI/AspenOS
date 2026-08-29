@@ -28,7 +28,7 @@ Aspen OS / AspenGrove architecture decisions. Prefer short, statused markdown in
 | ID | Topic | Trigger |
 |----|-------|---------|
 | ADR-0007 | Sunset dual-publish (`starship.*`/`agnetic.*` → `aspen.*` only) | >50% consumers on `aspen.*` or first external plant pilot |
-| ADR-0008 | Authenticated operator-of-record binding for DualHumanGate | Before any non-sim arm (G9+) |
+| [ADR-0008](./ADR-0008-operator-of-record-binding.md) | Authenticated operator-of-record for DualHumanGate | **Proposed** — plan-only; before any non-sim arm (G9+) |
 
 ## Related docs
 
