@@ -192,14 +192,17 @@ log "Layout validation OK"
 mkdir -p "$OUTPUT_DIR"
 DEB_NAME="starship-os_${VERSION}_amd64.deb"
 # root-owner for reproducible package metadata when run as root; else current user
-dpkg-deb --root-owner-group --build "$PKG_ROOT" "$OUTPUT_DIR/$DEB_NAME" 2>/dev/null \
-  || dpkg-deb --build "$PKG_ROOT" "$OUTPUT_DIR/$DEB_NAME"
+# Unset LD_LIBRARY_PATH: Paperclip agent env leaks an older liblzma from embedded-postgres
+# that causes dpkg-deb to fail with "XZ_5.4 not found" (ASP-521).
+DPKG="env -u LD_LIBRARY_PATH dpkg-deb"
+$DPKG --root-owner-group --build "$PKG_ROOT" "$OUTPUT_DIR/$DEB_NAME" 2>/dev/null \
+  || $DPKG --build "$PKG_ROOT" "$OUTPUT_DIR/$DEB_NAME"
 
 log "Built: $OUTPUT_DIR/$DEB_NAME"
 
 # ─── Post-build verify (avoid pipefail+grep -q SIGPIPE) ─────────────
 LIST=$(mktemp)
-dpkg-deb -c "$OUTPUT_DIR/$DEB_NAME" > "$LIST"
+$DPKG -c "$OUTPUT_DIR/$DEB_NAME" > "$LIST"
 if grep -q './installed/' "$LIST"; then
     rm -f "$LIST"
     err "package still contains nested ./installed/ paths"

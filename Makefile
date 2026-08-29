@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-CARGO := $(HOME)/.cargo/bin/cargo
+CARGO := cargo
 GO := go
 export PATH := $(HOME)/.cargo/bin:$(HOME)/.local/bin:$(PATH)
 

@@ -5,9 +5,34 @@
 **Schedule:** Daily at 02:00 UTC (`0 2 * * *`)  
 **Manual trigger:** Yes, via `workflow_dispatch` in GitHub Actions
 
+## Procedure (runbook)
+
+1. **Workspace verification**
+   - `git rev-parse --show-toplevel` resolves to the `aspen-os` git root.
+   - `git remote get-url origin` points at `https://github.com/AbsolutionAI/AspenOS.git`.
+2. **Toolchain**: ensure `nats-server` is on PATH:
+   `export PATH="$HOME/go/bin:$HOME/.local/bin:$PATH"`.
+3. **Smoke suites** (record pass/fail counts):
+   - `make smoke`
+   - `make iso-smoke`
+4. **Static inventory**:
+   - systemd unit count (`*.service`/`*.timer`/`*.socket` across `systemd/`, `dist/pkgroot/lib/systemd/system/`, `deploy/`, `config/`)
+   - Debian metadata presence (`debian/DEBIAN/{control,postinst,postrm,prerm}`)
+   - `scripts/update.sh` present and executable
+   - Windows packaging artifacts under `packaging/windows/` (`install.bat`, `configure.bat`, `uninstall.bat`, `staragent.exe`, `staragent.yaml`, `README.txt`)
+   - Version consistency between `VERSION` file and `debian/DEBIAN/control`
+5. **Build steps**: ISO/deb builds are SKIP by design on this host (Option B, see `ISO_BUILDER.md`); static checks only.
+6. **Reporting**: post a results comment on the run issue with:
+   - verdict line (PASS/FAIL)
+   - pass/fail counts per suite
+   - toolchain notes (nats-server version, etc.)
+   - deviations from this baseline doc
+
+On failure: diagnose, fix if well-scoped, otherwise mark the run issue blocked naming the failing check and owner.
+
 ## What gets checked
 
-The nightly check runs in 8 sections:
+The nightly check runs in 11 sections:
 
 | Section | Checks |
 |---------|--------|
@@ -18,7 +43,10 @@ The nightly check runs in 8 sections:
 | 5. Debian package | `scripts/build-deb.sh`, package size > 1MB |
 | 6. Systemd units | All 9 canonical units exist on disk |
 | 7. Shell syntax | `bash -n` on every `scripts/*.sh` |
-| 8. Key file presence | VERSION, Makefile, configs, NATS configs, pins.json |
+| 8. Key file presence | VERSION, Makefile, configs, NATS configs, pins.json, version consistency |
+| 9. Debian metadata | control, postinst, postrm, prerm |
+| 10. Windows packaging | install.bat, configure.bat, uninstall.bat, staragent.exe, staragent.yaml, README.txt |
+| 11. Update mechanism | scripts/update.sh present and executable |
 
 ## CI infrastructure
 
@@ -30,10 +58,38 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 - The exit code equals the number of failed checks (0 = all passed)
 - The full run log is visible in GitHub Actions under the nightly workflow
 
+## Baseline
+
+| Check | Baseline |
+| --- | --- |
+| `make smoke` | 59 tests: 58 passed, 1 known performance deviation (C11 p50 = 3.451ms, threshold 2ms — hardware-dependent; see note below) |
+| `make iso-smoke` | 32 passed, 0 failed |
+| **`scripts/check-nightly.sh` total** | **78 passed, 1 known failure** (C11 p50 benchmark) |
+| nats-server | v2.14.5 |
+| systemd unit files | 18 (9 in `systemd/`, 9 in `dist/pkgroot/lib/systemd/system/`) |
+| Debian metadata | `debian/DEBIAN/`: control (starship-os 2.2.0 amd64), postinst, postrm, prerm |
+| `scripts/update.sh` | present, executable |
+| Windows packaging | `packaging/windows/`: install.bat, configure.bat, uninstall.bat, staragent.exe, staragent.yaml, README.txt |
+| Version consistency | VERSION matches debian/DEBIAN/control |
+
+Update this table when suites gain or lose checks so future nightly runs can report meaningful deviations.
+
+## Known deviations
+
+### C11 sandbox p50 benchmark (`make smoke` check 53 of 59)
+
+The ADR 0001 criterion requires `c11_internal p50 < 2ms`. On this control-plane host,
+the measured p50 is ~3.451ms. This is a hardware-dependent benchmark: the threshold may
+be met on dedicated CI runners with newer processors or lower latency profiles.
+
+**Not actionable** unless the sandbox is moved to a different host or optimized. The
+nightly check records this as a single known failure (1 of 59 smoke tests).
+
 ## What is NOT checked
 
 - ISO build (requires root / nested virt, not feasible in CI)
-- Windows packaging
+- Windows packaging build from source (no CI build host)
+- Docker image build (`make docker`)
 - Performance benchmarks (use `make bench`)
 - Integration tests against real NATS mesh
 
@@ -47,7 +103,10 @@ See `docs/solutions/` for historical packaging issues:
 - `asp-190-health-checker-unit-deployment.md` — Health checker unit packaging
 - `asp-192-deploy-stale-units.md` — Stale units cleanup
 - `asp-478-c11-kernel7-allowlist.md` — C11 seccomp allowlist drift
+- `asp-512-nightly-check.md` — Initial nightly check
+- `asp-518-nightly-check-fixes.md` — Shell syntax + sibling repo hardening
+- `asp-521-nightly-check-complete.md` — Debian metadata, Windows packaging, update mechanism
 
 ## Adding new checks
 
-Edit `scripts/check-nightly.sh` and add a `check "description" command-to-run` line in the appropriate section, or create a new section.
+Edit `scripts/check-nightly.sh` and add a `check "description" command-to-run` line in the appropriate section, or create a new section. Update this ops doc with the new check and the baseline table.

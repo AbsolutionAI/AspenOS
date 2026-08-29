@@ -1,0 +1,13 @@
+{
+  "issue": "ASP-499",
+  "issueId": "e200a0a8-5c64-4554-b3f2-594ce65f3bbc",
+  "status": "done",
+  "verification": "12/12 smoke tests pass",
+  "fix": [
+    "scripts/smoke-fleet-bus.py — sibling repo auto-discovery for aspen-edge-rrm + aspen-swarm-manager",
+    "scripts/smoke-test.sh — PYTHONPATH on fleet bus invocation"
+  ],
+  "verifiedAt": "2026-08-27T23:10:00Z",
+  "dispositionNote": "Paperclip API unreachable (PAPERCLIP_API_URL contains literal placeholder). Durable record left here. Manual disposition required to sync to board.",
+  "recoveryAttempt": 1
+}

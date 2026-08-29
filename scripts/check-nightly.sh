@@ -106,6 +106,29 @@ check "nats/agent-bus.conf" test -f nats/agent-bus.conf
 check "nats/fleet-bus.conf" test -f nats/fleet-bus.conf
 check "nats/subjects.yaml" test -f nats/subjects.yaml
 check "third_party/pins.json" test -f third_party/pins.json
+check "VERSION matches debian/control" bash -c 'v=$(cat VERSION 2>/dev/null); grep -q "^Version: $v$" debian/DEBIAN/control 2>/dev/null'
+
+# ─── Section 9: Debian metadata ─────────────────────────────
+echo -e "\n${YELLOW}── Section 9: Debian metadata ──${NC}"
+check "debian control file" test -f debian/DEBIAN/control
+check "debian postinst" test -f debian/DEBIAN/postinst
+check "debian postrm" test -f debian/DEBIAN/postrm
+check "debian prerm" test -f debian/DEBIAN/prerm
+check "debian control declares starship-os" grep -q '^Package: starship-os' debian/DEBIAN/control
+
+# ─── Section 10: Windows packaging ──────────────────────────
+echo -e "\n${YELLOW}── Section 10: Windows packaging ──${NC}"
+check "windows install.bat" test -f packaging/windows/install.bat
+check "windows configure.bat" test -f packaging/windows/configure.bat
+check "windows uninstall.bat" test -f packaging/windows/uninstall.bat
+check "windows staragent.exe" test -f packaging/windows/staragent.exe
+check "windows staragent.yaml" test -f packaging/windows/staragent.yaml
+check "windows README.txt" test -f packaging/windows/README.txt
+
+# ─── Section 11: Update mechanism ───────────────────────────
+echo -e "\n${YELLOW}── Section 11: Update mechanism ──${NC}"
+check "update.sh exists" test -f scripts/update.sh
+check "update.sh executable" test -x scripts/update.sh
 
 # ─── Summary ─────────────────────────────────────────────────
 TIMING_END=$(date +%s%N)
