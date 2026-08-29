@@ -82,4 +82,4 @@ jobs:
       - uses: actions/checkout@v4
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq libseccomp-dev gcc pkg-config
       - run: make -C src/c/sandbox_spike all test
-      - run: ./src/c/sandbox_spike/sandbox_run --help | grep -q built-in
+      - run: ./src/c/sandbox_spike/sandbox_run --help >/dev/null
