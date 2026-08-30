@@ -45,8 +45,8 @@ jobs:
 
       - name: Install nats-server (for accounts conf validation)
         run: |
-          curl -sL https://github.com/nats-io/nats-server/releases/download/v2.14.3/nats-server-v2.14.3-linux-amd64.tar.gz | tar xz
-          sudo cp nats-server-v2.14.3-linux-amd64/nats-server /usr/local/bin/
+          curl -sL https://github.com/nats-io/nats-server/releases/download/v2.14.5/nats-server-v2.14.5-linux-amd64.tar.gz | tar xz
+          sudo cp nats-server-v2.14.5-linux-amd64/nats-server /usr/local/bin/
 
       - name: Checkout pinned sibling repos (for fleet-bus smoke)
         run: |

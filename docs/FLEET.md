@@ -28,17 +28,33 @@ Fleet
 Cluster mesh (`services/cluster.py`) remains the low-level node/task router.  
 Fleet is the **topology + exercise** control plane on top.
 
-## NATS subjects (dual-publish)
+## NATS subjects (primary `aspen.` prefix)
 
-| Subject | Purpose |
-|---------|---------|
-| `starship.fleet.register` | Node registration |
-| `starship.fleet.heartbeat` | Node heartbeat |
-| `starship.fleet.status` | Node status snapshot |
-| `starship.fleet.ops.status` | Ops manager aggregate |
-| `starship.fleet.exercise` | Exercise start/stop events |
+**Migration note (2026-08-29):** New work uses `aspen.` prefix per ADR-0007 and ADR-0003. Dual-publish `starship.*` / `agnetic.*` only for Alpha 2.0 bridge clients. Full sunset tracked in open ADR candidate.
 
-Legacy `agnetic.fleet.*` is dual-published for Alpha 2.0 clients.
+| Subject                              | Purpose / Payload summary                          | Notes |
+|--------------------------------------|----------------------------------------------------|-------|
+| `aspen.fleet.node.register`         | node_id, plant, roles[], caps[], version          | register on boot |
+| `aspen.fleet.node.heartbeat`        | node_id, ts, status, resource{}, agents[]         | 5–30s |
+| `aspen.fleet.ops.status`            | aggregate plants/nodes, degraded[]                | ops-manager |
+| `aspen.fleet.mission.*`             | mission graph events                              | swarm-manager |
+| `aspen.edge.<node_id>.heartbeat`    | RRM-local detail                                  | optional fan-in |
+| `aspen.edge.<node_id>.propose_act`  | act proposals from micro-agents                   | RRM in |
+| `aspen.edge.<node_id>.authorize`    | dual-human authz for held proposals               | `{proposal_id, human_id, note?}` |
+| `aspen.edge.<node_id>.command`      | RRM → micro-agent commands                        | - |
+| `aspen.safety.estop`                | reason, source, ts                                | retain + fanout; all RRMs |
+| `aspen.safety.authorize_clear`      | one principal toward dual-clear                   | `{human_id}` |
+| `aspen.safety.clear`                | execute clear after two distinct authorize_clear  | never unlatches alone |
+| `aspen.sentinel.fleet.overview`     | aggregate plants/nodes/status, degraded[]         | Sentinel dashboard (ADR-0007) |
+| `aspen.sentinel.audit.event`        | {event_id, actor, action, target, result, ts}     | durable JetStream |
+| `aspen.sentinel.osint.ingest`       | source, raw/ref, confidence, tags[]               | Sentinel OSINT |
+| `aspen.authz.gate.request`          | capability, resource, context, proposer_agent_id  | propose_act path (ADR-0009) |
+| `aspen.authz.gate.decision`         | request_id, decision, humans[], note?             | dual-human for RED/BLACK |
+| `aspen.authz.capability.grant`      | agent_id, caps[], expires?, scope                 | modular per Light Cell / Full Plant |
+
+**Cross-references:** ADR-0003 (Fleet/Edge Safety), ADR-0007 (Sentinel + authz subjects), ADR-0009 (Gatekeepers).
+
+Legacy `agnetic.fleet.*` / `starship.*` remain only for backward compatibility during migration.
 
 ## CLI
 

@@ -13,8 +13,7 @@
 2. **Toolchain**: ensure `nats-server` is on PATH:
    `export PATH="$HOME/go/bin:$HOME/.local/bin:$PATH"`.
 3. **Smoke suites** (record pass/fail counts):
-   - `make smoke`
-   - `make iso-smoke`
+   - `bash scripts/check-nightly.sh` (80 checks across 12 sections)
 4. **Static inventory**:
    - systemd unit count (`*.service`/`*.timer`/`*.socket` across `systemd/`, `dist/pkgroot/lib/systemd/system/`, `deploy/`, `config/`)
    - Debian metadata presence (`debian/DEBIAN/{control,postinst,postrm,prerm}`)
@@ -32,14 +31,14 @@ On failure: diagnose, fix if well-scoped, otherwise mark the run issue blocked n
 
 ## What gets checked
 
-The nightly check runs in 11 sections:
+The nightly check runs in 12 sections:
 
 | Section | Checks |
 |---------|--------|
 | 1. Go build | `make build`, `starshipctl version` |
 | 2. Rust build | `cargo build --release` for staragent |
 | 3. C11 components | sandbox_spike, policyexec, starshipd, heald |
-| 4. Smoke tests | Full suite via `scripts/smoke-test.sh` (includes fleet-bus smoke against pinned sibling repos) |
+| 4. Smoke tests | Full suite via `scripts/smoke-test.sh` (58 tests, including iso-firstboot-smoke, fleet-bus smoke against pinned sibling repos) |
 | 5. Debian package | `scripts/build-deb.sh`, package size > 1MB |
 | 6. Systemd units | All 9 canonical units exist on disk |
 | 7. Shell syntax | `bash -n` on every `scripts/*.sh` |
@@ -47,6 +46,7 @@ The nightly check runs in 11 sections:
 | 9. Debian metadata | control, postinst, postrm, prerm |
 | 10. Windows packaging | install.bat, configure.bat, uninstall.bat, staragent.exe, staragent.yaml, README.txt |
 | 11. Update mechanism | scripts/update.sh present and executable |
+| 12. Gatekeeper module | `src/python/gatekeeper/minimal_shim.py` present, valid Python syntax |
 
 ## CI infrastructure
 
@@ -62,15 +62,15 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 
 | Check | Baseline |
 | --- | --- |
-| `make smoke` | 59 tests: 58 passed, 1 known performance deviation (C11 p50 = 3.451ms, threshold 2ms — hardware-dependent; see note below) |
-| `make iso-smoke` | 32 passed, 0 failed |
-| **`scripts/check-nightly.sh` total** | **78 passed, 1 known failure** (C11 p50 benchmark) |
+| `scripts/check-nightly.sh` total | **80 passed, 1 known failure** (81 checks; C11 p50 benchmark deviation = known, hardware-dependent) |
+| Of which: smoke test suite | 58 passed, 1 failed (C11 p50 benchmark) |
 | nats-server | v2.14.5 |
 | systemd unit files | 18 (9 in `systemd/`, 9 in `dist/pkgroot/lib/systemd/system/`) |
 | Debian metadata | `debian/DEBIAN/`: control (starship-os 2.2.0 amd64), postinst, postrm, prerm |
 | `scripts/update.sh` | present, executable |
 | Windows packaging | `packaging/windows/`: install.bat, configure.bat, uninstall.bat, staragent.exe, staragent.yaml, README.txt |
 | Version consistency | VERSION matches debian/DEBIAN/control |
+| Gatekeeper module | `src/python/gatekeeper/minimal_shim.py` present, valid Python syntax |
 
 Update this table when suites gain or lose checks so future nightly runs can report meaningful deviations.
 
@@ -106,6 +106,7 @@ See `docs/solutions/` for historical packaging issues:
 - `asp-512-nightly-check.md` — Initial nightly check
 - `asp-518-nightly-check-fixes.md` — Shell syntax + sibling repo hardening
 - `asp-521-nightly-check-complete.md` — Debian metadata, Windows packaging, update mechanism
+- `asp-524-nightly-check-improvements.md` — nats-server v2.14.5, gatekeeper module, baseline refresh
 
 ## Adding new checks
 

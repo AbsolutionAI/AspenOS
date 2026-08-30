@@ -21,14 +21,17 @@ Aspen OS / AspenGrove architecture decisions. Prefer short, statused markdown in
 | [ADR-0004](./ADR-0004-light-core-plugins.md) | Light core + plugins | Accepted | Optional deps |
 | [ADR-0005](./ADR-0005-langgraph-execution-plugin.md) | LangGraph as execution plugin | Accepted | Paperclip remains org SoR |
 | [ADR-0006](./ADR-0006-memory-store-tiering.md) | Tiered memory store (LanceDB vs PG+AGE) | **Accepted** | BEL-154 + Master Spec §3.1 — accepted ASP-426 |
+| [ADR-0007](./ADR-0007-nats-subject-contracts-sentinel-c2.md) | NATS subject contracts for Sentinel + C2 | **Proposed** | BEL-196 — Sentinel subjects, authz gates, audit |
+| [ADR-0008](./ADR-0008-package-classification-core-plugin-devonly.md) | AspenGrove package classification (core/plugin/dev-only) | **Proposed** | BEL-195 — three-tier split, PACKAGES.md |
+| [ADR-0009](./ADR-0009-capability-based-gatekeepers.md) | Capability-based gatekeepers (no broad API keys) | **Proposed** | BEL-215 — propose_act + dual-human gate |
 | [ADR-0010](./0001-c11-agent-runtime.md) | C11 agent runtime (legacy file `0001-…`) | Accepted | Logical **0010**; file keeps historic name |
 
 ### Open candidates (not yet filed)
 
 | ID | Topic | Trigger |
 |----|-------|---------|
-| ADR-0007 | Sunset dual-publish (`starship.*`/`agnetic.*` → `aspen.*` only) | >50% consumers on `aspen.*` or first external plant pilot |
-| ADR-0008 | Authenticated operator-of-record binding for DualHumanGate | Before any non-sim arm (G9+) |
+| ADR-0011 | Sunset dual-publish (`starship.*`/`agnetic.*` → `aspen.*` only) | >50% consumers on `aspen.*` or first external plant pilot |
+| ADR-0012 | Authenticated operator-of-record binding for DualHumanGate | Before any non-sim arm (G9+) |
 
 ## Related docs
 

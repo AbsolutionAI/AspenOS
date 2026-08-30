@@ -130,6 +130,11 @@ echo -e "\n${YELLOW}── Section 11: Update mechanism ──${NC}"
 check "update.sh exists" test -f scripts/update.sh
 check "update.sh executable" test -x scripts/update.sh
 
+# ─── Section 12: Gatekeeper module ──────────────────────────
+echo -e "\n${YELLOW}── Section 12: Gatekeeper module ──${NC}"
+check "gatekeeper shim exists" test -f src/python/gatekeeper/minimal_shim.py
+check "gatekeeper shim syntax" python3 -c "import ast; ast.parse(open('src/python/gatekeeper/minimal_shim.py').read())"
+
 # ─── Summary ─────────────────────────────────────────────────
 TIMING_END=$(date +%s%N)
 ELAPSED_MS=$(( (TIMING_END - TIMING_BEGIN) / 1000000 ))
