@@ -1,7 +1,10 @@
 # ADR-0009: Capability-Based Gatekeepers (No Broad API Keys)
 
-**Status:** Proposed — 2026-08-29  
+**Status:** Accepted (design) — 2026-08-31  
+**Accepted by:** ASP-530 Weekly Architecture Review  
+**Implementation:** BEL-215 continues (NATS wire, adapter mediation, no broad keys in images)  
 **Linear:** BEL-215 (Urgent) · Related BEL-196 (NATS contracts), ADR-0003 (Safety Contracts), Master Spec v4.0 hard rules  
+**Prototype:** `src/python/gatekeeper/minimal_shim.py`  
 **Target Products:** AspenOS (primary), Aspen Sentinel, aspen-dev
 
 ## Context

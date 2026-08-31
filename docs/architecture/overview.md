@@ -2,7 +2,7 @@
 
 **Canonical product SoR:** [`docs/sor/MASTER_SPEC.md`](../sor/MASTER_SPEC.md) (AspenGrove v4.0 — Three Organs).  
 **ADRs:** [`docs/adr/README.md`](../adr/README.md)  
-**Last architecture review:** [`docs/ops/WEEKLY_ARCHITECTURE_REVIEW_2026-08-24.md`](../ops/WEEKLY_ARCHITECTURE_REVIEW_2026-08-24.md)
+**Last architecture review:** [`docs/ops/WEEKLY_ARCHITECTURE_REVIEW_2026-08-31.md`](../ops/WEEKLY_ARCHITECTURE_REVIEW_2026-08-31.md)
 
 This monorepo is the **AspenOS / Starship Alpha** implementation tree. Product boundaries:
 
@@ -49,11 +49,13 @@ Legacy `/opt/agnetic` may still appear in Alpha installs — treat as migration 
 
 ## Bus subjects
 
-| Family | Canonical (ADR-0003) | Legacy bridge |
-|--------|----------------------|---------------|
+| Family | Canonical (ADR-0003 / 0007) | Legacy bridge |
+|--------|------------------------------|---------------|
 | Fleet | `aspen.fleet.*` | `starship.fleet.*`, `agnetic.fleet.*` |
 | Edge | `aspen.edge.<node>.*` | — |
 | Safety | `aspen.safety.*` | — |
+| Sentinel | `aspen.sentinel.*` | — |
+| Authz / gate | `aspen.authz.*` | — |
 | Worker | `aspen.worker.langgraph.*` | — |
 | Alpha agents | `starship.agent.*` | `agnetic.agent.*` |
 
