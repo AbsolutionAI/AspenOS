@@ -3,7 +3,7 @@
 **Paperclip:** ASP-362 (parent ASP-166 Weekly Architecture Review)  
 **Date:** 2026-08-22  
 **Scope:** Inventory only — **no subject deletions**  
-**Purpose:** Support future **ADR-0007** dual-publish deprecation window  
+**Purpose:** Support future **ADR-0011** dual-publish deprecation window (sunset `starship.*`/`agnetic.*`; ADR-0007 is Sentinel/authz subjects)  
 **Canonical contracts:** [ADR-0003](../adr/ADR-0003-fleet-edge-safety-contracts.md) · `docs/FLEET.md`
 
 ## Naming trees

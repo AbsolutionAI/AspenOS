@@ -1,9 +1,10 @@
 # ADR-0007: NATS Subject Contracts for Aspen Sentinel + AspenOS C2
 
-**Status:** Proposed — 2026-08-29  
+**Status:** Accepted — 2026-08-31  
+**Accepted by:** ASP-530 Weekly Architecture Review  
 **Linear:** BEL-196 (A3) · Parent BEL-193 (AspenGrove Three-Product Epic)  
-**Schema home:** aspen-contracts (https://github.com/AbsolutionAI/aspen-contracts)  
-**Related:** ADR-0003 (Fleet/Edge Safety), Master Spec v4.0 §3.1 (NATS/JetStream bus), BEL-179 (Fleet Epic)
+**Schema home:** aspen-contracts (https://github.com/AbsolutionAI/aspen-contracts) — monorepo `docs/FLEET.md` is interim SoR until mirror  
+**Related:** ADR-0003 (Fleet/Edge Safety), ADR-0009 (Gatekeepers), Master Spec v4.0 §3.1 (NATS/JetStream bus), BEL-179 (Fleet Epic)
 
 ## Context
 Aspen Sentinel requires dedicated subjects for authorization gates, audit feeds, fleet overview, and OSINT ingest while preserving the existing `aspen.fleet.*` / `aspen.edge.*` / `aspen.safety.*` tree (ADR-0003). AspenOS C2 and micro-agents must interoperate without breaking changes. All safety-adjacent actions remain `propose_act` only until dual-human authorization.
@@ -11,7 +12,7 @@ Aspen Sentinel requires dedicated subjects for authorization gates, audit feeds,
 ## Decision
 ### Subject Prefix & Namespace
 - Primary: `aspen.sentinel.*` and `aspen.authz.*`
-- Preserve `aspen.` for all new work (sunset dual-publish `starship.*` / `agnetic.*` per open ADR-0007 candidate)
+- Preserve `aspen.` for all new work (sunset dual-publish `starship.*` / `agnetic.*` tracked as open candidate **ADR-0011**)
 - Backward compatibility: existing fleet subjects unchanged
 
 ### New Subject Table (additions to FLEET.md / subject matrix)
@@ -46,7 +47,7 @@ Aspen Sentinel requires dedicated subjects for authorization gates, audit feeds,
 ## Consequences
 - **Positive**: Clean separation for Sentinel dashboard consumers; full audit trail; enables capability-based gatekeepers (BEL-215); supports Light Cell vs Full Plant profiles.
 - **Risks / Mitigations**: Breaking change risk low (additive only). Dual-human path already enforced in safety contracts.
-- **Migration**: Existing Alpha clients continue on dual-prefix until >50% consumers on `aspen.*` (open ADR-0007).
+- **Migration**: Existing Alpha clients continue on dual-prefix until >50% consumers on `aspen.*` (open candidate ADR-0011).
 
 ## Acceptance Criteria
 - Contracts published in aspen-contracts repo

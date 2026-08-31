@@ -21,9 +21,9 @@ Aspen OS / AspenGrove architecture decisions. Prefer short, statused markdown in
 | [ADR-0004](./ADR-0004-light-core-plugins.md) | Light core + plugins | Accepted | Optional deps |
 | [ADR-0005](./ADR-0005-langgraph-execution-plugin.md) | LangGraph as execution plugin | Accepted | Paperclip remains org SoR |
 | [ADR-0006](./ADR-0006-memory-store-tiering.md) | Tiered memory store (LanceDB vs PG+AGE) | **Accepted** | BEL-154 + Master Spec §3.1 — accepted ASP-426 |
-| [ADR-0007](./ADR-0007-nats-subject-contracts-sentinel-c2.md) | NATS subject contracts for Sentinel + C2 | **Proposed** | BEL-196 — Sentinel subjects, authz gates, audit |
-| [ADR-0008](./ADR-0008-package-classification-core-plugin-devonly.md) | AspenGrove package classification (core/plugin/dev-only) | **Proposed** | BEL-195 — three-tier split, PACKAGES.md |
-| [ADR-0009](./ADR-0009-capability-based-gatekeepers.md) | Capability-based gatekeepers (no broad API keys) | **Proposed** | BEL-215 — propose_act + dual-human gate |
+| [ADR-0007](./ADR-0007-nats-subject-contracts-sentinel-c2.md) | NATS subject contracts for Sentinel + C2 | **Accepted** | BEL-196 — ASP-530 accept; aspen-contracts mirror follow-up |
+| [ADR-0008](./ADR-0008-package-classification-core-plugin-devonly.md) | AspenGrove package classification (core/plugin/dev-only) | **Accepted** | BEL-195 — ASP-530 accept; PACKAGES.md SoR |
+| [ADR-0009](./ADR-0009-capability-based-gatekeepers.md) | Capability-based gatekeepers (no broad API keys) | **Accepted (design)** | BEL-215 eng wire continues; shim prototype |
 | [ADR-0010](./0001-c11-agent-runtime.md) | C11 agent runtime (legacy file `0001-…`) | Accepted | Logical **0010**; file keeps historic name |
 
 ### Open candidates (not yet filed)

@@ -1,8 +1,9 @@
 # ADR-0008: AspenGrove Package Classification (Core / Plugin / Dev-only)
 
-**Status:** Proposed — 2026-08-29  
+**Status:** Accepted — 2026-08-31  
+**Accepted by:** ASP-530 Weekly Architecture Review  
 **Linear:** BEL-195 (A2) · Parent BEL-193 (AspenGrove Three-Product Epic)  
-**Related:** ADR-0001 (Aspen Grove GitHub Packaging), ADR-0004 (Light Core + Plugins), Master Spec v4.0 §2.3 (Packaging), PACKAGES.md
+**Related:** ADR-0001 (Aspen Grove GitHub Packaging), ADR-0004 (Light Core + Plugins), Master Spec v4.0 §2.3 (Packaging), `docs/PACKAGES.md`
 
 ## Context
 aspen-dev owns the packaging and evolution of AspenOS / Aspen Sentinel. Ambiguity in package ownership leads to agent extraction errors, license conflicts, and unclear boundaries between what ships with the OS vs what is optional vs what is internal tooling.
