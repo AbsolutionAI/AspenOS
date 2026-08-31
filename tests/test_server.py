@@ -1,6 +1,9 @@
 import sys
 import json
 import pytest
+
+pytest.importorskip("aiohttp", reason="aiohttp package not installed")
+
 from aiohttp import web
 from unittest.mock import patch, AsyncMock, MagicMock
 

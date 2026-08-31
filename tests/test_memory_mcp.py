@@ -16,7 +16,12 @@ MCP_SRC = REPO_ROOT / "mcp" / "aspen-memory-mcp" / "src"
 if str(MCP_SRC) not in sys.path:
     sys.path.insert(0, str(MCP_SRC))
 
-from aspen_memory_mcp.server import _valid_types, build_server  # noqa: E402
+try:
+    from aspen_memory_mcp.server import _valid_types, build_server  # noqa: E402
+except ModuleNotFoundError as exc:
+    if "mcp.server" in str(exc):
+        pytest.skip("mcp.server module not installed (pip install mcp)", allow_module_level=True)
+    raise
 
 EXPECTED_TOOLS = {
     "memory_search",

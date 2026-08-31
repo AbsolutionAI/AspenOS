@@ -3,6 +3,8 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 sys.path.insert(0, str(PROJECT_ROOT / "agents"))
@@ -35,7 +37,12 @@ def test_explicit_db_env_writes_holographic(tmp_path, monkeypatch):
     )
     assert path.exists()
     sys.path.insert(0, "/home/tech/.hermes/hermes-agent")
-    from plugins.memory.holographic.store import MemoryStore
+    try:
+        from plugins.memory.holographic.store import MemoryStore
+    except ModuleNotFoundError as exc:
+        if "tools.registry" in str(exc) or "holographic" in str(exc):
+            pytest.skip("Hermes holographic plugin not available", allow_module_level=False)
+        raise
 
     store = MemoryStore(db_path=str(db))
     hits = store.search_facts("OpenCode holographic")

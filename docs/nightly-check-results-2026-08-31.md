@@ -1,4 +1,4 @@
-# Nightly Check Results — 2026-08-31 08:08 UTC
+# Nightly Check Results — 2026-08-31 15:30 UTC
 
 **Verdict: PASS (1 known failure)**
 
@@ -7,9 +7,9 @@
 | Passed | 80 |
 | Failed | 1 |
 | Total  | 81 |
-| Time   | 10,336ms |
+| Time   | 10,788ms |
 
-**Known failure:** C11 p50 benchmark deviation (check within smoke test suite) — hardware-dependent, measured ~3.451ms vs 2ms threshold per ADR 0001. Not actionable on this control-plane host.
+**Known failure:** C11 p50 benchmark deviation — hardware-dependent, ~3.451ms vs 2ms threshold per ADR 0001. Not actionable on this control-plane host.
 
 ## Toolchain
 - nats-server: v2.14.5 (on PATH at `$HOME/go/bin/nats-server`)
@@ -36,10 +36,10 @@
 | 12 | Gatekeeper module | 2 | 0 |
 
 ## Workspace verification
-- Git root: `/home/tech/projects/aspen-dev/repos/aspen-os` ✓
+- Git root: `/home/tech/aspen-dev/repos/aspen-os` ✓
 - Origin URL: `https://github.com/AbsolutionAI/AspenOS.git` ✓
 - Branch: `master`
-- Last commit: `8d75775` — `docs(compound): ASP-525 daily implementation sweep learning`
+- Last commit: `57cf10e` — `docs(compound): ASP-541 daily implementation sweep learning`
 
 ## Static inventory
 - systemd unit files: 9 in `systemd/`, 9 in `dist/pkgroot/lib/systemd/system/` (matches baseline)
@@ -48,6 +48,7 @@
 - `scripts/update.sh`: present and executable
 - Windows packaging: install.bat, configure.bat, uninstall.bat, staragent.exe, staragent.yaml, README.txt (all 6 present)
 - Gatekeeper module: `src/python/gatekeeper/minimal_shim.py` present with valid Python syntax
+- Python tests: 152 passed, 2 skipped (optional deps: aiohttp, mcp.server), 1 pre-existing collection-order failure (`test_holographic_ingest` in bulk)
 
 ## Baseline deviations from ops doc
 None. Baseline matches: 80 passed, 1 known failure (C11 p50).
