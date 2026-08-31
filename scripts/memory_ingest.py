@@ -40,7 +40,7 @@ DEFAULT_INGEST_DIR = Path(os.environ.get(
     "/home/tech/.aspen/memory/ingest",
 ))
 
-VALID_SOURCES = {"hermes", "paperclip", "opencode", "aider", "appflowy"}
+VALID_SOURCES = {"hermes", "paperclip", "opencode", "aider", "appflowy", "grokbuild"}
 
 
 def _now_utc() -> str:
@@ -103,6 +103,28 @@ def ingest_record(
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a") as fh:
         fh.write(json.dumps(record, sort_keys=True) + "\n")
+
+    # Dual-write to shared holographic SQLite (best-effort; never fail ingest).
+    try:
+        try:
+            from holographic_ingest import write_holographic
+        except ImportError:
+            from scripts.holographic_ingest import write_holographic
+
+        write_holographic(
+            content,
+            source=source,
+            source_id=source_id,
+            agent=agent,
+            project=project,
+            linear_refs=linear_refs,
+            paperclip_refs=paperclip_refs,
+            ingest_dir=ingest_dir,
+            default_ingest_dir=DEFAULT_INGEST_DIR,
+        )
+    except Exception:
+        pass
+
     return path
 
 
