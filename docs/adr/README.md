@@ -25,13 +25,13 @@ Aspen OS / AspenGrove architecture decisions. Prefer short, statused markdown in
 | [ADR-0008](./ADR-0008-package-classification-core-plugin-devonly.md) | AspenGrove package classification (core/plugin/dev-only) | **Proposed** | BEL-195 — three-tier split, PACKAGES.md |
 | [ADR-0009](./ADR-0009-capability-based-gatekeepers.md) | Capability-based gatekeepers (no broad API keys) | **Proposed** | BEL-215 — propose_act + dual-human gate |
 | [ADR-0010](./0001-c11-agent-runtime.md) | C11 agent runtime (legacy file `0001-…`) | Accepted | Logical **0010**; file keeps historic name |
+| [ADR-0012](./ADR-0012-operator-of-record-binding.md) | Authenticated operator-of-record binding for DualHumanGate | **Proposed** | ASP-534 / ASP-530 — NATS `human_id` SoR; before G9+ non-sim arm |
 
 ### Open candidates (not yet filed)
 
 | ID | Topic | Trigger |
 |----|-------|---------|
-| ADR-0011 | Sunset dual-publish (`starship.*`/`agnetic.*` → `aspen.*` only) | >50% consumers on `aspen.*` or first external plant pilot |
-| ADR-0012 | Authenticated operator-of-record binding for DualHumanGate | Before any non-sim arm (G9+) |
+| ADR-0011 | Sunset dual-publish (`starship.*`/`agnetic.*` → `aspen.*` only) | >50% consumers on `aspen.*` or first external plant pilot |)
 
 ## Related docs
 
