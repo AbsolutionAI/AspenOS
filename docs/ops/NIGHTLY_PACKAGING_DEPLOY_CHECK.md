@@ -13,7 +13,7 @@
 2. **Toolchain**: ensure `nats-server` is on PATH:
    `export PATH="$HOME/go/bin:$HOME/.local/bin:$PATH"`.
 3. **Smoke suites** (record pass/fail counts):
-   - `bash scripts/check-nightly.sh` (80 checks across 12 sections)
+   - `bash scripts/check-nightly.sh` (~92 checks across 15 sections)
 4. **Static inventory**:
    - systemd unit count (`*.service`/`*.timer`/`*.socket` across `systemd/`, `dist/pkgroot/lib/systemd/system/`, `deploy/`, `config/`)
    - Debian metadata presence (`debian/DEBIAN/{control,postinst,postrm,prerm}`)
@@ -31,7 +31,7 @@ On failure: diagnose, fix if well-scoped, otherwise mark the run issue blocked n
 
 ## What gets checked
 
-The nightly check runs in 12 sections:
+The nightly check runs in 15 sections:
 
 | Section | Checks |
 |---------|--------|
@@ -47,6 +47,9 @@ The nightly check runs in 12 sections:
 | 10. Windows packaging | install.bat, configure.bat, uninstall.bat, staragent.exe, staragent.yaml, README.txt |
 | 11. Update mechanism | scripts/update.sh present and executable |
 | 12. Gatekeeper module | `src/python/gatekeeper/minimal_shim.py` present, valid Python syntax |
+| 13. Python test suite | pytest importable, test suite runs (150+ pass), no pytest errors |
+| 14. ISO build structure | autoinstall profiles (user-data.edge.yaml, user-data.server.yaml, user-data.ops.yaml), hooks, package lists |
+| 15. Dashboard static assets | style.css, ui.js, dashboard.js, agents.js, chat.js, panels.js, incidents.js, boot.js |
 
 ## CI infrastructure
 
@@ -62,8 +65,9 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 
 | Check | Baseline |
 | --- | --- |
-| `scripts/check-nightly.sh` total | **80 passed, 1 known failure** (81 checks; C11 p50 benchmark deviation = known, hardware-dependent) |
+| `scripts/check-nightly.sh` total | **100 passed, 1 known failure** (C11 p50 benchmark deviation = known, hardware-dependent) |
 | Of which: smoke test suite | 58 passed, 1 failed (C11 p50 benchmark) |
+| Python test suite | 152+ passed, 3 skipped (optional deps: aiohttp, mcp.server), 0 failures |
 | nats-server | v2.14.5 |
 | systemd unit files | 18 (9 in `systemd/`, 9 in `dist/pkgroot/lib/systemd/system/`) |
 | Debian metadata | `debian/DEBIAN/`: control (starship-os 2.2.0 amd64), postinst, postrm, prerm |
@@ -71,6 +75,8 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 | Windows packaging | `packaging/windows/`: install.bat, configure.bat, uninstall.bat, staragent.exe, staragent.yaml, README.txt |
 | Version consistency | VERSION matches debian/DEBIAN/control |
 | Gatekeeper module | `src/python/gatekeeper/minimal_shim.py` present, valid Python syntax |
+| ISO build structure | 3 autoinstall profiles (edge/server/ops YAMLs), chroot hooks present, package lists present |
+| Dashboard static assets | 8 files present (style.css, ui.js, dashboard.js, agents.js, chat.js, panels.js, incidents.js, boot.js) |
 
 Update this table when suites gain or lose checks so future nightly runs can report meaningful deviations.
 
@@ -87,7 +93,7 @@ nightly check records this as a single known failure (1 of 59 smoke tests).
 
 ## What is NOT checked
 
-- ISO build (requires root / nested virt, not feasible in CI)
+- ISO build from source (requires root / nested virt, not feasible in CI; directory structure is statically checked in Section 14)
 - Windows packaging build from source (no CI build host)
 - Docker image build (`make docker`)
 - Performance benchmarks (use `make bench`)
@@ -107,6 +113,7 @@ See `docs/solutions/` for historical packaging issues:
 - `asp-518-nightly-check-fixes.md` — Shell syntax + sibling repo hardening
 - `asp-521-nightly-check-complete.md` — Debian metadata, Windows packaging, update mechanism
 - `asp-524-nightly-check-improvements.md` — nats-server v2.14.5, gatekeeper module, baseline refresh
+- `asp-543-nightly-check-improvements.md` — Python test suite, ISO structure, dashboard assets
 
 ## Adding new checks
 

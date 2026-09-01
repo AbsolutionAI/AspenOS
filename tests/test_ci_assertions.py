@@ -1,4 +1,4 @@
-"""CI contract: NATS PATH + C11 help must not be brittle string/PATH traps."""
+"""CI contract: nightly check sections must not regress."""
 import re
 from pathlib import Path
 
@@ -11,6 +11,10 @@ def _smoke() -> str:
 
 def _ci() -> str:
     return (ROOT / ".github" / "workflows" / "ci.yml").read_text()
+
+
+def _nightly() -> str:
+    return (ROOT / "scripts" / "check-nightly.sh").read_text()
 
 
 def _gen_accounts_line() -> str:
@@ -39,3 +43,39 @@ def test_ci_c11_help_is_not_coupled_to_builtin_string():
     ci = _ci()
     assert "grep -q built-in" not in ci
     assert "sandbox_run --help" in ci
+
+
+def test_nightly_section_13_python_test_suite_present():
+    nightly = _nightly()
+    assert "Section 13: Python test suite" in nightly
+    assert "pytest importable" in nightly
+    assert "python test suite" in nightly
+    assert "pytest pass count >= 150" in nightly
+    assert "no pytest failures" in nightly
+
+
+def test_nightly_section_14_iso_structure_present():
+    nightly = _nightly()
+    assert "Section 14: ISO build structure" in nightly
+    assert "iso/autoinstall dir exists" in nightly
+    assert "edge profile exists" in nightly
+    assert "server profile exists" in nightly
+    assert "ops profile exists" in nightly
+    assert "iso config hooks dir exists" in nightly
+    assert "iso chroot hook exists" in nightly
+    assert "iso package lists exist" in nightly
+    assert "iso package list non-empty" in nightly
+
+
+def test_nightly_section_15_dashboard_assets_present():
+    nightly = _nightly()
+    assert "Section 15: Dashboard static assets" in nightly
+    for asset in ("style.css", "ui.js", "dashboard.js", "agents.js",
+                  "chat.js", "panels.js", "incidents.js", "boot.js"):
+        assert f"dashboard {asset}" in nightly, f"missing check for {asset}"
+
+
+def test_nightly_python_test_uses_failed_not_error():
+    nightly = _nightly()
+    assert "grep -q 'FAILED'" in nightly
+    assert "grep -q 'error'" not in nightly

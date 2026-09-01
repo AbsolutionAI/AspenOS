@@ -135,6 +135,37 @@ echo -e "\n${YELLOW}── Section 12: Gatekeeper module ──${NC}"
 check "gatekeeper shim exists" test -f src/python/gatekeeper/minimal_shim.py
 check "gatekeeper shim syntax" python3 -c "import ast; ast.parse(open('src/python/gatekeeper/minimal_shim.py').read())"
 
+# ─── Section 13: Python test suite ──────────────────────────
+echo -e "\n${YELLOW}── Section 13: Python test suite ──${NC}"
+check "pytest importable" python3 -c "import pytest"
+PYTEST_OUT=$(mktemp)
+check "python test suite" bash -c "python3 -m pytest tests/ -v --tb=no 2>&1 | tee '$PYTEST_OUT' | tail -3"
+check "pytest pass count >= 150" bash -c "grep -Eo '[0-9]+ passed' '$PYTEST_OUT' 2>/dev/null | awk '{s+=\$1} END {exit(s<150)}'"
+check "no pytest failures" bash -c "grep -q 'FAILED' '$PYTEST_OUT' 2>/dev/null && exit 1; exit 0"
+rm -f "$PYTEST_OUT"
+
+# ─── Section 14: ISO structure check ───────────────────────
+echo -e "\n${YELLOW}── Section 14: ISO build structure ──${NC}"
+check "iso/autoinstall dir exists" test -d iso/autoinstall
+check "edge profile exists" test -f iso/autoinstall/user-data.edge.yaml
+check "server profile exists" test -f iso/autoinstall/user-data.server.yaml
+check "ops profile exists" test -f iso/autoinstall/user-data.ops.yaml
+check "iso config hooks dir exists" test -d iso/config/hooks
+check "iso chroot hook exists" bash -c 'ls iso/config/hooks/*.chroot 2>/dev/null | head -1 | grep -q .'
+check "iso package lists exist" test -d iso/config/package-lists
+check "iso package list non-empty" bash -c 'ls iso/config/package-lists/*.list.chroot 2>/dev/null | head -1 | grep -q .'
+
+# ─── Section 15: Dashboard static assets ───────────────────
+echo -e "\n${YELLOW}── Section 15: Dashboard static assets ──${NC}"
+check "dashboard style.css" test -f dashboard/static/style.css
+check "dashboard ui.js" test -f dashboard/static/ui.js
+check "dashboard dashboard.js" test -f dashboard/static/dashboard.js
+check "dashboard agents.js" test -f dashboard/static/agents.js
+check "dashboard chat.js" test -f dashboard/static/chat.js
+check "dashboard panels.js" test -f dashboard/static/panels.js
+check "dashboard incidents.js" test -f dashboard/static/incidents.js
+check "dashboard boot.js" test -f dashboard/static/boot.js
+
 # ─── Summary ─────────────────────────────────────────────────
 TIMING_END=$(date +%s%N)
 ELAPSED_MS=$(( (TIMING_END - TIMING_BEGIN) / 1000000 ))
