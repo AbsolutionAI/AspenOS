@@ -2,12 +2,12 @@
 
 **Verdict: PASS (1 known failure)**
 
-| Metric | 08:32 UTC | 09:15 UTC (ASP-544) |
-|--------|-----------|---------------------|
-| Passed | 100 | 100 |
-| Failed | 1 | 1 |
-| Total  | 101 | 101 |
-| Time   | 10,867ms | 12,655ms |
+| Metric | 08:32 UTC | 09:15 UTC (ASP-544) | 15:25 UTC (ASP-544 sweep) |
+|--------|-----------|---------------------|--------------------------|
+| Passed | 100 | 100 | 100 |
+| Failed | 1 | 1 | 1 |
+| Total  | 101 | 101 | 101 |
+| Time   | 10,867ms | 12,655ms | 11,638ms |
 
 **Known failure:** C11 p50 benchmark deviation — hardware-dependent, ~3.451ms vs 2ms threshold per ADR 0001. Not actionable on this control-plane host.
 
@@ -42,7 +42,7 @@
 - Git root: `/home/tech/projects/aspen-dev/repos/aspen-os` ✓
 - Origin URL: `https://github.com/AbsolutionAI/AspenOS.git` ✓
 - Branch: `master`
-- Last commit: `e895f55` — `docs(compound): update ASP-541 sweep learning with test skip guards` (before ASP-544 commit)
+- Last commit: `8df715a` — `docs(sweep): ASP-544 daily sweep record — nightly v4 shipped` (HEAD, ASP-544 sweep)
 
 ## Static inventory
 - systemd unit files: 9 in `systemd/`, 9 in `dist/pkgroot/lib/systemd/system/` (matches baseline)
