@@ -89,7 +89,7 @@ check "message history unit exists" test -f systemd/agnetic-message-history.serv
 
 # ─── Section 7: Shell syntax ─────────────────────────────────
 echo -e "\n${YELLOW}── Section 7: Shell syntax check ──${NC}"
-for script in scripts/*.sh; do
+for script in scripts/*.sh packaging/*.sh; do
   [[ -f "$script" ]] || continue
   name=$(basename "$script")
   check "bash -n $name" bash -n "$script"
