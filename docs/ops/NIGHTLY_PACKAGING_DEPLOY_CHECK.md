@@ -41,7 +41,7 @@ The nightly check runs in 15 sections:
 | 4. Smoke tests | Full suite via `scripts/smoke-test.sh` (58 tests, including iso-firstboot-smoke, fleet-bus smoke against pinned sibling repos) |
 | 5. Debian package | `scripts/build-deb.sh`, package size > 1MB |
 | 6. Systemd units | All 9 canonical units exist on disk |
-| 7. Shell syntax | `bash -n` on every `scripts/*.sh` |
+| 7. Shell syntax | `bash -n` on every `scripts/*.sh` and `packaging/*.sh` |
 | 8. Key file presence | VERSION, Makefile, configs, NATS configs, pins.json, version consistency |
 | 9. Debian metadata | control, postinst, postrm, prerm |
 | 10. Windows packaging | install.bat, configure.bat, uninstall.bat, staragent.exe, staragent.yaml, README.txt |
@@ -65,11 +65,11 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 
 | Check | Baseline |
 | --- | --- |
-| `scripts/check-nightly.sh` total | **100 passed, 1 known failure** (C11 p50 benchmark deviation = known, hardware-dependent) |
+| `scripts/check-nightly.sh` total | **101 passed, 1 known failure** (C11 p50 benchmark deviation = known, hardware-dependent) |
 | Of which: smoke test suite | 58 passed, 1 failed (C11 p50 benchmark) |
 | Python test suite | 152+ passed, 3 skipped (optional deps: aiohttp, mcp.server), 0 failures |
 | nats-server | v2.14.5 |
-| systemd unit files | 18 (9 in `systemd/`, 9 in `dist/pkgroot/lib/systemd/system/`) |
+| systemd unit files | 16 (8 in `systemd/`, 8 in `dist/pkgroot/lib/systemd/system/`) |
 | Debian metadata | `debian/DEBIAN/`: control (starship-os 2.2.0 amd64), postinst, postrm, prerm |
 | `scripts/update.sh` | present, executable |
 | Windows packaging | `packaging/windows/`: install.bat, configure.bat, uninstall.bat, staragent.exe, staragent.yaml, README.txt |
@@ -77,6 +77,7 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 | Gatekeeper module | `src/python/gatekeeper/minimal_shim.py` present, valid Python syntax |
 | ISO build structure | 3 autoinstall profiles (edge/server/ops YAMLs), chroot hooks present, package lists present |
 | Dashboard static assets | 8 files present (style.css, ui.js, dashboard.js, agents.js, chat.js, panels.js, incidents.js, boot.js) |
+| Shell syntax coverage | 34 scripts (33 in `scripts/`, 1 in `packaging/`), all pass `bash -n` |
 
 Update this table when suites gain or lose checks so future nightly runs can report meaningful deviations.
 
