@@ -77,7 +77,7 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 | Gatekeeper module | `src/python/gatekeeper/minimal_shim.py` present, valid Python syntax |
 | ISO build structure | 3 autoinstall profiles (edge/server/ops YAMLs), chroot hooks present, package lists present |
 | Dashboard static assets | 8 files present (style.css, ui.js, dashboard.js, agents.js, chat.js, panels.js, incidents.js, boot.js) |
-| Shell syntax coverage | 34 scripts (33 in `scripts/`, 1 in `packaging/`), all pass `bash -n` |
+| Shell syntax coverage | 35 scripts (34 in `scripts/`, 1 in `packaging/`), all pass `bash -n` |
 
 Update this table when suites gain or lose checks so future nightly runs can report meaningful deviations.
 
