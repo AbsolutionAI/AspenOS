@@ -1,6 +1,7 @@
 # Aspen Umbrella Content Strategy (X)
 
-**Status:** APPROVED — active feed SoR  
+**Status:** APPROVED — feed composition SoR  
+**Execution:** PAUSED until BTH proven (Captain 2026-09-01). Linear BEL-155 Backlog. Hermes cron `cfe7a6e7492d` paused. See `docs/ops/CONTENT_X_LINEAR_SOR.md`.  
 **For approval:** morning of 2026-08-05  
 **Account:** @sonofabsolution (Absolution Studios)  
 **Brand stack:** Aspen OS · AI agents · manufacturing/robotics · builder tools · Gumroad kits  
