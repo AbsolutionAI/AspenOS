@@ -65,11 +65,11 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 
 | Check | Baseline |
 | --- | --- |
-| `scripts/check-nightly.sh` total | **101 passed, 1 known failure** (C11 p50 benchmark deviation = known, hardware-dependent) |
-| Of which: smoke test suite | 58 passed, 1 failed (C11 p50 benchmark) |
-| Python test suite | 152+ passed, 3 skipped (optional deps: aiohttp, mcp.server), 0 failures |
+| `scripts/check-nightly.sh` total | **99 passed, 3 known failures** (C11 p50 + pytest missing on system Python 3.14 ×2) |
+| Of which: smoke test suite | 58 passed, 1 failed (C11 p50 benchmark); fleet-bus dual-auth green |
+| Python test suite | pytest not importable on system Python 3.14 (PEP 668); when venv present: 152+ passed, 3 skipped |
 | nats-server | v2.14.5 |
-| systemd unit files | 16 (8 in `systemd/`, 8 in `dist/pkgroot/lib/systemd/system/`) |
+| systemd unit files | 18 (9 in `systemd/`, 9 in `dist/pkgroot/lib/systemd/system/` — includes health-checker) |
 | Debian metadata | `debian/DEBIAN/`: control (starship-os 2.2.0 amd64), postinst, postrm, prerm |
 | `scripts/update.sh` | present, executable |
 | Windows packaging | `packaging/windows/`: install.bat, configure.bat, uninstall.bat, staragent.exe, staragent.yaml, README.txt |
@@ -91,6 +91,21 @@ be met on dedicated CI runners with newer processors or lower latency profiles.
 
 **Not actionable** unless the sandbox is moved to a different host or optimized. The
 nightly check records this as a single known failure (1 of 59 smoke tests).
+
+### pytest missing on system Python 3.14
+
+Control-plane host Python is 3.14 with PEP 668 externally-managed env. `python3 -c
+"import pytest"` fails without a project venv. Section 13 therefore reports two known
+failures (importable + pass-count ≥150). Prefer a documented venv or `apt install
+python3-pytest` on the check host; do not use `--break-system-packages` by default.
+
+### fleet-bus dual-human estop clear (ASP-553)
+
+`aspen-edge-rrm` requires two distinct human `authorize_clear` principals before
+`aspen.safety.clear` unlatches. Smoke (`scripts/smoke-fleet-bus.py`) must exercise
+bare-clear refusal + dual-auth clear, and prefer
+`/home/tech/projects/aspen-dev/repos/{aspen-edge-rrm,aspen-swarm-manager}` over stale
+`/home/tech/repos/*` copies when resolving siblings from Hermes worktrees.
 
 ## What is NOT checked
 

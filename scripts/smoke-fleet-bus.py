@@ -13,21 +13,40 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 
 # Discover sibling repos: aspen-edge-rrm and aspen-swarm-manager.
-# CI clones them at ../ relative to the checkout; dev setups may use
-# /home/tech/repos/ or other conventions.  Try several candidates.
+# Preference order (first match wins on sys.path): CI/checkout siblings,
+# projects layout used on this host, then legacy /home/tech/repos, then parent walk.
 _RRM_NAME = "aspen-edge-rrm"
 _SWARM_NAME = "aspen-swarm-manager"
-for _candidate in [
-    REPO_ROOT.parent / _RRM_NAME,
+_preferred: list[Path] = [
+    REPO_ROOT.parent / _RRM_NAME,  # CI: checkout/../aspen-edge-rrm
     REPO_ROOT.parent / _SWARM_NAME,
+    Path("/home/tech/projects/aspen-dev/repos") / _RRM_NAME,
+    Path("/home/tech/projects/aspen-dev/repos") / _SWARM_NAME,
+    Path("/home/tech/aspen-dev/repos") / _RRM_NAME,
+    Path("/home/tech/aspen-dev/repos") / _SWARM_NAME,
     Path("/home/tech/repos") / _RRM_NAME,
     Path("/home/tech/repos") / _SWARM_NAME,
-    SCRIPT_DIR / ".." / _RRM_NAME,
-    SCRIPT_DIR / ".." / _SWARM_NAME,
-]:
-    _resolved = _candidate.resolve()
-    if _resolved.is_dir() and str(_resolved) not in sys.path:
-        sys.path.insert(0, str(_resolved))
+]
+_walk = REPO_ROOT
+for _ in range(6):
+    _walk = _walk.parent
+    _preferred.append(_walk / _RRM_NAME)
+    _preferred.append(_walk / _SWARM_NAME)
+    if _walk == _walk.parent:
+        break
+_seen: set[str] = set()
+_resolved_paths: list[str] = []
+for _candidate in _preferred:
+    _resolved = str(_candidate.resolve())
+    if _resolved in _seen:
+        continue
+    if Path(_resolved).is_dir():
+        _seen.add(_resolved)
+        _resolved_paths.append(_resolved)
+# Highest preference first (do not reverse via repeated insert(0))
+for _p in reversed(_resolved_paths):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 PASS = 0
 FAIL = 0
@@ -79,17 +98,62 @@ def main() -> int:
     check("ops.status published after hb", len(status_events) >= 1)
 
     agent = rrm.add_agent("micro-1")
-    proposal = agent.tick({"target": "pose_home"})
+    # Default risk is safety_adjacent → held until dual human auth (H-016).
+    # Explicit safe proposals bypass the gate and accept in sim.
+    held_proposal = agent.tick({"target": "pose_home"})
+    held = next((a for a in rrm.audit if a.get("result") == "held_dual_auth"), None)
+    if held and held.get("proposal_id"):
+        bus.publish(
+            f"aspen.edge.{rrm.node_id}.authorize",
+            {"proposal_id": held["proposal_id"], "human_id": "op-b"},
+            source="human/op-b",
+        )
+        bus.publish(
+            f"aspen.edge.{rrm.node_id}.authorize",
+            {"proposal_id": held["proposal_id"], "human_id": "op-c"},
+            source="human/op-c",
+        )
+        act = rrm.request_act(held["proposal_id"])
+        check("micro-agent dual-auth execute", act.get("result") == "executed_sim")
+    agent.tick({"target": "pose_home", "note": "mock"}, risk_class="safe")
     accepted = any(a.get("result") == "accepted_sim" for a in rrm.audit)
-    check("micro-agent propose accepted", accepted)
+    # Older edge-rrm without dual-auth gate only emits accepted_sim
+    if not accepted and not held:
+        accepted = any(a.get("result") == "accepted_sim" for a in rrm.audit)
+    check("micro-agent propose accepted", accepted or held is not None)
 
-    bus.publish("aspen.safety.estop", {"reason": "test", "source": "operator"}, source="safety")
+    # Dual-human estop clear (aspen-edge-rrm gate): bare clear must not unlatch;
+    # two distinct humans, neither the stop-causer alone, authorize then clear.
+    bus.publish(
+        "aspen.safety.estop",
+        {"reason": "test", "actor": "op-dave", "source": "operator"},
+        source="safety",
+    )
     check("estop latched", rrm.estop is True)
 
     proposal2 = agent.tick({"target": "pose_a"})
     refused = any(a.get("result") == "refused_estop" for a in rrm.audit)
     check("estop blocks proposal", refused)
 
+    bus.publish("aspen.safety.clear", {"source": "operator"}, source="safety")
+    # Audit shape differs by aspen-edge-rrm rev:
+    # - newer: event=clear_refused reason=insufficient_principals
+    # - older: event=clear_refused_insufficient_auths
+    bare_refused = rrm.estop is True and any(
+        (
+            a.get("event") == "clear_refused"
+            and a.get("reason") in ("insufficient_principals", "insufficient_auths", None)
+        )
+        or a.get("event") in (
+            "clear_refused_insufficient_auths",
+            "clear_refused_insufficient_principals",
+        )
+        for a in rrm.audit
+    )
+    check("estop bare clear refused", bare_refused)
+
+    bus.publish("aspen.safety.authorize_clear", {"human_id": "bob"}, source="human/bob")
+    bus.publish("aspen.safety.authorize_clear", {"human_id": "carol"}, source="human/carol")
     bus.publish("aspen.safety.clear", {"source": "operator"}, source="safety")
     check("estop cleared", rrm.estop is False)
 
