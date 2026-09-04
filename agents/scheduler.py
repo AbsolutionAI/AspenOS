@@ -3,6 +3,7 @@ Reads agent config and triggers workflows on cron schedule."""
 
 import json
 import asyncio
+import os
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -96,8 +97,8 @@ async def scheduler_loop(nc):
 
 
 async def main():
-    from nats import connect as nats_connect
-    nc = await nats_connect("nats://127.0.0.1:4222")
+    from nats_connect import connect
+    nc = await connect(os.getenv("NATS_URL", "nats://127.0.0.1:4222"))
     await scheduler_loop(nc)
 
 
