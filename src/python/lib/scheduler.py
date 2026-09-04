@@ -97,7 +97,7 @@ async def scheduler_loop(nc):
 
 async def main():
     from nats import connect as nats_connect
-    nc = await nats_connect(os.getenv("NATS_URL", "nats://[IP_ADDRESS]:4222"))
+    nc = await nats_connect(os.getenv("NATS_URL", "nats://127.0.0.1:4222"))
     await scheduler_loop(nc)
 
 
