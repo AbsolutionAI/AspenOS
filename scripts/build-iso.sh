@@ -106,8 +106,8 @@ cp "$REPO_DIR/agents/"*.yaml "$LB_DIR/config/includes.chroot/etc/starship/" 2>/d
 
 # Copy systemd units
 mkdir -p "$LB_DIR/config/includes.chroot/lib/systemd/system"
-cp "$REPO_DIR/systemd/agnetic-"*.service "$LB_DIR/config/includes.chroot/lib/systemd/system/" 2>/dev/null || true
-cp "$REPO_DIR/systemd/agnetic-"*.target "$LB_DIR/config/includes.chroot/lib/systemd/system/" 2>/dev/null || true
+cp "$REPO_DIR/systemd/"{agnetic-,starship-}*.service "$LB_DIR/config/includes.chroot/lib/systemd/system/" 2>/dev/null || true
+cp "$REPO_DIR/systemd/"{agnetic-,starship-}*.target "$LB_DIR/config/includes.chroot/lib/systemd/system/" 2>/dev/null || true
 
 # ─── 5. Build the ISO ──────────────────────────────────────────────
 log "Building ISO (this will take 30-60 minutes)..."
