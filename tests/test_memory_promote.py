@@ -1,5 +1,6 @@
 import json
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -11,16 +12,25 @@ import memory_promote as mp  # noqa: E402
 from memory import MemoryManager  # noqa: E402
 
 
+def recent_ts() -> str:
+    """A timestamp inside memory_promote's 30-day recency window.
+
+    Hardcoded dates age out of the window and flip scoring tests once the
+    fixture is older than 30 days.  Reference "now" so these always pass.
+    """
+    return (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 @pytest.fixture
 def ingest_fixture(tmp_path):
     """BEL-154-style raw ingest JSONL with decision + config + weak entries."""
     src = tmp_path / "ingest" / "paperclip"
     src.mkdir(parents=True)
-    (src / "2026-08-06.jsonl").write_text("\n".join([
+    (src / f"{recent_ts()[:10]}.jsonl").write_text("\n".join([
         json.dumps({
             "source": "paperclip",
             "source_id": "run-123",
-            "timestamp": "2026-08-06T08:00:00Z",
+            "timestamp": recent_ts(),
             "agent": "opencode",
             "content": "Decision: use DeepSeek V4-Flash for all agents.",
             "metadata": {"linear_refs": ["BEL-154"], "paperclip_refs": ["ABS-10"]},
@@ -28,7 +38,7 @@ def ingest_fixture(tmp_path):
         json.dumps({
             "source": "paperclip",
             "source_id": "run-124",
-            "timestamp": "2026-08-06T08:00:00Z",
+            "timestamp": recent_ts(),
             "agent": "opencode",
             "content": "Config: export AGENTIC_MEMORY_DB=/var/lib/starship/memory.db",
             "metadata": {},
@@ -36,7 +46,7 @@ def ingest_fixture(tmp_path):
         json.dumps({
             "source": "paperclip",
             "source_id": "run-125",
-            "timestamp": "2026-08-06T08:00:00Z",
+            "timestamp": recent_ts(),
             "agent": "opencode",
             "content": "minor chat about the weather",
             "metadata": {},
@@ -72,14 +82,14 @@ class TestExtraction:
 class TestScoring:
     def test_decision_scores_high(self):
         cand = mp.FactCandidate(content="Decision: x", fact_type="decision",
-                                timestamp="2026-08-06T00:00:00Z")
+                                timestamp=recent_ts())
         assert mp.score_confidence(cand) == 0.95
 
     def test_cross_referenced_above_threshold(self):
         cand = mp.FactCandidate(
             content="c", fact_type="pattern",
             linear_refs=["BEL-154"], paperclip_refs=["ABS-10"],
-            timestamp="2026-08-06T00:00:00Z")
+            timestamp=recent_ts())
         assert mp.score_confidence(cand) >= 0.7
 
     def test_old_entries_decay(self):
@@ -89,7 +99,7 @@ class TestScoring:
 
     def test_human_authored_scores_higher(self):
         cand = mp.FactCandidate(content="c", fact_type="decision",
-                                timestamp="2026-08-06T00:00:00Z")
+                                timestamp=recent_ts())
         assert (mp.score_confidence(cand, authored_by_human=True)
                 > mp.score_confidence(cand, authored_by_human=False))
 
@@ -100,7 +110,7 @@ class TestPromotion:
         cand = mp.FactCandidate(
             content="Decision: use SQLite for facts.",
             fact_type="decision",
-            timestamp="2026-08-06T00:00:00Z",
+            timestamp=recent_ts(),
             agent="opencode",
             linear_refs=["BEL-154"],
             paperclip_refs=["ABS-10"],
@@ -114,7 +124,7 @@ class TestPromotion:
     def test_below_threshold_returns_none(self, tmp_path):
         manager = MemoryManager(db_path=str(tmp_path / "mem.db"))
         cand = mp.FactCandidate(content="ordinary chatter", fact_type="pattern",
-                                timestamp="2026-08-06T00:00:00Z")
+                                timestamp=recent_ts())
         assert mp.promote(manager, cand, min_confidence=0.7) is None
         manager.close()
 
