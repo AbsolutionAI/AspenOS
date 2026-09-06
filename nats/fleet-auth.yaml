@@ -1,5 +1,7 @@
 # Starship OS — multi-node NATS fleet auth map
 # Secrets via env / nats/creds (gitignored); never commit real tokens.
+# H-011: gen-nats-accounts.sh materializes nkey-only user entries when nk is
+# available (no plaintext passwords in fleet-accounts.conf); fallback = password.
 
 version: "2.1"
 # mode: disabled | token | accounts
@@ -22,11 +24,11 @@ accounts:
   STARSHIP_OPS:
     role: ops
     jetstream: true
-    description: Full mesh — ops / plant-alpha
+    description: Full mesh — ops / plant-alpha (sentinel + authz host)
   STARSHIP_EDGE:
     role: edge
     jetstream: true
-    description: Edge plant limited subjects
+    description: Edge plant limited subjects + aspen.fleet/edge/safety
   STARSHIP_RANGE:
     roles: [red, blue]
     description: Isolated red/blue exercise plant
@@ -35,11 +37,24 @@ accounts:
     description: Telemetry publish-only
 
 # Subject permissions by fleet role (mirror of fleet-accounts.conf.tmpl)
+# aspen.* rows per ADR-0007 (H-013): sentinel/authz/fleet/safety ACLs guarded.
 roles:
   ops:
     account: STARSHIP_OPS
-    publish: ["starship.>", "agnetic.>"]
-    subscribe: ["starship.>", "agnetic.>"]
+    publish:
+      - "starship.>"
+      - "agnetic.>"
+      - "aspen.sentinel.>"
+      - "aspen.authz.>"
+      - "aspen.fleet.>"
+      - "aspen.safety.>"
+    subscribe:
+      - "starship.>"
+      - "agnetic.>"
+      - "aspen.sentinel.>"
+      - "aspen.authz.>"
+      - "aspen.fleet.>"
+      - "aspen.safety.>"
   plant-controller:
     account: STARSHIP_EDGE
     publish:
@@ -49,10 +64,19 @@ roles:
       - "agnetic.fleet.heartbeat"
       - "agnetic.fleet.register"
       - "agnetic.fleet.status"
+      - "aspen.fleet.>"
+      - "aspen.edge.>"
+      - "aspen.safety.estop"
+      - "aspen.safety.authorize_clear"
     subscribe:
       - "starship.fleet.>"
       - "starship.fleet.ops.>"
       - "agnetic.fleet.>"
+      - "aspen.fleet.>"
+      - "aspen.edge.>"
+      - "aspen.safety.estop"
+      - "aspen.safety.clear"
+      - "aspen.sentinel.>"
   red-team:
     account: STARSHIP_RANGE
     publish:
@@ -60,11 +84,16 @@ roles:
       - "starship.fleet.heartbeat"
       - "agnetic.agent.proxy.>"
       - "agnetic.fleet.heartbeat"
+      - "aspen.fleet.node.register"
+      - "aspen.fleet.node.heartbeat"
+      - "aspen.edge.>"
     subscribe:
       - "starship.agent.proxy.>"
       - "starship.fleet.exercise"
       - "agnetic.agent.proxy.>"
       - "agnetic.fleet.exercise"
+      - "aspen.fleet.>"
+      - "aspen.safety.estop"
   blue-team:
     account: STARSHIP_RANGE
     publish:
@@ -74,9 +103,14 @@ roles:
       - "agnetic.agent.>"
       - "agnetic.fleet.heartbeat"
       - "agnetic.fleet.status"
+      - "aspen.fleet.>"
+      - "aspen.edge.>"
     subscribe:
       - "starship.>"
       - "agnetic.>"
+      - "aspen.fleet.>"
+      - "aspen.safety.estop"
+      - "aspen.sentinel.fleet.overview"
   telemetry:
     account: STARSHIP_TELEM
     publish:
@@ -94,7 +128,8 @@ production:
   notes:
     - "Ops firstboot defaults to accounts mode (gen-nats-accounts.sh)"
     - "Creds live in /etc/starship/nats/creds/ (mode 600) — never commit"
-    - "nkeys optional: go install github.com/nats-io/nkeys/nk@latest"
+    - "nkey-only auth preferred: go install github.com/nats-io/nkeys/nk@latest"
+    - "gen-nats-accounts.sh drops plaintext passwords when nkeys generated (H-011)"
     - "Clients: source /etc/starship/nats.env or role env (ops/edge/red/blue/telem)"
     - "Python: agents/nats_connect.py (user/pass; nkey if nkeys package present)"
     - "Bind 0.0.0.0 only on trusted fleet LAN or VPN; prefer TLS for WAN"

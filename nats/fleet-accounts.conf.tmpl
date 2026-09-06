@@ -8,6 +8,11 @@
 #   STARSHIP_EDGE   — edge plant (limited)
 #   STARSHIP_RANGE  — red/blue range (isolated)
 #   STARSHIP_TELEM  — telemetry publishers only
+#
+# aspen.* ACLs (H-013 / ADR-0007): the aspen.sentinel.*, aspen.authz.*,
+# aspen.fleet.* and aspen.safety.* namespaces are guarded per role. ops is the
+# trusted mesh/sentinel host; edge/range roles get scoped positive access;
+# telemetry stays publish-only. starship.* / agnetic.* allowances are unchanged.
 
 port: 4222
 host: "0.0.0.0"
@@ -41,7 +46,30 @@ accounts {
   STARSHIP_OPS {
     jetstream: enabled
     users: [
-      {user: "ops", password: "__OPS_PASS__"}__OPS_NKEY_LINE__
+      {user: "ops", password: "__OPS_PASS__"
+       permissions: {
+         publish: {
+           allow: [
+             "starship.>"
+             "agnetic.>"
+             "aspen.sentinel.>"
+             "aspen.authz.>"
+             "aspen.fleet.>"
+             "aspen.safety.>"
+           ]
+         }
+         subscribe: {
+           allow: [
+             "starship.>"
+             "agnetic.>"
+             "aspen.sentinel.>"
+             "aspen.authz.>"
+             "aspen.fleet.>"
+             "aspen.safety.>"
+           ]
+         }
+       }
+      }
     ]
     exports: [
       {stream: "starship.fleet.>"}
@@ -50,12 +78,17 @@ accounts {
       {stream: "agnetic.fleet.>"}
       {stream: "agnetic.agent.>"}
       {stream: "agnetic.telemetry.>"}
+      {stream: "aspen.sentinel.>"}
+      {stream: "aspen.authz.>"}
     ]
     imports: [
       {stream: {account: "STARSHIP_EDGE", subject: "starship.fleet.>"}}
       {stream: {account: "STARSHIP_EDGE", subject: "agnetic.fleet.>"}}
       {stream: {account: "STARSHIP_TELEM", subject: "starship.telemetry.>"}}
       {stream: {account: "STARSHIP_TELEM", subject: "agnetic.telemetry.>"}}
+      {stream: {account: "STARSHIP_EDGE", subject: "aspen.fleet.>"}}
+      {stream: {account: "STARSHIP_EDGE", subject: "aspen.edge.>"}}
+      {stream: {account: "STARSHIP_EDGE", subject: "aspen.safety.estop"}}
     ]
   }
 
@@ -76,6 +109,10 @@ accounts {
              "agnetic.fleet.status"
              "agnetic.agent.proxy.>"
              "agnetic.telemetry.>"
+             "aspen.fleet.>"
+             "aspen.edge.>"
+             "aspen.safety.estop"
+             "aspen.safety.authorize_clear"
            ]
          }
          subscribe: {
@@ -85,14 +122,25 @@ accounts {
              "starship.agent.proxy.>"
              "agnetic.fleet.>"
              "agnetic.agent.proxy.>"
+             "aspen.fleet.>"
+             "aspen.edge.>"
+             "aspen.safety.estop"
+             "aspen.safety.clear"
+             "aspen.sentinel.>"
            ]
          }
        }
-      }__EDGE_NKEY_LINE__
+      }
     ]
     exports: [
       {stream: "starship.fleet.>"}
       {stream: "agnetic.fleet.>"}
+      {stream: "aspen.fleet.>"}
+      {stream: "aspen.edge.>"}
+      {stream: "aspen.safety.estop"}
+    ]
+    imports: [
+      {stream: {account: "STARSHIP_OPS", subject: "aspen.sentinel.>"}}
     ]
   }
 
@@ -107,6 +155,9 @@ accounts {
              "starship.fleet.heartbeat"
              "agnetic.agent.proxy.>"
              "agnetic.fleet.heartbeat"
+             "aspen.fleet.node.register"
+             "aspen.fleet.node.heartbeat"
+             "aspen.edge.>"
            ]
          }
          subscribe: {
@@ -115,10 +166,12 @@ accounts {
              "starship.fleet.exercise"
              "agnetic.agent.proxy.>"
              "agnetic.fleet.exercise"
+             "aspen.fleet.>"
+             "aspen.safety.estop"
            ]
          }
        }
-      }__RED_NKEY_LINE__
+      }
       {user: "blue", password: "__BLUE_PASS__"
        permissions: {
          publish: {
@@ -129,13 +182,15 @@ accounts {
              "agnetic.agent.>"
              "agnetic.fleet.heartbeat"
              "agnetic.fleet.status"
+             "aspen.fleet.>"
+             "aspen.edge.>"
            ]
          }
          subscribe: {
-           allow: ["starship.>", "agnetic.>"]
+           allow: ["starship.>", "agnetic.>", "aspen.fleet.>", "aspen.safety.estop", "aspen.sentinel.fleet.overview"]
          }
        }
-      }__BLUE_NKEY_LINE__
+      }
     ]
   }
 
@@ -150,7 +205,7 @@ accounts {
            allow: []
          }
        }
-      }__TELEM_NKEY_LINE__
+      }
     ]
     exports: [
       {stream: "starship.telemetry.>"}

@@ -75,3 +75,30 @@ events:
   - warning
   - completed
   - heartbeat
+
+# aspen.* namespace (ADR-0007 / ADR-0003, H-013).
+# New work uses aspen.*; dual-publish starship.*/agnetic.* only for Alpha clients.
+aspen:
+  sentinel:
+    audit_event: "aspen.sentinel.audit.event"
+    fleet_overview: "aspen.sentinel.fleet.overview"
+    osint_ingest: "aspen.sentinel.osint.ingest"
+    incident_channel: "aspen.sentinel.incident.channel"
+  authz:
+    gate_request: "aspen.authz.gate.request"
+    gate_decision: "aspen.authz.gate.decision"
+    capability_grant: "aspen.authz.capability.grant"
+  fleet:
+    node_register: "aspen.fleet.node.register"
+    node_heartbeat: "aspen.fleet.node.heartbeat"
+    ops_status: "aspen.fleet.ops.status"
+    mission: "aspen.fleet.mission.>"
+  edge:
+    heartbeat: "aspen.edge.<node_id>.heartbeat"
+    propose_act: "aspen.edge.<node_id>.propose_act"
+    authorize: "aspen.edge.<node_id>.authorize"
+    command: "aspen.edge.<node_id>.command"
+  safety:
+    estop: "aspen.safety.estop"
+    authorize_clear: "aspen.safety.authorize_clear"
+    clear: "aspen.safety.clear"

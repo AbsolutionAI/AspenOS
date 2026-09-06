@@ -2,11 +2,17 @@
 # Starship OS — generate multi-tenant NATS accounts + optional nkeys
 # Usage:
 #   bash scripts/gen-nats-accounts.sh [--out DIR] [--no-nkeys]
+#   bash scripts/gen-nats-accounts.sh --password-only   # legacy plaintext mode
 # Writes:
-#   $OUT/fleet-accounts.conf   — server config (secrets embedded)
-#   $OUT/creds/*.env           — per-role client env (user/pass)
+#   $OUT/fleet-accounts.conf   — server config (nkey-only when nk available)
+#   $OUT/creds/*.env           — per-role client env (nkey seed or user/pass)
 #   $OUT/creds/*.nk            — nkey seeds (if nk available)
-#   $OUT/creds/manifest.json   — public metadata (no passwords)
+#   $OUT/creds/manifest.json   — public metadata (no secrets)
+#
+# H-011: when the nk binary is present, user entries are materialized as
+# nkey-only ({nkey: "U..."}) and the plaintext password: field is dropped from
+# the server config entirely. gen will still fall back to password auth when nk
+# is missing (creds/*.env chmod 600); pass --password-only to force that.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -18,7 +24,7 @@ PORT="${STARSHIP_NATS_PORT:-4222}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --out) OUT="$2"; shift 2 ;;
-    --no-nkeys) USE_NKEYS=0; shift ;;
+    --no-nkeys|--password-only) USE_NKEYS=0; shift ;;
     --host) HOST="$2"; shift 2 ;;
     --port) PORT="$2"; shift 2 ;;
     -h|--help)
@@ -90,42 +96,57 @@ for role in ops edge red blue telem; do
   fi
 done
 
-nkey_line() {
-  local role="$1"
-  local pub="${NK_PUB[$role]:-}"
-  if [[ -n "$pub" ]]; then
-    # Sibling user entry (comma-separated inside users array)
-    printf ', {nkey: "%s"}' "$pub"
-  else
-    printf ''
-  fi
-}
+NKEY_MODE=1
+if [[ "$USE_NKEYS" == "1" ]]; then
+  any_seed=0
+  for role in ops edge red blue telem; do
+    [[ -n "${NK_SEED[$role]:-}" ]] && any_seed=1
+  done
+  [[ "$any_seed" == "0" ]] && NKEY_MODE=0
+else
+  NKEY_MODE=0
+fi
 
 # Materialize server conf
+# nkey-only user entries when nk generated seeds (H-011); the plaintext
+# password: field is dropped from the config in that mode (sys admin excluded).
 CONF="$OUT/fleet-accounts.conf"
 HTTP_PORT=$((PORT + 4000))
 [[ "$PORT" == "4222" ]] && HTTP_PORT=8222
-sed \
-  -e "s|__SYS_PASS__|${SYS_PASS}|g" \
-  -e "s|__OPS_PASS__|${OPS_PASS}|g" \
-  -e "s|__EDGE_PASS__|${EDGE_PASS}|g" \
-  -e "s|__RED_PASS__|${RED_PASS}|g" \
-  -e "s|__BLUE_PASS__|${BLUE_PASS}|g" \
-  -e "s|__TELEM_PASS__|${TELEM_PASS}|g" \
-  -e "s|__OPS_NKEY_LINE__|$(nkey_line ops)|g" \
-  -e "s|__EDGE_NKEY_LINE__|$(nkey_line edge)|g" \
-  -e "s|__RED_NKEY_LINE__|$(nkey_line red)|g" \
-  -e "s|__BLUE_NKEY_LINE__|$(nkey_line blue)|g" \
-  -e "s|__TELEM_NKEY_LINE__|$(nkey_line telem)|g" \
-  -e "s|^port: 4222|port: ${PORT}|" \
-  -e "s|^http_port: 8222|http_port: ${HTTP_PORT}|" \
-  "$TMPL" > "$CONF"
+SED_ARGS=(-e "s|__SYS_PASS__|${SYS_PASS}|g")
+for role in ops edge red blue telem; do
+  RKEY="${role^^}_PASS"
+  pass="${!RKEY}"
+  pub="${NK_PUB[$role]:-}"
+  if [[ "$NKEY_MODE" == "1" && -n "$pub" ]]; then
+    SED_ARGS+=(-e "s|{user: \"${role}\", password: \"__${RKEY}__\"|{nkey: \"${pub}\"|g")
+  else
+    SED_ARGS+=(-e "s|__${RKEY}__|${pass}|g")
+  fi
+done
+SED_ARGS+=(-e "s|^port: 4222|port: ${PORT}|" -e "s|^http_port: 8222|http_port: ${HTTP_PORT}|")
+sed "${SED_ARGS[@]}" "$TMPL" > "$CONF"
 chmod 600 "$CONF"
 
 write_role_env() {
   local role="$1" user="$2" pass="$3" account="$4"
+  local seed="${NK_SEED[$role]:-}" pub="${NK_PUB[$role]:-}"
   local f="$OUT/creds/${role}.env"
-  cat > "$f" <<EOF
+  if [[ "$NKEY_MODE" == "1" && -n "$seed" ]]; then
+    cat > "$f" <<EOF
+# Starship OS NATS client — role=${role} account=${account} (nkey-only)
+# Generated $(date -u +%Y-%m-%dT%H:%M:%SZ)
+# No plaintext password — server conf embeds the nkey public key only.
+NATS_URL=nats://${HOST}:${PORT}
+NATS_USER=${pub}
+STARSHIP_NATS_ACCOUNT=${account}
+STARSHIP_NATS_MODE=accounts
+STARSHIP_NATS_ROLE=${role}
+STARSHIP_NATS_NKEY_SEED=${seed}
+STARSHIP_NATS_NKEY_PUB=${pub}
+EOF
+  else
+    cat > "$f" <<EOF
 # Starship OS NATS client — role=${role} account=${account}
 # Generated $(date -u +%Y-%m-%dT%H:%M:%SZ)
 NATS_URL=nats://${user}:${pass}@${HOST}:${PORT}
@@ -134,11 +155,6 @@ NATS_PASSWORD=${pass}
 STARSHIP_NATS_ACCOUNT=${account}
 STARSHIP_NATS_MODE=accounts
 STARSHIP_NATS_ROLE=${role}
-EOF
-  if [[ -n "${NK_SEED[$role]:-}" ]]; then
-    cat >> "$f" <<EOF
-STARSHIP_NATS_NKEY_SEED=${NK_SEED[$role]}
-STARSHIP_NATS_NKEY_PUB=${NK_PUB[$role]}
 EOF
   fi
   chmod 600 "$f"
@@ -166,11 +182,11 @@ cp "$OUT/creds/ops.env" "$OUT/nats.env"
 chmod 600 "$OUT/nats.env"
 
 # Public manifest (no secrets)
-python3 - "$OUT" "$USE_NKEYS" <<'PY'
+python3 - "$OUT" "$NKEY_MODE" <<'PY'
 import json, sys, os
 from pathlib import Path
 out = Path(sys.argv[1])
-use_nkeys = sys.argv[2] == "1"
+nkey_only = sys.argv[2] == "1"
 roles = {}
 for role in ("ops", "edge", "red", "blue", "telem"):
     pub = out / "creds" / f"{role}.nk.pub"
@@ -188,20 +204,21 @@ for role in ("ops", "edge", "red", "blue", "telem"):
 manifest = {
     "version": "2.1",
     "mode": "accounts",
-    "nkeys": use_nkeys and any(r["nkey_pub"] for r in roles.values()),
+    "auth": "nkey_only" if nkey_only else "password",
     "server_conf": "fleet-accounts.conf",
     "roles": roles,
 }
 (out / "creds" / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-print(json.dumps({"ok": True, "out": str(out), "nkeys": manifest["nkeys"], "roles": list(roles)}, indent=2))
+print(json.dumps({"ok": True, "out": str(out), "auth": manifest["auth"], "roles": list(roles)}, indent=2))
 PY
 
 echo "Generated:"
 echo "  server: $CONF"
 echo "  clients: $OUT/creds/*.env"
 echo "  default: $OUT/nats.env  (ops)"
-if find_nk &>/dev/null && [[ "$USE_NKEYS" == "1" ]]; then
+if [[ "$NKEY_MODE" == "1" ]]; then
+  echo "  auth:    nkey-only (no plaintext passwords in server conf)"
   echo "  nkeys:   $OUT/creds/*.nk"
 else
-  echo "  nkeys:   skipped (install nk: go install github.com/nats-io/nkeys/nk@latest)"
+  echo "  auth:    password (install nk: go install github.com/nats-io/nkeys/nk@latest to enable nkey-only)"
 fi
