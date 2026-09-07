@@ -21,17 +21,17 @@ Aspen OS / AspenGrove architecture decisions. Prefer short, statused markdown in
 | [ADR-0004](./ADR-0004-light-core-plugins.md) | Light core + plugins | Accepted | Optional deps |
 | [ADR-0005](./ADR-0005-langgraph-execution-plugin.md) | LangGraph as execution plugin | Accepted | Paperclip remains org SoR |
 | [ADR-0006](./ADR-0006-memory-store-tiering.md) | Tiered memory store (LanceDB vs PG+AGE) | **Accepted** | BEL-154 + Master Spec §3.1 — accepted ASP-426 |
-| [ADR-0007](./ADR-0007-nats-subject-contracts-sentinel-c2.md) | NATS subject contracts for Sentinel + C2 | **Proposed** | BEL-196 — Sentinel subjects, authz gates, audit |
-| [ADR-0008](./ADR-0008-package-classification-core-plugin-devonly.md) | AspenGrove package classification (core/plugin/dev-only) | **Proposed** | BEL-195 — three-tier split, PACKAGES.md |
-| [ADR-0009](./ADR-0009-capability-based-gatekeepers.md) | Capability-based gatekeepers (no broad API keys) | **Proposed** | BEL-215 — propose_act + dual-human gate |
+| [ADR-0007](./ADR-0007-nats-subject-contracts-sentinel-c2.md) | NATS subject contracts for Sentinel + C2 | **Accepted** | BEL-196 — ASP-530 accept; ASP-563 reconfirm; aspen-contracts mirror residual |
+| [ADR-0008](./ADR-0008-package-classification-core-plugin-devonly.md) | AspenGrove package classification (core/plugin/dev-only) | **Accepted** | BEL-195 — ASP-530 accept; ASP-563 reconfirm; PACKAGES.md SoR |
+| [ADR-0009](./ADR-0009-capability-based-gatekeepers.md) | Capability-based gatekeepers (no broad API keys) | **Accepted (design + Phase 1)** | BEL-215 — ASP-540 P1; Phase 2 token/credential strip residual |
 | [ADR-0010](./0001-c11-agent-runtime.md) | C11 agent runtime (legacy file `0001-…`) | Accepted | Logical **0010**; file keeps historic name |
+| [ADR-0012](./ADR-0012-operator-of-record-binding.md) | Authenticated operator-of-record binding for DualHumanGate | **Proposed** | ASP-534 / ASP-530 — NATS `human_id` SoR; before G9+ non-sim arm |
 
 ### Open candidates (not yet filed)
 
 | ID | Topic | Trigger |
 |----|-------|---------|
 | ADR-0011 | Sunset dual-publish (`starship.*`/`agnetic.*` → `aspen.*` only) | >50% consumers on `aspen.*` or first external plant pilot |
-| ADR-0012 | Authenticated operator-of-record binding for DualHumanGate | Before any non-sim arm (G9+) |
 
 ## Related docs
 
@@ -40,7 +40,7 @@ Aspen OS / AspenGrove architecture decisions. Prefer short, statused markdown in
 - Fleet subject inventory: `docs/ops/FLEET_SUBJECT_PUBLISHERS.md`
 - Memory design: `docs/architecture/MEMORY_LAYER.md` (BEL-154)
 - ABS path ownership: `docs/ops/ABS_MIRROR_ROUTING.md`
-- Weekly reviews: `docs/ops/WEEKLY_ARCHITECTURE_REVIEW_*.md`
+- Weekly reviews: `docs/ops/WEEKLY_ARCHITECTURE_REVIEW_*.md` (latest: 2026-09-07 / ASP-563)
 
 ## How to add an ADR
 
@@ -49,3 +49,4 @@ Aspen OS / AspenGrove architecture decisions. Prefer short, statused markdown in
 3. Add a row to this index in the same PR.
 4. Link parent Paperclip / Linear IDs in the Status block.
 5. Do not mark **Accepted** without architecture review (ASP Weekly Architecture Review or explicit human accept).
+6. After acceptance, **merge the status flip to `origin/master` in the same cycle** — orphan hermes commits caused 0007–0009 to reappear as Proposed (ASP-563 finding).

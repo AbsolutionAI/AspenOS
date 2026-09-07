@@ -1,10 +1,10 @@
 # Fleet subject publishers inventory (ASP-362)
 
 **Paperclip:** ASP-362 (parent ASP-166 Weekly Architecture Review)  
-**Date:** 2026-08-22  
+**Date:** 2026-08-22 · **Reviewed:** 2026-09-07 (ASP-563)  
 **Scope:** Inventory only — **no subject deletions**  
-**Purpose:** Support future **ADR-0007** dual-publish deprecation window  
-**Canonical contracts:** [ADR-0003](../adr/ADR-0003-fleet-edge-safety-contracts.md) · `docs/FLEET.md`
+**Purpose:** Support future **ADR-0011** dual-publish deprecation window (candidate; not filed)  
+**Canonical contracts:** [ADR-0003](../adr/ADR-0003-fleet-edge-safety-contracts.md) · [ADR-0007](../adr/ADR-0007-nats-subject-contracts-sentinel-c2.md) · `docs/FLEET.md`
 
 ## Naming trees
 
