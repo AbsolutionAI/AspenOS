@@ -1,8 +1,8 @@
 # Security Threat Model — AspenOS v2.2
 
-**Version:** 2.2 · **Refresh:** 2026-08-31 (Biweekly)  
+**Version:** 2.2 · **Refresh:** 2026-09-07 (Biweekly)  
 **Author:** Auditor (Paperclip agent 4203b00e)  
-**Previous baseline:** ASP-431 (2026-08-24) — F-015–F-019, H-022–H-026, H-007–H-015 backlog  
+**Previous baseline:** ASP-535 (2026-08-31) — H-007–H-021 backlog, F-015–F-019  
 **SoR:** `docs/SECURITY.md` · `docs/FLEET.md` · `docs/adr/ADR-0003` · `docs/adr/ADR-0007` · `docs/adr/ADR-0009`  
 **IEC 62443 mapping:** §5.2 (zones/conduits), §3.3 (SLT), §5.3 (defence-in-depth)
 
@@ -57,7 +57,7 @@
 | H-005 | Abliterated local model refusal bypass | Model safety | 7.0 (AV:L/AC:L) | Mandatory policy + sandbox + Droid Shield, never trust model alone | Active |
 | H-006 | Cross-plant privilege escalation | Plant isolation | 7.0 (AV:N/AC:M) | `same_plant_only` default ACL, `check_cross_plant()` fail-closed | Active |
 
-### 2.2 v2.2 refresh threats (updated 2026-08-31)
+### 2.2 v2.2 refresh threats (updated 2026-09-07)
 
 | ID | Threat | Asset | Risk (CVSS) | Mitigation | Status |
 |----|--------|-------|-------------|------------|--------|
@@ -111,7 +111,7 @@
 | blue | STARSHIP_RANGE | agent.>, fleet.heartbeat, status | `starship.>` · `agnetic.>` | **No imports** — isolated |
 | telem | STARSHIP_TELEM | telemetry.> | (none) | Exports: telemetry to OPS |
 
-**Gap:** `aspen.*` subjects are NOT yet in this permission matrix. The migration from `starship.*` to `aspen.*` is mid-flight (ADR-0007 proposed). Until the NATS config is regenerated with `aspen.*` subject entries, any agent with bus access can publish arbitrary `aspen.*` messages.
+> **Dual-subject table note:** This table summarises `starship.*` / `agnetic.*` subject permissions, the pre-migration baseline. H-013 (ASP-536) added per-role `aspen.*` ACLs (sentinel, authz, fleet, safety) in the `fleet-accounts.conf.tmpl` — all roles have scoped `aspen.*` publish/subscribe and cross-account imports. The generated conf includes both namespaces. Residual: (a) clients still dual-publish `starship.*` during the `aspen.` prefix migration; (b) live NATS servers need a conf regenerate + reload to enforce. These rows will be folded into a single `Starship + Aspen` table at the next major refresh.
 
 ### 3.2 Fleet tool ACL (agents/fleet_policy.py)
 
@@ -197,32 +197,26 @@
 
 ---
 
-## 5. Changes Since Last Refresh (ASP-431, 2026-08-24)
+## 5. Changes Since Last Refresh (ASP-535, 2026-08-31)
 
 | Change | Impact | New threats | Status |
 |--------|--------|-------------|--------|
-| ADR-0007 (NATS subject contracts) | Added `aspen.sentinel.*` + `aspen.authz.*` subjects | H-013, H-015, H-021 | Wired: ACLs (ASP-536), audit publisher (ASP-537); H-013 closed, H-015 closed |
-| ADR-0008 (Package classification) | Core/Plugin/Dev-only tiers | H-019 | Proposed; no gate |
-| ADR-0009 (Capability-based gatekeepers) | Eliminates broad credentials | H-008, H-010, H-020 | Phase 1 implemented (proposal interception + dual-human gate, ASP-540); full token lifecycle + credential strip Phase 2 |
-| ADR-0006 (Memory store tiering) | T1 local-first + optional T2 PG | (none new) | Accepted |
-| H-018 (ASP-533) completed | Dual-guard single-plant scheduler | H-016 → closed | **CLOSED** |
-| `aspen.` prefix migration in progress | Dual-publish during transition | H-013, H-021 | Mid-flight |
-| Dual-human gate design in ADR-0003 | Rejected duplicate principals | H-009 | Implemented (ASP-540): distinct-principal enforcement + audited duplicates |
+| ASP-568 H-011/H-013 reconciliation | Verified gen-nats-accounts nkey-only mode; validated per-role aspen.* ACL template | None (H-011 → Partial, H-013 → Closed) | Closed: checklist reconciled vs delivery evidence |
+| Nightly check ASP-562 (2026-09-07) | 101 passed, 1 known failure | None — same baseline | PASS — no security regression |
+| ADR-0009 gatekeeper status doc update | c4dade7 documents ADR-0009 state across threat model, FLEET, ADR-0007 | N/A | Reflected |
 
-### Threats closed this cycle
+### Threats closed this cycle (since 2026-08-31)
 
 | Item | Reason | Closing evidence |
 |------|--------|-----------------|
-| H-016 (LangGraph emit-side guard) | Both guard layers implemented | ASP-533 DONE: `aspen_lgw/guard.py` + `SwarmManager._busy_plants` |
-| H-018 (Single-plant dual-arm) | Dual guard prevents second arm on same plant | ASP-533: `PlantBusyError`, `arm_or_propose()` route to `propose_act` |
+| H-013 (Missing aspen.* ACL) | Per-role aspen.* template ACLs committed for all roles; cross-account imports/exports wired | ASP-536: fleet-accounts.conf.tmpl; H-013 check in smoke-test.sh; ASP-568 verification |
 
-### New threats this cycle
+### Threats with status change this cycle
 
-| ID | Source | Rationale |
-|----|--------|----------|
-| H-021 | ADR-0007 migration | `aspen.sentinel.*` / `aspen.authz.*` subjects have no publish permissions in NATS accounts config |
-| H-HOST-04 | Audit | `AGENTIC_MASTER_PASSWORD` env var places master secret in process env — leaks under /proc or crash dump |
-| H-019 | ADR-0008 proposed | No CI gate prevents Dev-only packages from reaching production images |
+| Item | Previous | Current | Rationale |
+|------|----------|---------|-----------|
+| H-011 (Plaintext NATS creds) | Active risk | **Partial** (ASP-536) | nkey-only gen mode; residual: nk binary at gen time, SYS password |
+| H-021 (aspen.sentinel. permissions) | No publish permissions in NATS config | **Mid-migration** | Template ACLs cover aspen.sentinel.*; live deployment needs regenerate + reload |
 
 ---
 
@@ -289,28 +283,32 @@
 
 ### P0 — Act this sprint
 
-1. **[x] Regenerate NATS accounts config with `aspen.*` subjects.** The current `fleet-accounts.conf` only restricts `starship.*` / `agnetic.*`. The `aspen.*` prefix (ADR-0007) has no subject-level ACL. An agent with bus credentials can publish arbitrary `aspen.fleet.mission.*` or `aspen.safety.*` messages without restriction. — **Closed (ASP-536):** per-role `aspen.*` ACLs committed in template, cross-account imports/exports wired. Residual: clients still dual-publish `starship.*` during `aspen.` prefix migration; full enforcement requires regenerating the conf (`gen-nats-accounts.sh`) and deploying to the live NATS server.
+1. **[ ] Add integration test for estop dual-human clear (H-007).** The estop `authorize_clear` + `clear` protocol has a dual-human gate check in the fleet-bus smoke suite (ASP-558), but no dedicated integration test that confirms a single `authorize_clear` alone never triggers `clear`. H-007 is the only remaining **Critical** gap.
 
-2. **[x] Encrypt NATS credentials in fleet-accounts.conf.** Currently 6 cleartext passwords are stored in the config file. Use nkey-only auth or encrypted creds files. — **Partial (ASP-536):** `gen-nats-accounts.sh` emits nkey-only `{nkey}` entries when `nk` binary is present, dropping the plaintext `password:` field. Residual: `nk` must be available at generation time; SYS account admin user always uses password. Run with `--password-only` for legacy fallback.
+2. **[ ] Implement H-019 CI gate — block Dev-only packages from production images.** PACKAGES.md defines three tiers (Core/Plugin/Dev-only). No CI gate enforces that Dev-only packages (`aspen-dev/` tree items) never land in production Debian packages or ISO images. Check pattern: `scripts/check-no-devonly-in-prod.sh` parsing PACKAGES.md, scanning production paths, failing the build if any Dev-only path is found. Add to `.github/workflows/ci.yml` and `scripts/check-nightly.sh`.
 
-3. **[x] Begin gatekeeper shim implementation** (ADR-0009). At minimum, a local proxy that intercepts `propose_act` on safety-adjacent subjects and enforces dual-human authorization before forwarding. — **Phase 1 done (ASP-540):** `minimal_shim.py` intercepts `aspen.safety.*` / `aspen.edge.*.command` / `aspen.fleet.mission.start` proposals, requires two distinct `human_id`s via `aspen.authz.gate.decision`, refuses bare/single-human forwards, audits every decision. Residual Phase 2: token consumption, credential strip, redundancy (H-020).
+3. **[ ] Verify AppArmor profiles load on all deployment targets (H-014).** Profiles exist at `security/apparmor/`, but `install-daemon.sh` may not copy them. Verify: add a nightly check (`check-nightly.sh` section) that confirms profiles are present in the installed system path and `aa-status` shows them loaded. Fail the build if profiles are present in source but absent from the installed target.
 
 ### P1 — Next sprint
 
-4. **[x] Wire `aspen.sentinel.audit.event` publisher (ASP-537).** Without audit, all agent actions are forensically opaque. Publisher implemented: JSONL file backed by JetStream (`scripts/sentinel-audit.py`), gatekeeper actions covered. Residual: Sentinel-dashboard/SIEM consumer.
+4. **[ ] NATS credential rotation procedure (H-017).** Document a rotation workflow: regenerate creds with `gen-nats-accounts.sh`, distribute new `.env` files, restart NATS clients. The script has no expiry enforcement or rotation window — document a 90-day rotation cadence and add a reminder cron.
 
-5. **Replace hardcoded NATS URL in scheduler.py** with `nats_connect.py` helper or env config.
+5. **[ ] Replace env-based master password with keyring or prompt (H-HOST-04).** `AGENTIC_MASTER_PASSWORD` lives in process env and leaks via `/proc` or crash dumps. Migrate to `keyring` backend or prompt-on-startup with TPM-backed sealed secret. Fall back to env only as a last resort with a documented warning.
 
-6. **Add integration test for estop clear** — verify dual-human gate prevents single-principal unlatch.
+6. **[ ] Node fingerprint for fleet heartbeat (F-017).** Fleet nodes register with NATS account + token but no PKI identity. A compromised bus credentials file lets an attacker register a fake node. Add a fingerprint field (`ed25519` public key or machine-id hash) to the `aspen.fleet.node.register` / `aspen.fleet.node.heartbeat` payload; ops-manager validates against a known-node allowlist.
 
 ### P2 — v2.3 planning
 
-7. **PKI for node identity** — fleet heartbeat should include a node fingerprint (e.g., TPM or pre-shared public key) to prevent registration spoofing (F-017).
+7. **ADR-0009 Phase 2:** Full token lifecycle (consumption/refresh), Hermes/Paperclip credential strip, immutable proxy enforcement, redundancy plan for SPOF (H-020).
 
-8. **TLS by default** in firstboot templates for WAN deployments.
+8. **TLS by default:** Enable `STARSHIP_NATS_TLS=1` in firstboot templates. Document WAN deployment with mutual TLS.
 
-9. **Automated ACL drift detection** — cron job compares `fleet.yaml` ACL against live fleet state.
+9. **Automated ACL drift detection:** Cron job compares `fleet.yaml` ACL baseline against live fleet state from heartbeats. Report drift events on `aspen.sentinel.audit.event`.
+
+10. **Security scan CI gate:** Integrate `bandit` (Python) and `semgrep` (multi-lang) into `make check` or CI pipeline. Start with critical/high rules only to avoid noise.
+
+11. **Code signing:** Sign `sandbox_run`, `policyexec`, `starshipd` binaries; verify signature at install/start time.
 
 ---
 
-*End of threat model v2.2. Next refresh: 2026-09-14.*
+*End of threat model v2.2. Next refresh: 2026-09-21.*
