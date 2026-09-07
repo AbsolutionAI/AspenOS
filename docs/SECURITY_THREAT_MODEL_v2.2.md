@@ -65,9 +65,9 @@
 | H-008 | **Propose_act self-authorization** | Actuation | **8.5** (AV:N/AC:L) | Gate must reject single-principal and self-approval; stable audited reasons | **Phase 1 implemented (ASP-540)** — safety-adjacent `propose_act` intercepted, dual-human enforced, bare/1-human forward refused + audited |
 | H-009 | **Dual-human collision — same principal counted twice** | Authorization | 7.5 (AV:N/AC:M) | Verify distinct `human_id` records in-window; duplicate-principal refuse with reason | **Satisfied (ASP-540)** — `authorize_gate_request` dedupes by `human_id`; duplicate ignored + `gate.authorize.duplicate` audited |
 | H-010 | **Stale capability tokens post-expiry** | Gatekeeper | 6.0 (AV:N/AC:L) | Short TTL + NATS auth time window; refuse if expired | ADR-0009 |
-| H-011 | **NATS plaintext credentials on disk** | Secrets | 7.5 (AV:L/AC:L) | `fleet-accounts.conf` contains passwords in plaintext; `mode 600`, never commit | **Active risk** |
+| H-011 | **NATS plaintext credentials on disk** | Secrets | 7.5 (AV:L/AC:L) | nkey-only generator (ASP-536): `gen-nats-accounts.sh` emits `{nkey}` entries and drops plaintext when `nk` present; fallback password on missing `nk`; SYS account excluded | **Partial (ASP-536)** — nkey-only gen mode; residual: `nk` binary required at gen time, SYS account always password |
 | H-012 | **scheduler.py hardcoded NATS URL** | Bus | 5.5 (AV:L/AC:H) | `nats://[IP_ADDRESS]:4222` hardcoded — should use env or config | **Closed** (ASP-539) |
-| H-013 | **No aspen.* subject ACL in NATS config** | Bus | 7.0 (AV:N/AC:L) | `fleet-accounts.conf` only restricts `starship.*` / `agnetic.*`; `aspen.*` subjects unrestricted | **Open: mid-migration** |
+| H-013 | **No aspen.* subject ACL in NATS config** | Bus | 7.0 (AV:N/AC:L) | Per-role `aspen.*` ACLs committed in template (ASP-536): ops=sentinel+authz+fleet+safety, edge=fleet+edge+estop+clear, range=scoped fleet/heartbeat; cross-account imports/exports wired | **CLOSED (ASP-536)** — template ACLs for all roles; residual: clients still dual-publish `starship.*` during migration |
 | H-014 | **Missing AppArmor profiles in deployment** | Host | 6.5 (AV:L/AC:M) | Profiles exist in `security/apparmor/` but install script may not run | Check gap |
 | H-015 | **Audit trail not yet connected to aspen.sentinel.audit.event** | Forensics | 6.0 (AV:N/AC:L) | Subject defined (ADR-0007) but no publisher; no forensic query path | **Open** — publisher wired (ASP-537); Sentinel-dashboard consumer pending |
 | H-016 | **LangGraph worker emit-side guard (H-018 completed)** | Mission subjects | 8.0 (AV:N/AC:L) | `aspen_lgw/guard.py`: blocks mission publish; `SwarmManager._busy_plants` prevents dual arm | **CLOSED** (ASP-533) |
@@ -169,8 +169,8 @@
 
 ### 4.1 Immediate (v2.2 refresh gaps)
 
-- [ ] **H-011:** Move NATS credentials from plaintext config to encrypted files or nkey-only auth. `fleet-accounts.conf` contains cleartext passwords.
-- [ ] **H-013:** Regenerate NATS accounts config with `aspen.*` subject permissions. Current config only covers `starship.*` / `agnetic.*`.
+- [x] **H-011:** Move NATS credentials from plaintext config to encrypted files or nkey-only auth. `gen-nats-accounts.sh` now emits nkey-only entries when `nk` present (ASP-536); residual: `nk` must be available at generation time, SYS account always password.
+- [x] **H-013:** Regenerate NATS accounts config with `aspen.*` subject permissions. Committed in template (ASP-536): all roles have scoped `aspen.*` publish/subscribe + cross-account imports.
 - [x] **H-015:** Wire audit publisher to `aspen.sentinel.audit.event`. No forensic trail currently records agent actions.
 - [x] **H-008:** Implement gatekeeper shim (ADR-0009). `propose_act` self-authorization is not cryptographically prevented. — **Phase 1 (ASP-540):** safety-adjacent proposal interception + dual-human authorization + refusal of bare/single-human forwards; every decision audited to `aspen.sentinel.audit.event`.
 - [x] **H-009:** Verify dual-human authorization collision logic in `act_gate_contract.md` — distinct principal enforcement must reject duplicates. — **ASP-540:** `authorize_gate_request` ignores duplicate `human_id` (audited `gate.authorize.duplicate`); two distinct in-window approvals required.
@@ -189,7 +189,7 @@
 
 - [ ] **ADR-0009 implementation (Phase 2):** Full token lifecycle (consumption/refresh), Hermes/Paperclip credential strip, immutable proxy enforcement. — Phase 1 (proposal interception + dual-human + audit) landed in ASP-540.
 - [ ] **TLS by default:** Enable `STARSHIP_NATS_TLS=1` in firstboot templates. Document WAN deployment.
-- [ ] **NATS nkey migration:** Replace password-based auth with nkeys across all accounts.
+- [ ] **NATS nkey migration (continued):** ASP-536 added nkey-only gen mode; residual work: enforce nkey-only in CI (fail `--password-only` in production builds), migrate SYS account, automate `nk` binary availability. Replace password-based auth across all accounts (partial ASP-536).
 - [ ] **Automated ACL drift detection:** Cron job compares live ACL with `fleet.yaml` baseline.
 - [ ] **Security scan CI gate:** Integrate `bandit` / `semgrep` into `make check` or CI pipeline.
 - [ ] **Code signing:** Sign `sandbox_run`, `policyexec` binaries; verify at install time.
@@ -201,7 +201,7 @@
 
 | Change | Impact | New threats | Status |
 |--------|--------|-------------|--------|
-| ADR-0007 (NATS subject contracts) | Added `aspen.sentinel.*` + `aspen.authz.*` subjects | H-013, H-015, H-021 | Wired: ACLs (ASP-536), audit publisher (ASP-537); H-015 closed |
+| ADR-0007 (NATS subject contracts) | Added `aspen.sentinel.*` + `aspen.authz.*` subjects | H-013, H-015, H-021 | Wired: ACLs (ASP-536), audit publisher (ASP-537); H-013 closed, H-015 closed |
 | ADR-0008 (Package classification) | Core/Plugin/Dev-only tiers | H-019 | Proposed; no gate |
 | ADR-0009 (Capability-based gatekeepers) | Eliminates broad credentials | H-008, H-010, H-020 | Phase 1 implemented (proposal interception + dual-human gate, ASP-540); full token lifecycle + credential strip Phase 2 |
 | ADR-0006 (Memory store tiering) | T1 local-first + optional T2 PG | (none new) | Accepted |
@@ -234,9 +234,9 @@
 | H-008 (Propose_act self-auth) | **Critical** | Gap | Gatekeeper implementation |
 | H-009 (Dual-human collision) | High | Design spec | Verify identity uniqueness logic |
 | H-010 (Stale capability tokens) | Medium | Design only | ADR-0009 phase |
-| H-011 (Plaintext NATS creds) | **High** | **Open** | Encrypt or nkey-only |
+| H-011 (Plaintext NATS creds) | **High** | **Partial (ASP-536)** | nkey-only gen mode; residual: `nk` at gen time, SYS password |
 | H-012 (Hardcoded NATS URL) | Medium | Closed (ASP-539) | Config/env refactor |
-| H-013 (Missing aspen.* ACL) | **High** | **Open** | Regenerate NATS accounts |
+| H-013 (Missing aspen.* ACL) | **High** | **Closed (ASP-536)** | Template ACLs committed for all roles |
 | H-014 (AppArmor deployment) | Medium | Check gap | Verify install script |
 | H-015 (Audit trail) | **High** | **Closed** (ASP-537) | Wire audit publisher |
 | H-017 (Credential rotation) | Medium | Open | Rotation procedure |
@@ -289,9 +289,9 @@
 
 ### P0 — Act this sprint
 
-1. **Regenerate NATS accounts config with `aspen.*` subjects.** The current `fleet-accounts.conf` only restricts `starship.*` / `agnetic.*`. The `aspen.*` prefix (ADR-0007) has no subject-level ACL. An agent with bus credentials can publish arbitrary `aspen.fleet.mission.*` or `aspen.safety.*` messages without restriction.
+1. **[x] Regenerate NATS accounts config with `aspen.*` subjects.** The current `fleet-accounts.conf` only restricts `starship.*` / `agnetic.*`. The `aspen.*` prefix (ADR-0007) has no subject-level ACL. An agent with bus credentials can publish arbitrary `aspen.fleet.mission.*` or `aspen.safety.*` messages without restriction. — **Closed (ASP-536):** per-role `aspen.*` ACLs committed in template, cross-account imports/exports wired. Residual: clients still dual-publish `starship.*` during `aspen.` prefix migration; full enforcement requires regenerating the conf (`gen-nats-accounts.sh`) and deploying to the live NATS server.
 
-2. **Encrypt NATS credentials in fleet-accounts.conf.** Currently 6 cleartext passwords are stored in the config file. Use nkey-only auth or encrypted creds files.
+2. **[x] Encrypt NATS credentials in fleet-accounts.conf.** Currently 6 cleartext passwords are stored in the config file. Use nkey-only auth or encrypted creds files. — **Partial (ASP-536):** `gen-nats-accounts.sh` emits nkey-only `{nkey}` entries when `nk` binary is present, dropping the plaintext `password:` field. Residual: `nk` must be available at generation time; SYS account admin user always uses password. Run with `--password-only` for legacy fallback.
 
 3. **[x] Begin gatekeeper shim implementation** (ADR-0009). At minimum, a local proxy that intercepts `propose_act` on safety-adjacent subjects and enforces dual-human authorization before forwarding. — **Phase 1 done (ASP-540):** `minimal_shim.py` intercepts `aspen.safety.*` / `aspen.edge.*.command` / `aspen.fleet.mission.start` proposals, requires two distinct `human_id`s via `aspen.authz.gate.decision`, refuses bare/single-human forwards, audits every decision. Residual Phase 2: token consumption, credential strip, redundancy (H-020).
 
