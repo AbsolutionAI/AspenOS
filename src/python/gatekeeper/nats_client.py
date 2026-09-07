@@ -18,7 +18,8 @@ Usage:
     await client.publish_audit({"type": "capability.grant", ...})
     await client.publish_decision(request_id, "grant", ...)
     await client.publish_grant(agent_id, caps, scope)
-    # subscribe() sets up gate.request listener that calls your handler
+    # subscribe() sets up gate.request + gate.decision listeners that call
+    # your request_handler / decision_handler callbacks
     await client.close()
 """
 
@@ -74,6 +75,7 @@ class NATSGateClient:
         nats_url: Optional[str] = None,
         offline_fallback: bool = True,
         request_handler: Optional[Callable] = None,
+        decision_handler: Optional[Callable] = None,
     ):
         """
         Args:
@@ -84,14 +86,21 @@ class NATSGateClient:
             request_handler: Async callable(request_data: dict) -> dict
                              invoked when a message arrives on
                              aspen.authz.gate.request. The return dict is
-                             published to aspen.authz.gate.decision.
+                             published to aspen.authz.gate.decision (and grant
+                             tokens mirrored to aspen.authz.capability.grant).
+            decision_handler: Async callable(decision_data: dict) -> dict|None
+                              invoked when a message arrives on
+                              aspen.authz.gate.decision. Only messages carrying
+                              a singular human_id are treated as authorizations
+                              (return None to suppress a response publish).
         """
         self._nats_url = nats_url or os.environ.get("ASPEN_NATS_URL", "")
         self._offline_fallback = offline_fallback
         self._request_handler = request_handler
+        self._decision_handler = decision_handler
         self._nc: Any = None  # nats.aio.client.Client or None
         self._js: Any = None  # JetStream context (optional)
-        self._sub: Any = None  # subscription handle
+        self._subs: list = []  # subscription handles
         self._connected = False
 
     # ---- lifecycle -------------------------------------------------------
@@ -126,9 +135,11 @@ class NATSGateClient:
             # Flush any events queued during offline period
             _flush_offline_buffer(self)
 
-            # Subscribe to gate.request if a handler was provided
+            # Subscribe to gate.request / gate.decision when handlers exist
             if self._request_handler is not None:
                 await self._subscribe_gate_requests()
+            if self._decision_handler is not None:
+                await self._subscribe_gate_decisions()
 
             return True
 
@@ -141,12 +152,12 @@ class NATSGateClient:
 
     async def close(self) -> None:
         """Drain and close the NATS connection."""
-        if self._sub:
+        for sub in self._subs:
             try:
-                await self._sub.unsubscribe()
+                await sub.unsubscribe()
             except Exception:
                 pass
-            self._sub = None
+        self._subs = []
         if self._nc:
             try:
                 await self._nc.drain()
@@ -252,6 +263,35 @@ class NATSGateClient:
 
     # ---- subscription ----------------------------------------------------
 
+    async def _publish_result(
+        self,
+        result: Dict[str, Any],
+        fallback_request_id: Optional[str] = None,
+    ) -> None:
+        """Publish a gatekeeper result.
+
+        The outcome always goes to ``aspen.authz.gate.decision`` (published
+        last so consumer checks see it on the wire); grant tokens are mirrored
+        to ``aspen.authz.capability.grant`` first.
+        """
+        decision = result.get("decision", "deny")
+        request_id = result.get("request_id") or fallback_request_id or "unknown"
+
+        if decision == "grant" and isinstance(result.get("token"), dict):
+            token = result["token"]
+            await self.publish_grant(
+                agent_id=str(token.get("agent_id", "unknown")),
+                caps=[str(token["capability"])] if token.get("capability") else [],
+                expires=token.get("expires"),
+                scope=token.get("scope"),
+            )
+
+        await self.publish_decision(
+            request_id=request_id,
+            decision=decision,
+            **{k: v for k, v in result.items() if k not in ("decision", "request_id")},
+        )
+
     async def _subscribe_gate_requests(self) -> None:
         """Subscribe to aspen.authz.gate.request and invoke the handler."""
         if not self._nc or not self._request_handler:
@@ -264,17 +304,47 @@ class NATSGateClient:
                 data = json.loads(msg.data.decode())
                 logger.debug("Received gate request: %s", data.get("capability", "unknown"))
                 result = await self._request_handler(data)
-                # Publish the handler's result as a decision
-                await self.publish_decision(
-                    request_id=result.get("request_id", data.get("request_id", "unknown")),
-                    decision=result.get("decision", "deny"),
-                    **{k: v for k, v in result.items() if k not in ("decision", "request_id")},
-                )
+                await self._publish_result(result, fallback_request_id=data.get("request_id"))
             except Exception as exc:
                 logger.error("Error handling gate request: %s", exc)
 
-        self._sub = await self._nc.subscribe(self.SUBJECT_REQUEST, cb=_on_request)
+        self._subs.append(await self._nc.subscribe(self.SUBJECT_REQUEST, cb=_on_request))
         logger.info("Subscribed to %s", self.SUBJECT_REQUEST)
+
+    async def _subscribe_gate_decisions(self) -> None:
+        """Subscribe to aspen.authz.gate.decision and apply human authorizations.
+
+        Only messages carrying a singular ``human_id`` (plus ``request_id``) are
+        treated as authorizations; the gatekeeper's own emits on this subject are
+        ignored so the layer never self-approves a proposal.
+        """
+        if not self._nc or not self._decision_handler:
+            return
+
+        import nats
+
+        async def _on_decision(msg):
+            try:
+                data = json.loads(msg.data.decode())
+            except (json.JSONDecodeError, AttributeError):
+                return
+            human_id = data.get("human_id") or data.get("human")
+            request_id = data.get("request_id")
+            if not human_id or not request_id:
+                return  # not a human authorization message
+            logger.debug(
+                "Received human authorization %s for request %s", human_id, request_id
+            )
+            try:
+                result = await self._decision_handler(data)
+                if result is None:
+                    return
+                await self._publish_result(result)
+            except Exception as exc:
+                logger.error("Error handling gate decision: %s", exc)
+
+        self._subs.append(await self._nc.subscribe(self.SUBJECT_DECISION, cb=_on_decision))
+        logger.info("Subscribed to %s (human authorization)", self.SUBJECT_DECISION)
 
     # ---- helpers ---------------------------------------------------------
 
