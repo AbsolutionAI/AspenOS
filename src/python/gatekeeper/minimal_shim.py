@@ -64,6 +64,22 @@ AUTH_WINDOW_SECONDS = 300
 # Pending dual-human authorization proposals, keyed by request_id.
 PROPOSALS: Dict[str, Dict[str, Any]] = {}
 
+# ---------------------------------------------------------------------------
+# Token lifecycle — Phase 2 (ADR-0009)
+# ---------------------------------------------------------------------------
+# Token states: "active" | "consumed" | "expired"
+# Registry keyed by token_id; every issued token is tracked here.
+TOKEN_REGISTRY: Dict[str, Dict[str, Any]] = {}
+
+# Default token TTL for freshly minted tokens (15 minutes).
+TOKEN_DEFAULT_TTL_MINUTES = 15
+
+# Default extension when refreshing a token (15 minutes).
+TOKEN_REFRESH_DELTA_MINUTES = 15
+
+# Stale token cleanup age — tokens expired longer than this are purged.
+TOKEN_CLEANUP_MAX_AGE_SECONDS = 3600  # 1 hour
+
 
 # ---------------------------------------------------------------------------
 # Audit (local + optional NATS + optional sentinel publisher)
@@ -242,9 +258,287 @@ def _grant_dict(proposal: Dict[str, Any]) -> Dict[str, Any]:
         "decision": "grant",
         "request_id": proposal["request_id"],
         "token": proposal["token"],
+        "token_id": proposal["token"]["token_id"],  # Phase 2: expose token_id for lifecycle
         "humans": list(proposal["humans"]),
         "requires": "dual_human",
     }
+
+
+# ---------------------------------------------------------------------------
+# Token lifecycle helpers — Phase 2 (ADR-0009)
+# ---------------------------------------------------------------------------
+
+def _token_state(token_id: str) -> Optional[Dict[str, Any]]:
+    """Look up a token by ID. Returns the token record or None."""
+    return TOKEN_REGISTRY.get(token_id)
+
+
+def _is_token_active(token_id: str) -> bool:
+    """True when the token exists and is neither consumed nor expired."""
+    token = TOKEN_REGISTRY.get(token_id)
+    if token is None:
+        return False
+    if token.get("status") != "active":
+        return False
+    # Check natural expiry
+    expires = token.get("expires")
+    if expires:
+        try:
+            exp_dt = datetime.fromisoformat(expires)
+            if exp_dt.tzinfo is None:
+                exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) >= exp_dt:
+                # Auto-mark expired
+                token["status"] = "expired"
+                return False
+        except (KeyError, ValueError):
+            return False
+    return True
+
+
+def consume_token(token_id: str) -> Dict[str, Any]:
+    """Mark a token as consumed (one-shot use).
+
+    Returns a result dict with decision and reason. Idempotent on already-
+    consumed tokens; refuses already-expired tokens.
+
+    Audit trail: records ``token.consumed`` on success or ``token.consume.deny``
+    on failure.
+    """
+    token = TOKEN_REGISTRY.get(token_id)
+    if token is None:
+        log_audit({
+            "type": "token.consume.deny",
+            "token_id": token_id,
+            "reason": "unknown_token",
+        })
+        return {"decision": "deny", "reason": "unknown_token", "token_id": token_id}
+
+    if token["status"] == "consumed":
+        # Idempotent — already consumed
+        log_audit({
+            "type": "token.consume.deny",
+            "token_id": token_id,
+            "agent_id": token.get("agent_id", ""),
+            "capability": token.get("capability", ""),
+            "reason": "already_consumed",
+        })
+        return {"decision": "deny", "reason": "already_consumed", "token_id": token_id}
+
+    if not _is_token_active(token_id):
+        token["status"] = "expired"  # ensure consistent
+        log_audit({
+            "type": "token.consume.deny",
+            "token_id": token_id,
+            "agent_id": token.get("agent_id", ""),
+            "capability": token.get("capability", ""),
+            "reason": "token_expired",
+        })
+        return {"decision": "deny", "reason": "token_expired", "token_id": token_id}
+
+    token["status"] = "consumed"
+    token["consumed_at"] = _utc_now()
+    log_audit({
+        "type": "token.consumed",
+        "token_id": token_id,
+        "agent_id": token.get("agent_id", ""),
+        "capability": token.get("capability", ""),
+        "reason": "one_shot_consumption",
+        "consumed_at": token["consumed_at"],
+    })
+    return {
+        "decision": "grant",
+        "status": "consumed",
+        "token_id": token_id,
+        "agent_id": token.get("agent_id", ""),
+        "capability": token.get("capability", ""),
+    }
+
+
+def refresh_token(
+    token_id: str,
+    extension_minutes: int = TOKEN_REFRESH_DELTA_MINUTES,
+) -> Dict[str, Any]:
+    """Extend a token's TTL by ``extension_minutes``.
+
+    Only active tokens may be refreshed. Consumed and expired tokens are
+    refused. Refreshing resets the ``expires`` field relative to current UTC.
+
+    Audit trail: records ``token.refresh`` on success or ``token.refresh.deny``
+    on failure.
+    """
+    token = TOKEN_REGISTRY.get(token_id)
+    if token is None:
+        log_audit({
+            "type": "token.refresh.deny",
+            "token_id": token_id,
+            "reason": "unknown_token",
+        })
+        return {"decision": "deny", "reason": "unknown_token", "token_id": token_id}
+
+    if token["status"] == "consumed":
+        log_audit({
+            "type": "token.refresh.deny",
+            "token_id": token_id,
+            "agent_id": token.get("agent_id", ""),
+            "capability": token.get("capability", ""),
+            "reason": "already_consumed",
+        })
+        return {"decision": "deny", "reason": "already_consumed", "token_id": token_id}
+
+    if not _is_token_active(token_id):
+        token["status"] = "expired"
+        log_audit({
+            "type": "token.refresh.deny",
+            "token_id": token_id,
+            "agent_id": token.get("agent_id", ""),
+            "capability": token.get("capability", ""),
+            "reason": "token_expired",
+        })
+        return {"decision": "deny", "reason": "token_expired", "token_id": token_id}
+
+    now = datetime.now(timezone.utc)
+    new_expires = now + timedelta(minutes=extension_minutes)
+    old_expires = token["expires"]
+    token["expires"] = new_expires.isoformat().replace("+00:00", "Z")
+    token["refreshed_at"] = _utc_now()
+    token["refresh_count"] = token.get("refresh_count", 0) + 1
+
+    log_audit({
+        "type": "token.refresh",
+        "token_id": token_id,
+        "agent_id": token.get("agent_id", ""),
+        "capability": token.get("capability", ""),
+        "old_expires": old_expires,
+        "new_expires": token["expires"],
+        "refresh_count": token["refresh_count"],
+    })
+    return {
+        "decision": "grant",
+        "token_id": token_id,
+        "agent_id": token.get("agent_id", ""),
+        "expires": token["expires"],
+        "refresh_count": token["refresh_count"],
+    }
+
+
+def expire_token(token_id: str) -> Dict[str, Any]:
+    """Force-expire a token before its natural TTL.
+
+    Idempotent: calling expire_token on an already-expired or consumed token
+    returns the current status without error.
+
+    Audit trail: records ``token.expired`` on success or ``token.expire.deny``
+    if the token is unknown.
+    """
+    token = TOKEN_REGISTRY.get(token_id)
+    if token is None:
+        log_audit({
+            "type": "token.expire.deny",
+            "token_id": token_id,
+            "reason": "unknown_token",
+        })
+        return {"decision": "deny", "reason": "unknown_token", "token_id": token_id}
+
+    if token["status"] == "consumed":
+        # Consumed is terminal; refuse to expire-after-consumption.
+        log_audit({
+            "type": "token.expire.deny",
+            "token_id": token_id,
+            "agent_id": token.get("agent_id", ""),
+            "capability": token.get("capability", ""),
+            "reason": "already_consumed",
+        })
+        return {"decision": "deny", "reason": "already_consumed", "token_id": token_id}
+
+    old_status = token["status"]
+    token["status"] = "expired"
+    token["expired_at"] = _utc_now()
+
+    log_audit({
+        "type": "token.expired",
+        "token_id": token_id,
+        "agent_id": token.get("agent_id", ""),
+        "capability": token.get("capability", ""),
+        "old_status": old_status,
+        "expired_at": token["expired_at"],
+    })
+    return {
+        "decision": "grant",
+        "status": "expired",
+        "token_id": token_id,
+        "agent_id": token.get("agent_id", ""),
+    }
+
+
+def _register_token(
+    agent_id: str,
+    capability: str,
+    resource: str,
+    scope: str,
+    authorized_by: list,
+    ttl_minutes: int = TOKEN_DEFAULT_TTL_MINUTES,
+) -> Dict[str, Any]:
+    """Create a token dict, register it in TOKEN_REGISTRY, and return it.
+
+    Shared helper used by both the safety dual-human grant path and the
+    direct inline grant path in ``request_capability``. Ensures every issued
+    token is tracked for lifecycle management.
+    """
+    token_id = str(uuid.uuid4())
+    expires = (
+        datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)
+    ).isoformat().replace("+00:00", "Z")
+
+    token = {
+        "token_id": token_id,
+        "agent_id": agent_id,
+        "capability": capability,
+        "resource": resource,
+        "expires": expires,
+        "scope": scope,
+        "status": "active",
+        "authorized_by": list(authorized_by),
+        "created_at": _utc_now(),
+        "refresh_count": 0,
+    }
+    TOKEN_REGISTRY[token_id] = token
+    return token
+
+
+def _cleanup_stale_tokens(
+    max_age_seconds: int = TOKEN_CLEANUP_MAX_AGE_SECONDS,
+) -> int:
+    """Remove from TOKEN_REGISTRY tokens that expired more than ``max_age_seconds`` ago.
+
+    Returns the count of tokens removed. Safe to call periodically (e.g. from
+    the daemon's main loop).
+    """
+    now = datetime.now(timezone.utc)
+    threshold = now - timedelta(seconds=max_age_seconds)
+    to_remove: list[str] = []
+
+    for tid, token in TOKEN_REGISTRY.items():
+        if token["status"] != "expired":
+            continue
+        expires = token.get("expires")
+        if not expires:
+            continue
+        try:
+            exp_dt = datetime.fromisoformat(expires)
+            if exp_dt.tzinfo is None:
+                exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+        except (ValueError, TypeError):
+            continue
+        if exp_dt < threshold:
+            to_remove.append(tid)
+
+    for tid in to_remove:
+        del TOKEN_REGISTRY[tid]
+
+    if to_remove:
+        logger.debug("Cleaned up %d stale tokens from registry", len(to_remove))
+    return len(to_remove)
 
 
 def _mark_refused(proposal: Dict[str, Any], reason: str) -> None:
@@ -266,18 +560,18 @@ def _mark_refused(proposal: Dict[str, Any], reason: str) -> None:
 
 
 def _grant_proposal(proposal: Dict[str, Any]) -> Dict[str, Any]:
-    """Mint a short-lived scoped token after dual-human authorization."""
-    token = {
-        "token_id": str(uuid.uuid4()),
-        "agent_id": proposal["agent_id"],
-        "capability": proposal["capability"],
-        "resource": proposal["resource"],
-        "expires": (
-            datetime.now(timezone.utc) + timedelta(minutes=15)
-        ).isoformat().replace("+00:00", "Z"),
-        "scope": proposal["profile"],
-        "authorized_by": list(proposal["humans"]),
-    }
+    """Mint a short-lived scoped token after dual-human authorization.
+
+    Phase 2: uses ``_register_token`` to ensure the token is tracked in
+    ``TOKEN_REGISTRY`` for lifecycle management (consumption, refresh, expiry).
+    """
+    token = _register_token(
+        agent_id=proposal["agent_id"],
+        capability=proposal["capability"],
+        resource=proposal["resource"],
+        scope=proposal["profile"],
+        authorized_by=list(proposal["humans"]),
+    )
     proposal["state"] = "granted"
     proposal["decision"] = "grant"
     proposal["token"] = token
@@ -481,17 +775,14 @@ def request_capability(
             },
         }
 
-    # 3. Grant short-lived token
-    token = {
-        "token_id": str(uuid.uuid4()),
-        "agent_id": agent_id,
-        "capability": capability,
-        "resource": resource,
-        "expires": (
-            datetime.now(timezone.utc) + timedelta(minutes=15)
-        ).isoformat().replace("+00:00", "Z"),
-        "scope": profile,
-    }
+    # 3. Grant short-lived token (registered in TOKEN_REGISTRY for lifecycle)
+    token = _register_token(
+        agent_id=agent_id,
+        capability=capability,
+        resource=resource,
+        scope=profile,
+        authorized_by=[],  # direct grants have no human authorization
+    )
 
     log_audit({
         "type": "capability.grant",

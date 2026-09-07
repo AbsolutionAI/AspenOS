@@ -62,9 +62,9 @@
 | ID | Threat | Asset | Risk (CVSS) | Mitigation | Status |
 |----|--------|-------|-------------|------------|--------|
 | H-007 | **EStop bypass — single-human clear** | Safety | **9.0** (AV:N/AC:L) | Dual-human `authorize_clear` before `clear` fires; `clear` alone never unlatches | **Gap: test coverage missing** |
-| H-008 | **Propose_act self-authorization** | Actuation | **8.5** (AV:N/AC:L) | Gate must reject single-principal and self-approval; stable audited reasons | **Phase 1 implemented (ASP-540)** — safety-adjacent `propose_act` intercepted, dual-human enforced, bare/1-human forward refused + audited |
+| H-008 | **Propose_act self-authorization** | Actuation | **8.5** (AV:N/AC:L) | Gate must reject single-principal and self-approval; stable audited reasons | **Phase 1 implemented (ASP-540)** — safety-adjacent `propose_act` intercepted, dual-human enforced, bare/1-human forward refused + audited. **Phase 2 (ASP-564)** — token lifecycle (issue/consume/refresh/expire) + `SafetySubjectEnforcer` immutable proxy enforcement of safety subjects |
 | H-009 | **Dual-human collision — same principal counted twice** | Authorization | 7.5 (AV:N/AC:M) | Verify distinct `human_id` records in-window; duplicate-principal refuse with reason | **Satisfied (ASP-540)** — `authorize_gate_request` dedupes by `human_id`; duplicate ignored + `gate.authorize.duplicate` audited |
-| H-010 | **Stale capability tokens post-expiry** | Gatekeeper | 6.0 (AV:N/AC:L) | Short TTL + NATS auth time window; refuse if expired | ADR-0009 |
+| H-010 | **Stale capability tokens post-expiry** | Gatekeeper | 6.0 (AV:N/AC:L) | Short TTL + NATS auth time window; refuse if expired | **Implemented (ASP-564)** — short-TTL tokens (15 min) with active/consumed/expired lifecycle, refuse-if-expired on consume/refresh, stale cleanup; Phase 1 design in ADR-0009 |
 | H-011 | **NATS plaintext credentials on disk** | Secrets | 7.5 (AV:L/AC:L) | nkey-only generator (ASP-536): `gen-nats-accounts.sh` emits `{nkey}` entries and drops plaintext when `nk` present; fallback password on missing `nk`; SYS account excluded | **Partial (ASP-536)** — nkey-only gen mode; residual: `nk` binary required at gen time, SYS account always password |
 | H-012 | **scheduler.py hardcoded NATS URL** | Bus | 5.5 (AV:L/AC:H) | `nats://[IP_ADDRESS]:4222` hardcoded — should use env or config | **Closed** (ASP-539) |
 | H-013 | **No aspen.* subject ACL in NATS config** | Bus | 7.0 (AV:N/AC:L) | Per-role `aspen.*` ACLs committed in template (ASP-536): ops=sentinel+authz+fleet+safety, edge=fleet+edge+estop+clear, range=scoped fleet/heartbeat; cross-account imports/exports wired | **CLOSED (ASP-536)** — template ACLs for all roles; residual: clients still dual-publish `starship.*` during migration |
@@ -172,7 +172,7 @@
 - [x] **H-011:** Move NATS credentials from plaintext config to encrypted files or nkey-only auth. `gen-nats-accounts.sh` now emits nkey-only entries when `nk` present (ASP-536); residual: `nk` must be available at generation time, SYS account always password.
 - [x] **H-013:** Regenerate NATS accounts config with `aspen.*` subject permissions. Committed in template (ASP-536): all roles have scoped `aspen.*` publish/subscribe + cross-account imports.
 - [x] **H-015:** Wire audit publisher to `aspen.sentinel.audit.event`. No forensic trail currently records agent actions.
-- [x] **H-008:** Implement gatekeeper shim (ADR-0009). `propose_act` self-authorization is not cryptographically prevented. — **Phase 1 (ASP-540):** safety-adjacent proposal interception + dual-human authorization + refusal of bare/single-human forwards; every decision audited to `aspen.sentinel.audit.event`.
+- [x] **H-008:** Implement gatekeeper shim (ADR-0009). `propose_act` self-authorization is not cryptographically prevented. — **Phase 1 (ASP-540):** safety-adjacent proposal interception + dual-human authorization + refusal of bare/single-human forwards; every decision audited to `aspen.sentinel.audit.event`. **Phase 2 (ASP-564):** capability token lifecycle + credential-strip proxy + immutable safety-subject enforcement.
 - [x] **H-009:** Verify dual-human authorization collision logic in `act_gate_contract.md` — distinct principal enforcement must reject duplicates. — **ASP-540:** `authorize_gate_request` ignores duplicate `human_id` (audited `gate.authorize.duplicate`); two distinct in-window approvals required.
 
 ### 4.2 Short-term (next 2 sprints)
@@ -187,7 +187,7 @@
 
 ### 4.3 Medium-term (v2.3 planning)
 
-- [ ] **ADR-0009 implementation (Phase 2):** Full token lifecycle (consumption/refresh), Hermes/Paperclip credential strip, immutable proxy enforcement. — Phase 1 (proposal interception + dual-human + audit) landed in ASP-540.
+- [x] **ADR-0009 implementation (Phase 2):** Full token lifecycle (consumption/refresh), Hermes/Paperclip credential strip, immutable proxy enforcement. — Phase 1 (proposal interception + dual-human + audit) landed in ASP-540; Phase 2 landed in ASP-564 (`GatekeeperProxy`/`NATSAgentProxy` credential strip, `SafetySubjectEnforcer`, token lifecycle).
 - [ ] **TLS by default:** Enable `STARSHIP_NATS_TLS=1` in firstboot templates. Document WAN deployment.
 - [ ] **NATS nkey migration (continued):** ASP-536 added nkey-only gen mode; residual work: enforce nkey-only in CI (fail `--password-only` in production builds), migrate SYS account, automate `nk` binary availability. Replace password-based auth across all accounts (partial ASP-536).
 - [ ] **Automated ACL drift detection:** Cron job compares live ACL with `fleet.yaml` baseline.
@@ -227,7 +227,7 @@
 | H-007 (EStop single-human clear) | **Critical** | Gap | Add integration test |
 | H-008 (Propose_act self-auth) | **Critical** | Gap | Gatekeeper implementation |
 | H-009 (Dual-human collision) | High | Design spec | Verify identity uniqueness logic |
-| H-010 (Stale capability tokens) | Medium | Design only | ADR-0009 phase |
+| H-010 (Stale capability tokens) | Medium | **Implemented (ASP-564)** | Short TTL + lifecycle; refuse if expired |
 | H-011 (Plaintext NATS creds) | **High** | **Partial (ASP-536)** | nkey-only gen mode; residual: `nk` at gen time, SYS password |
 | H-012 (Hardcoded NATS URL) | Medium | Closed (ASP-539) | Config/env refactor |
 | H-013 (Missing aspen.* ACL) | **High** | **Closed (ASP-536)** | Template ACLs committed for all roles |
@@ -299,7 +299,7 @@
 
 ### P2 — v2.3 planning
 
-7. **ADR-0009 Phase 2:** Full token lifecycle (consumption/refresh), Hermes/Paperclip credential strip, immutable proxy enforcement, redundancy plan for SPOF (H-020).
+7. **ADR-0009 Phase 2:** Full token lifecycle (consumption/refresh), Hermes/Paperclip credential strip, immutable proxy enforcement, redundancy plan for SPOF (H-020). — Implemented in ASP-564 (except the H-020 redundancy plan, tracked separately).
 
 8. **TLS by default:** Enable `STARSHIP_NATS_TLS=1` in firstboot templates. Document WAN deployment with mutual TLS.
 
