@@ -202,7 +202,7 @@
 | Change | Impact | New threats | Status |
 |--------|--------|-------------|--------|
 | ADR-0007 (NATS subject contracts) | Added `aspen.sentinel.*` + `aspen.authz.*` subjects | H-013, H-015, H-021 | Wired: ACLs (ASP-536), audit publisher (ASP-537); H-015 closed |
-| ADR-0008 (Package classification) | Core/Plugin/Dev-only tiers | H-019 | Proposed; no gate |
+| ADR-0008 (Package classification) | Core/Plugin/Dev-only tiers | H-019 | **Accepted** (ASP-530/563); CI gate residual |
 | ADR-0009 (Capability-based gatekeepers) | Eliminates broad credentials | H-008, H-010, H-020 | Phase 1 implemented (proposal interception + dual-human gate, ASP-540); full token lifecycle + credential strip Phase 2 |
 | ADR-0006 (Memory store tiering) | T1 local-first + optional T2 PG | (none new) | Accepted |
 | H-018 (ASP-533) completed | Dual-guard single-plant scheduler | H-016 → closed | **CLOSED** |
