@@ -56,6 +56,50 @@ Fleet is the **topology + exercise** control plane on top.
 
 Legacy `agnetic.fleet.*` / `starship.*` remain only for backward compatibility during migration.
 
+## Audit trail (`aspen.sentinel.audit.event`)
+
+ADR-0007 audit events use the `{event_id, actor, action, target, result, ts}` envelope.
+The publisher (ASP-537) writes every event to an append-only JSONL journal
+(always durable, fsync'd) and mirrors it into the `ASPEN_SENTINEL` JetStream
+stream on subject `aspen.sentinel.audit.event`. No broker → events still land in
+JSONL and are backfilled to JetStream on reconnect (idempotent via `Nats-Msg-Id`).
+
+```bash
+# Record one event (JSON printed; fully offline-capable)
+python3 scripts/sentinel-audit.py emit --actor aspen-fleet-edge \
+    --action capability.grant --target plant:chae-cell-01 --result grant
+
+# Read the trail
+python3 scripts/sentinel-audit.py tail -n 20          # most recent JSONL events
+python3 scripts/sentinel-audit.py query --actor aspen-fleet-edge --result deny
+python3 scripts/sentinel-audit.py js-last -n 20        # tail the JetStream mirror
+
+# Backfill JSONL -> JetStream after an outage (idempotent)
+python3 scripts/sentinel-audit.py replay --nats-url nats://localhost:4222
+
+# State
+python3 scripts/sentinel-audit.py check --online
+```
+
+Configuration: `ASPEN_NATS_URL` (broker), `ASPEN_AUDIT_LOG` (journal path,
+default `/var/lib/aspen/sentinel/audit.jsonl`), `ASPEN_AUDIT_STREAM`
+(default `ASPEN_SENTINEL`). The stream binds `aspen.sentinel.>` and is created
+idempotently on first connect. The gatekeeper shim
+(`src/python/gatekeeper/minimal_shim.py`) fans every capability decision into
+this trail. Sentinel dashboard / SIEM consumers are follow-up (ADR-0007).
+
+## Gatekeeper dual-human gate (`aspen.authz.*`)
+
+ADR-0009 Phase 1 (ASP-540): the gatekeeper shim intercepts `propose_act` on
+safety-adjacent subjects (`aspen.safety.*`, `aspen.edge.*.command`,
+`aspen.fleet.mission.start`) and **never forwards** until two distinct humans
+authorize via `aspen.authz.gate.decision` (`{request_id, human_id}`). One human,
+a bare forward, unknown, or window-expired proposal is refused with an audited
+reason. Grants mint a short-lived scoped token on `aspen.authz.capability.grant`
+and, like every propose/authorize/duplicate/refuse, land on
+`aspen.sentinel.audit.event` (ADR-0007 envelope). Duplicate `human_id`s are
+ignored and audited (`gate.authorize.duplicate`, H-009).
+
 ## CLI
 
 ```bash

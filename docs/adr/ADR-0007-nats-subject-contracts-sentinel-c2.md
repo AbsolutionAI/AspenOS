@@ -48,6 +48,27 @@ Aspen Sentinel requires dedicated subjects for authorization gates, audit feeds,
 - **Risks / Mitigations**: Breaking change risk low (additive only). Dual-human path already enforced in safety contracts.
 - **Migration**: Existing Alpha clients continue on dual-prefix until >50% consumers on `aspen.*` (open ADR-0007).
 
+## Wired so far (ASP-537 / ASP-536)
+- `aspen.sentinel.audit.event` — publisher live: `src/python/sentinel/audit.py`
+  (`AuditEventPublisher`) + `scripts/sentinel-audit.py` CLI. Events use the
+  `{event_id, actor, action, target, result, ts}` envelope, are appended to a
+  JSONL journal (always) and mirrored into the `ASPEN_SENTINEL` JetStream stream
+  on subject `aspen.sentinel.audit.event` (best-effort, idempotent replay). The
+  gatekeeper shim (`ADR-0009`) fans capability decisions into this trail.
+  Consumer (Sentinel dashboard) is follow-up.
+- `aspen.authz.gate.request/decision`, `aspen.authz.capability.grant` — subscribed
+  / published by the gatekeeper shim (`src/python/gatekeeper/nats_client.py`).
+  Since ASP-540 the gatekeeper intercepts safety-adjacent `propose_act`
+  (`aspen.safety.*`, `aspen.edge.*.command`, `aspen.fleet.mission.start`),
+  collects two distinct human approvals on `aspen.authz.gate.decision`
+  (`{request_id, human_id}`), refuses bare/single-human forwards, and gates
+  every decision into the ADR-0007 audit envelope.
+- NATS ACLs for `aspen.sentinel.*` / `aspen.authz.*` / `aspen.fleet.*` /
+  `aspen.safety.*` per role — `nats/fleet-accounts.conf.tmpl` (ASP-536).
+
+**Next**: Sentinel dashboard consumer for `aspen.sentinel.fleet.overview` /
+`aspen.sentinel.audit.event`; update Master Spec §3.1.
+
 ## Acceptance Criteria
 - Contracts published in aspen-contracts repo
 - FLEET.md / subject table updated with new rows + cross-links

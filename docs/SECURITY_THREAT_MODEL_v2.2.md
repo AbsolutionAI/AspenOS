@@ -62,14 +62,14 @@
 | ID | Threat | Asset | Risk (CVSS) | Mitigation | Status |
 |----|--------|-------|-------------|------------|--------|
 | H-007 | **EStop bypass — single-human clear** | Safety | **9.0** (AV:N/AC:L) | Dual-human `authorize_clear` before `clear` fires; `clear` alone never unlatches | **Gap: test coverage missing** |
-| H-008 | **Propose_act self-authorization** | Actuation | **8.5** (AV:N/AC:L) | Gate must reject single-principal and self-approval; stable audited reasons | **ADR-0009 proposed, not implemented** |
-| H-009 | **Dual-human collision — same principal counted twice** | Authorization | 7.5 (AV:N/AC:M) | Verify distinct `human_id` records in-window; duplicate-principal refuse with reason | Design spec req |
+| H-008 | **Propose_act self-authorization** | Actuation | **8.5** (AV:N/AC:L) | Gate must reject single-principal and self-approval; stable audited reasons | **Phase 1 implemented (ASP-540)** — safety-adjacent `propose_act` intercepted, dual-human enforced, bare/1-human forward refused + audited |
+| H-009 | **Dual-human collision — same principal counted twice** | Authorization | 7.5 (AV:N/AC:M) | Verify distinct `human_id` records in-window; duplicate-principal refuse with reason | **Satisfied (ASP-540)** — `authorize_gate_request` dedupes by `human_id`; duplicate ignored + `gate.authorize.duplicate` audited |
 | H-010 | **Stale capability tokens post-expiry** | Gatekeeper | 6.0 (AV:N/AC:L) | Short TTL + NATS auth time window; refuse if expired | ADR-0009 |
 | H-011 | **NATS plaintext credentials on disk** | Secrets | 7.5 (AV:L/AC:L) | `fleet-accounts.conf` contains passwords in plaintext; `mode 600`, never commit | **Active risk** |
-| H-012 | **scheduler.py hardcoded NATS URL** | Bus | 5.5 (AV:L/AC:H) | `nats://[IP_ADDRESS]:4222` hardcoded — should use env or config | **Open** |
+| H-012 | **scheduler.py hardcoded NATS URL** | Bus | 5.5 (AV:L/AC:H) | `nats://[IP_ADDRESS]:4222` hardcoded — should use env or config | **Closed** (ASP-539) |
 | H-013 | **No aspen.* subject ACL in NATS config** | Bus | 7.0 (AV:N/AC:L) | `fleet-accounts.conf` only restricts `starship.*` / `agnetic.*`; `aspen.*` subjects unrestricted | **Open: mid-migration** |
 | H-014 | **Missing AppArmor profiles in deployment** | Host | 6.5 (AV:L/AC:M) | Profiles exist in `security/apparmor/` but install script may not run | Check gap |
-| H-015 | **Audit trail not yet connected to aspen.sentinel.audit.event** | Forensics | 6.0 (AV:N/AC:L) | Subject defined (ADR-0007) but no publisher; no forensic query path | **Open** |
+| H-015 | **Audit trail not yet connected to aspen.sentinel.audit.event** | Forensics | 6.0 (AV:N/AC:L) | Subject defined (ADR-0007) but no publisher; no forensic query path | **Open** — publisher wired (ASP-537); Sentinel-dashboard consumer pending |
 | H-016 | **LangGraph worker emit-side guard (H-018 completed)** | Mission subjects | 8.0 (AV:N/AC:L) | `aspen_lgw/guard.py`: blocks mission publish; `SwarmManager._busy_plants` prevents dual arm | **CLOSED** (ASP-533) |
 | H-017 | **NATS credential rotation — no automatic rotation** | Credentials | 5.5 (AV:A/AC:H) | Manual `gen-nats-accounts.sh` only; no expiry enforcement | **Open** |
 | H-018 | **Single-plant dual-arm prevention (H-018)** | Scheduler | 8.0 (AV:N/AC:M) | Dual guard layers: emit-side + scheduler-side | **CLOSED** (ASP-533) |
@@ -149,7 +149,7 @@
 | **CR 1.2** — Software process identity | Systemd `User=agnetic`, capability-based delegation (ADR-0009 proposed) | **Partial** — OS user identity; no code signing |
 | **CR 1.5** — Third-party/remote session integrity | Hermes gateway; Simplex bridge (dashboard Connect tab) | **Partial** |
 | **CR 2.1** — Authorization enforcement | fleet_policy.py tool ACL, NATS subject permissions | **Satisfied** |
-| **CR 2.3** — Dual approval for critical actions | `propose_act` -> `authorize` dual-human; estop dual-clear | **Satisfied** (design) — ADR-0009 pending implementation |
+| **CR 2.3** — Dual approval for critical actions | `propose_act` -> `authorize` dual-human; estop dual-clear | **Satisfied** — estop dual-clear (ASP-538) + ADR-0009 dual-human gate (Phase 1, ASP-540) |
 | **CR 2.4** — Restriction of logical access associated with mobile/remote | Plant isolation, range plant default | **Satisfied** |
 | **CR 2.5** — Review of access rights | ACL audit in fleet.yaml; periodic threat model refresh | **Partial** — no automated drift detection |
 | **CR 3.1** — Communication integrity | NATS JetStream; optional TLS | **Partial** — TLS not default |
@@ -157,7 +157,7 @@
 | **CR 3.3** — Zone/conduit boundary | Plant zones (ops/edge/range); NATS account boundaries | **Satisfied** |
 | **CR 3.4** — Software update integrity | ADR-0008 package classification; `dpkg` signature | **Partial** — no CI gate enforcing Dev-only isolation |
 | **CR 4.1** — System inventory | Fleet heartbeat + node register; Fleet Map dashboard | **Satisfied** |
-| **CR 4.2** — Security event logging | `aspen.sentinel.audit.event` subject defined (ADR-0007) | **Gap** — no publisher, no storage, no query |
+| **CR 4.2** — Security event logging | `aspen.sentinel.audit.event` subject defined (ADR-0007) | **Partial** — publisher wired (ASP-537): JSONL journal + JetStream durable trail, gatekeeper events covered; Sentinel-dashboard query consumer pending |
 | **CR 4.3** — Continuous monitoring | Health checker, telemetry bus, Sentinel dashboard | **Partial** — no alert on ACL drift |
 | **CR 5.1** — Patch management | Debian packaging; systemd unit updates | **Partial** — no vulnerability scanning CI gate |
 | **CR 5.2** — Malicious code protection | Tool sandbox, Droid Shield scanning, redaction | **Satisfied** |
@@ -171,14 +171,14 @@
 
 - [ ] **H-011:** Move NATS credentials from plaintext config to encrypted files or nkey-only auth. `fleet-accounts.conf` contains cleartext passwords.
 - [ ] **H-013:** Regenerate NATS accounts config with `aspen.*` subject permissions. Current config only covers `starship.*` / `agnetic.*`.
-- [ ] **H-015:** Wire audit publisher to `aspen.sentinel.audit.event`. No forensic trail currently records agent actions.
-- [ ] **H-008:** Implement gatekeeper shim (ADR-0009). `propose_act` self-authorization is not cryptographically prevented.
-- [ ] **H-009:** Verify dual-human authorization collision logic in `act_gate_contract.md` — distinct principal enforcement must reject duplicates.
+- [x] **H-015:** Wire audit publisher to `aspen.sentinel.audit.event`. No forensic trail currently records agent actions.
+- [x] **H-008:** Implement gatekeeper shim (ADR-0009). `propose_act` self-authorization is not cryptographically prevented. — **Phase 1 (ASP-540):** safety-adjacent proposal interception + dual-human authorization + refusal of bare/single-human forwards; every decision audited to `aspen.sentinel.audit.event`.
+- [x] **H-009:** Verify dual-human authorization collision logic in `act_gate_contract.md` — distinct principal enforcement must reject duplicates. — **ASP-540:** `authorize_gate_request` ignores duplicate `human_id` (audited `gate.authorize.duplicate`); two distinct in-window approvals required.
 
 ### 4.2 Short-term (next 2 sprints)
 
 - [ ] **H-007:** Add integration test for estop `clear` — verify single `authorize_clear` alone never unlatches.
-- [ ] **H-012:** Replace hardcoded `nats://[IP_ADDRESS]:4222` in `agents/scheduler.py` with config/env.
+- [x] **H-012:** Replace hardcoded `nats://[IP_ADDRESS]:4222` in `agents/scheduler.py` with config/env.
 - [ ] **H-014:** Verify AppArmor profiles load on all deployment targets; fail build if missing.
 - [ ] **H-017:** Implement NATS credential rotation procedure or script. Document rotation window.
 - [ ] **H-019:** Add CI gate to block Dev-only packages from production images.
@@ -187,7 +187,7 @@
 
 ### 4.3 Medium-term (v2.3 planning)
 
-- [ ] **ADR-0009 implementation:** Full gatekeeper shim with capability tokens, dual-human authorization, audit logging.
+- [ ] **ADR-0009 implementation (Phase 2):** Full token lifecycle (consumption/refresh), Hermes/Paperclip credential strip, immutable proxy enforcement. — Phase 1 (proposal interception + dual-human + audit) landed in ASP-540.
 - [ ] **TLS by default:** Enable `STARSHIP_NATS_TLS=1` in firstboot templates. Document WAN deployment.
 - [ ] **NATS nkey migration:** Replace password-based auth with nkeys across all accounts.
 - [ ] **Automated ACL drift detection:** Cron job compares live ACL with `fleet.yaml` baseline.
@@ -201,13 +201,13 @@
 
 | Change | Impact | New threats | Status |
 |--------|--------|-------------|--------|
-| ADR-0007 (NATS subject contracts) | Added `aspen.sentinel.*` + `aspen.authz.*` subjects | H-013, H-015, H-021 | Proposed; not wired |
+| ADR-0007 (NATS subject contracts) | Added `aspen.sentinel.*` + `aspen.authz.*` subjects | H-013, H-015, H-021 | Wired: ACLs (ASP-536), audit publisher (ASP-537); H-015 closed |
 | ADR-0008 (Package classification) | Core/Plugin/Dev-only tiers | H-019 | Proposed; no gate |
-| ADR-0009 (Capability-based gatekeepers) | Eliminates broad credentials | H-008, H-010, H-020 | Proposed; not implemented |
+| ADR-0009 (Capability-based gatekeepers) | Eliminates broad credentials | H-008, H-010, H-020 | Phase 1 implemented (proposal interception + dual-human gate, ASP-540); full token lifecycle + credential strip Phase 2 |
 | ADR-0006 (Memory store tiering) | T1 local-first + optional T2 PG | (none new) | Accepted |
 | H-018 (ASP-533) completed | Dual-guard single-plant scheduler | H-016 → closed | **CLOSED** |
 | `aspen.` prefix migration in progress | Dual-publish during transition | H-013, H-021 | Mid-flight |
-| Dual-human gate design in ADR-0003 | Rejected duplicate principals | H-009 | Design spec |
+| Dual-human gate design in ADR-0003 | Rejected duplicate principals | H-009 | Implemented (ASP-540): distinct-principal enforcement + audited duplicates |
 
 ### Threats closed this cycle
 
@@ -235,10 +235,10 @@
 | H-009 (Dual-human collision) | High | Design spec | Verify identity uniqueness logic |
 | H-010 (Stale capability tokens) | Medium | Design only | ADR-0009 phase |
 | H-011 (Plaintext NATS creds) | **High** | **Open** | Encrypt or nkey-only |
-| H-012 (Hardcoded NATS URL) | Medium | Open | Config/env refactor |
+| H-012 (Hardcoded NATS URL) | Medium | Closed (ASP-539) | Config/env refactor |
 | H-013 (Missing aspen.* ACL) | **High** | **Open** | Regenerate NATS accounts |
 | H-014 (AppArmor deployment) | Medium | Check gap | Verify install script |
-| H-015 (Audit trail) | **High** | **Open** | Wire audit publisher |
+| H-015 (Audit trail) | **High** | **Closed** (ASP-537) | Wire audit publisher |
 | H-017 (Credential rotation) | Medium | Open | Rotation procedure |
 | H-019 (Package classification CI) | Medium | Open | CI gate |
 | H-020 (Gatekeeper SPOF) | Medium | Design only | Redundancy plan |
@@ -293,11 +293,11 @@
 
 2. **Encrypt NATS credentials in fleet-accounts.conf.** Currently 6 cleartext passwords are stored in the config file. Use nkey-only auth or encrypted creds files.
 
-3. **Begin gatekeeper shim implementation** (ADR-0009). At minimum, a local proxy that intercepts `propose_act` on safety-adjacent subjects and enforces dual-human authorization before forwarding.
+3. **[x] Begin gatekeeper shim implementation** (ADR-0009). At minimum, a local proxy that intercepts `propose_act` on safety-adjacent subjects and enforces dual-human authorization before forwarding. — **Phase 1 done (ASP-540):** `minimal_shim.py` intercepts `aspen.safety.*` / `aspen.edge.*.command` / `aspen.fleet.mission.start` proposals, requires two distinct `human_id`s via `aspen.authz.gate.decision`, refuses bare/single-human forwards, audits every decision. Residual Phase 2: token consumption, credential strip, redundancy (H-020).
 
 ### P1 — Next sprint
 
-4. **Wire `aspen.sentinel.audit.event` publisher.** Without audit, all agent actions are forensically opaque. Start with a simple JSONL file backed by JetStream.
+4. **[x] Wire `aspen.sentinel.audit.event` publisher (ASP-537).** Without audit, all agent actions are forensically opaque. Publisher implemented: JSONL file backed by JetStream (`scripts/sentinel-audit.py`), gatekeeper actions covered. Residual: Sentinel-dashboard/SIEM consumer.
 
 5. **Replace hardcoded NATS URL in scheduler.py** with `nats_connect.py` helper or env config.
 
