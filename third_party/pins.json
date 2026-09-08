@@ -29,10 +29,10 @@
       "source": "git",
       "github": "https://github.com/AbsolutionAI/aspen-edge-rrm",
       "branch": "master",
-      "commit": "aa3f84d06e7f8e1715f3de6f0b8be86dc5fc5d85",
+      "commit": "6a8f1aea4c5e90738338314e0866ebb1b3d23670",
       "clone_into": "../aspen-edge-rrm",
       "used_by": "scripts/smoke-fleet-bus.py",
-      "notes": "Fleet bus contracts (aspen.fleet.* / aspen.safety.*); pinned for CI smoke"
+      "notes": "Fleet bus contracts (aspen.fleet.* / aspen.safety.*) + estop dual-human clear gate (H-007, f4f2c8d); pinned for CI smoke. Bumped from aa3f84d by ASP-573."
     },
     "aspen-swarm-manager": {
       "package": "aspen-swarm-manager",

@@ -61,7 +61,7 @@
 
 | ID | Threat | Asset | Risk (CVSS) | Mitigation | Status |
 |----|--------|-------|-------------|------------|--------|
-| H-007 | **EStop bypass — single-human clear** | Safety | **9.0** (AV:N/AC:L) | Dual-human `authorize_clear` before `clear` fires; `clear` alone never unlatches | **Gap: test coverage missing** |
+| H-007 | **EStop bypass — single-human clear** | Safety | **9.0** (AV:N/AC:L) | Dual-human `authorize_clear` before `clear` fires; `clear` alone never unlatches | **Covered (ASP-573)** — dedicated negative-case integration test in `scripts/smoke-fleet-bus.py`; pinned `aspen-edge-rrm` gate |
 | H-008 | **Propose_act self-authorization** | Actuation | **8.5** (AV:N/AC:L) | Gate must reject single-principal and self-approval; stable audited reasons | **Phase 1 implemented (ASP-540)** — safety-adjacent `propose_act` intercepted, dual-human enforced, bare/1-human forward refused + audited. **Phase 2 (ASP-564)** — token lifecycle (issue/consume/refresh/expire) + `SafetySubjectEnforcer` immutable proxy enforcement of safety subjects |
 | H-009 | **Dual-human collision — same principal counted twice** | Authorization | 7.5 (AV:N/AC:M) | Verify distinct `human_id` records in-window; duplicate-principal refuse with reason | **Satisfied (ASP-540)** — `authorize_gate_request` dedupes by `human_id`; duplicate ignored + `gate.authorize.duplicate` audited |
 | H-010 | **Stale capability tokens post-expiry** | Gatekeeper | 6.0 (AV:N/AC:L) | Short TTL + NATS auth time window; refuse if expired | **Implemented (ASP-564)** — short-TTL tokens (15 min) with active/consumed/expired lifecycle, refuse-if-expired on consume/refresh, stale cleanup; Phase 1 design in ADR-0009 |
@@ -177,7 +177,7 @@
 
 ### 4.2 Short-term (next 2 sprints)
 
-- [ ] **H-007:** Add integration test for estop `clear` — verify single `authorize_clear` alone never unlatches.
+- [x] **H-007:** Add integration test for estop `clear` — verify single `authorize_clear` alone never unlatches. — **ASP-573:** dedicated negative-case integration test in `scripts/smoke-fleet-bus.py` (H-007 block) + `aspen-edge-rrm` pin bumped to gated master; bare clear and single `authorize_clear` audited `clear_refused_insufficient_auths` and never unlatch.
 - [x] **H-012:** Replace hardcoded `nats://[IP_ADDRESS]:4222` in `agents/scheduler.py` with config/env.
 - [ ] **H-014:** Verify AppArmor profiles load on all deployment targets; fail build if missing.
 - [ ] **H-017:** Implement NATS credential rotation procedure or script. Document rotation window.
@@ -224,7 +224,7 @@
 
 | Item | Priority | Status | Action |
 |------|----------|--------|--------|
-| H-007 (EStop single-human clear) | **Critical** | Gap | Add integration test |
+| H-007 (EStop single-human clear) | **Critical** | Covered | Integration test added (ASP-573) |
 | H-008 (Propose_act self-auth) | **Critical** | Gap | Gatekeeper implementation |
 | H-009 (Dual-human collision) | High | Design spec | Verify identity uniqueness logic |
 | H-010 (Stale capability tokens) | Medium | **Implemented (ASP-564)** | Short TTL + lifecycle; refuse if expired |
@@ -283,7 +283,7 @@
 
 ### P0 — Act this sprint
 
-1. **[ ] Add integration test for estop dual-human clear (H-007).** The estop `authorize_clear` + `clear` protocol has a dual-human gate check in the fleet-bus smoke suite (ASP-558), but no dedicated integration test that confirms a single `authorize_clear` alone never triggers `clear`. H-007 is the only remaining **Critical** gap.
+1. **[x] Add integration test for estop dual-human clear (H-007).** Dedicated negative-case integration test added in `scripts/smoke-fleet-bus.py` (H-007 block, ASP-573): bare `clear` refused, single `authorize_clear` + `clear` refused, dual distinct `authorize_clear` + `clear` unlatches; audit verified. `aspen-edge-rrm` pin bumped in `third_party/pins.json` to the gated master (`f4f2c8d`+) so CI/nightly clone the gated RRM.
 
 2. **[ ] Implement H-019 CI gate — block Dev-only packages from production images.** PACKAGES.md defines three tiers (Core/Plugin/Dev-only). No CI gate enforces that Dev-only packages (`aspen-dev/` tree items) never land in production Debian packages or ISO images. Check pattern: `scripts/check-no-devonly-in-prod.sh` parsing PACKAGES.md, scanning production paths, failing the build if any Dev-only path is found. Add to `.github/workflows/ci.yml` and `scripts/check-nightly.sh`.
 

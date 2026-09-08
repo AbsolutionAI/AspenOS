@@ -79,6 +79,7 @@ check "pins.json present" test -f third_party/pins.json
 check "dashboard server syntax" python3 -c "import ast; ast.parse(open('dashboard/server.py').read())"
 check "nats subjects dual" grep -q 'starship.fleet' nats/subjects.yaml
 check "fleet-bus smoke" bash -c 'python3 scripts/smoke-fleet-bus.py >/dev/null'
+check "fleet-bus H-007 dual-human clear gate" bash -c 'OUT=$(python3 scripts/smoke-fleet-bus.py 2>&1); grep -q "PASS  H-007" <<<"$OUT" && ! grep -q "FAIL  H-007" <<<"$OUT"'
 
 echo ""
 echo "Result: $PASS passed, $FAIL failed"

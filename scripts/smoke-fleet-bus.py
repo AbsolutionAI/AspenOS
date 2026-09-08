@@ -90,8 +90,25 @@ def main() -> int:
     refused = any(a.get("result") == "refused_estop" for a in rrm.audit)
     check("estop blocks proposal", refused)
 
+    # H-007 (CVSS 9.0): estop clear requires two distinct humans. A bare clear or a
+    # single authorize_clear must never unlatch. This is the dedicated integration
+    # test for the gate; it runs against the pinned aspen-edge-rrm via FleetBus.
+    def _refused_count() -> int:
+        return sum(1 for a in rrm.audit if a.get("event") == "clear_refused_insufficient_auths")
+
     bus.publish("aspen.safety.clear", {"source": "operator"}, source="safety")
-    check("estop cleared", rrm.estop is False)
+    check("H-007 bare clear never unlatches", rrm.estop is True)
+    check("H-007 bare clear audited refused", _refused_count() == 1)
+
+    bus.publish("aspen.safety.authorize_clear", {"human_id": "operator-a"}, source="operator-a")
+    bus.publish("aspen.safety.clear", {"source": "operator"}, source="safety")
+    check("H-007 single authorize_clear never unlatches", rrm.estop is True)
+    check("H-007 single auth audited refused", _refused_count() == 2)
+
+    bus.publish("aspen.safety.authorize_clear", {"human_id": "operator-b"}, source="operator-b")
+    bus.publish("aspen.safety.clear", {"source": "operator"}, source="safety")
+    check("H-007 dual authorize_clear unlatches", rrm.estop is False)
+    check("H-007 clear audited armed", any(a.get("event") == "clear" for a in rrm.audit))
 
     try:
         from aspen_swarm import SwarmManager, MemberRegistry
