@@ -18,6 +18,13 @@ jobs:
       - run: ruff check agents/ dashboard/ services/ || true
       - run: ruff format --check agents/ dashboard/ services/ || true
 
+  security-devonly-isolation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Dev-only package isolation (H-019)
+        run: bash scripts/check-no-devonly-in-prod.sh
+
   smoke:
     runs-on: ubuntu-latest
     steps:

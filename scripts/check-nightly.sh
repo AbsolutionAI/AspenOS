@@ -166,6 +166,10 @@ check "dashboard panels.js" test -f dashboard/static/panels.js
 check "dashboard incidents.js" test -f dashboard/static/incidents.js
 check "dashboard boot.js" test -f dashboard/static/boot.js
 
+# ─── Section 16: Dev-only package isolation (H-019) ──────────
+echo -e "\n${YELLOW}── Section 16: Dev-only package isolation (H-019) ──${NC}"
+check "no Dev-only in production paths" bash scripts/check-no-devonly-in-prod.sh
+
 # ─── Summary ─────────────────────────────────────────────────
 TIMING_END=$(date +%s%N)
 ELAPSED_MS=$(( (TIMING_END - TIMING_BEGIN) / 1000000 ))
