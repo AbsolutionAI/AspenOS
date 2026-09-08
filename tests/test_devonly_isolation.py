@@ -49,8 +49,12 @@ def test_devonly_marker_detected():
         assert result.returncode != 0, (
             "Script should have failed when Dev‑only marker is present"
         )
-        # The output should mention the offending marker
-        assert "aspen-package-mesh" in result.stderr or "Dev-only" in result.stderr
+        # The output should mention the offending marker. The script reports
+        # its verdict via `echo` (stdout), so check stdout (and stderr) combined.
+        combined = f"{result.stdout}\n{result.stderr}"
+        assert "aspen-package-mesh" in combined or "Dev-only" in combined, (
+            f"Script output did not mention the offending marker:\n{combined}"
+        )
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
