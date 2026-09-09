@@ -21,32 +21,49 @@ fi
 
 # ─── 1. Build Dev-only marker pattern from docs/PACKAGES.md ───────────
 # Dev-only tokens come from three places:
-#  - the classification matrix "Dev-only" row examples
-#  - the "## Dev-only Examples" bullet list
+#  - the classification matrix "Dev-only" row examples (package-mesh scripts,
+#    compound-engineering tools, grok-build sandbox, gatekeeper-shim)
+#  - the "## Dev-only Examples" bullet list (aspen-package-mesh,
+#    compound-engineering-gate-tools, gatekeeper/minimal_shim.py)
 #  - ADR-0008 rule 3: the owning tree marker "aspen-dev/"
 MARKERS=()
 
 matrix_tokens=$(awk -F'|' '/^\|\s*\*\*Dev-only\*\*/{print $6}' "$PACKAGES_MD")
 examples_tokens=$(sed -n '/## Dev-only Examples (internal only)/,/## /p' "$PACKAGES_MD" \
-  | grep '^\- ' | sed 's/^\- //; s/ (.*//' | tr -d '`')
+  | grep '^\- ' | sed 's/^\- //; s/ (.*//; s/`//g')
 
 for t in $matrix_tokens $examples_tokens; do
-  # normalize punctuation-noise, lowercase for case-insensitive match later
-  t="$(printf '%s' "$t" | sed 's/[.,:]//g')"
-  # drop noise words that are not specific package/tool identifiers
+  # keep identifier-ish tokens only (contain - or /); drop parentheticals
+  t="$(printf '%s' "$t" | sed 's/(.*//' | sed 's/^[.,: -]*//; s/[.,: -]*$//')"
+  [[ "$t" == *-* || "$t" == */* ]] || continue
   case "$t" in
-    scripts|tools|sandbox|internal|tooling|aspen-dev) continue ;;
+    scripts|tools|aspen-dev|gatekeeper-shim|package-mesh) continue ;;
   esac
   [[ -n "$t" ]] && MARKERS+=("$t")
 done
 MARKERS+=("aspen-dev/")
+# dedupe, case-insensitive normalize to lowercase for the grep
+MARKERS=( $(printf '%s\n' "${MARKERS[@]}" | tr 'A-Z' 'a-z' | sort -u) )
 
-# ─── 2. Production scan roots ──────────────────────────────────────────
-# Trees staged by scripts/build-deb.sh / scripts/build-iso.sh, plus every
-# Dockerfile under the repo. Build artifacts (dist/, agent/target/) excluded.
-PROD_ROOTS=( agents config dashboard debian iso nats packaging scripts services skills souls systemd tray )
+# ─── 2. Production scan targets ────────────────────────────────────────
+# Scan the content that actually ships in the Debian package / ISO image:
+# the source trees staged by scripts/build-deb.sh and scripts/build-iso.sh,
+# plus every Dockerfile under the repo. Dev-kit tooling (check-*.sh,
+# smoke-*.sh, build-*.sh, install-*.sh, push-*, vendor-*, backup*.sh, ...)
+# is itself Dev-only by classification and is NOT scanned.
+PROD_ROOTS=( agents config dashboard debian iso nats packaging services skills souls systemd tray )
+
+# Runtime scripts staged by build-deb.sh (the full scripts/ tree is CI/dev
+# tooling; only these files are shipped into /opt/starship).
+RUNTIME_SCRIPTS=(
+  scripts/detect-gpu.sh scripts/starship-firstboot.sh scripts/select-profile.sh
+  scripts/gen-nats-accounts.sh scripts/gen-nats-tls.sh
+  scripts/message_history.py scripts/agent-health-checker.py
+)
+
 SCAN_TARGETS=()
 for r in "${PROD_ROOTS[@]}"; do [[ -e "$r" ]] && SCAN_TARGETS+=("$r"); done
+for f in "${RUNTIME_SCRIPTS[@]}"; do [[ -f "$f" ]] && SCAN_TARGETS+=("$f"); done
 
 # Dockerfiles (repo has none today; protective if added later)
 mapfile -t DOCKERFILES < <(find . -path ./.git -prune -o \
@@ -59,34 +76,47 @@ if [[ "${#MARKERS[@]}" -eq 0 ]]; then
 fi
 
 # ─── 3. Build grep pattern ─────────────────────────────────────────────
+# Each Dev-only marker is matched in both dash and underscore form so a
+# Python import (aspen_package_mesh) or a file path name (aspen-package-mesh)
+# is caught alike.
 PATTERN=""
 for m in "${MARKERS[@]}"; do
-  p="$(printf '%s' "$m" | sed 's|[][(){}.+*?^$\\/]|\\&|g')"
-  [[ -n "$PATTERN" ]] && PATTERN="$PATTERN|"
-  PATTERN="$PATTERN$p"
+  for form in "$m" "${m//-/_}"; do
+    p="$(printf '%s' "$form" | sed 's|[][(){}.+*?^$\\/]|\\&|g')"
+    [[ -n "$PATTERN" ]] && PATTERN="$PATTERN|"
+    PATTERN="$PATTERN$p"
+  done
 done
 
 # ─── 4. Scan & report ──────────────────────────────────────────────────
+# The gate script itself legitimately references Dev-only names (docs, tests),
+# so exclude it (and its own clones) from the scan.
+SELF_NAME="$(basename "$0")"
+GREP_EXCLUDES=( --exclude-dir=.git --exclude-dir=target --exclude-dir=dist \
+  --exclude="$SELF_NAME" --exclude="*$SELF_NAME" )
+
 if [[ "${1:-}" == "--self-test" ]]; then
   # Plant a temporary Dev-only marker under a scanned root and require a fail.
   PLANT_DIR="$(mktemp -d "$REPO_DIR/skills/.devonly-selftest.XXXXXX")"
   trap 'rm -rf "$PLANT_DIR"' EXIT
   printf '%s\n' "aspen-package-mesh planted for self-test" > "$PLANT_DIR/planted.txt"
-  if grep -rniI -E "$PATTERN" "${SCAN_TARGETS[@]}" | grep -v "$PLANT_DIR" \
-      | grep -q . 2>/dev/null; then
+  EXCLUDES=( "${GREP_EXCLUDES[@]}" --exclude-dir="$(basename "$PLANT_DIR")" )
+  ALREADY=$(grep -rniI -E "$PATTERN" "${SCAN_TARGETS[@]}" "${EXCLUDES[@]}" 2>/dev/null || true)
+  if [[ -n "$ALREADY" ]]; then
     echo -e "${RED}FAIL${NC} self-test: unexpected pre-existing Dev-only reference"
+    printf '%s\n' "$ALREADY" | sed 's/^/    /'
     exit 1
   fi
-  if grep -rniI -E "$PATTERN" "${SCAN_TARGETS[@]}" | grep -q "$PLANT_DIR"; then
-    echo -e "${GREEN}PASS${NC} self-test: planted Dev-only marker detected (gate fails as intended)"
+  if grep -rniI -E "$PATTERN" "${SCAN_TARGETS[@]}" "${GREP_EXCLUDES[@]}" 2>/dev/null \
+      | grep -q "$(basename "$PLANT_DIR")"; then
+    echo -e "${GREEN}PASS${NC} self-test: planted Dev-only marker detected (gate would fail)"
     exit 0
   fi
   echo -e "${RED}FAIL${NC} self-test: planted Dev-only marker was NOT detected"
   exit 1
 fi
 
-MATCHES=$(grep -rniI -E "$PATTERN" "${SCAN_TARGETS[@]}" \
-    --exclude-dir=.git --exclude-dir=target --exclude-dir=dist 2>/dev/null || true)
+MATCHES=$(grep -rniI -E "$PATTERN" "${SCAN_TARGETS[@]}" "${GREP_EXCLUDES[@]}" 2>/dev/null || true)
 
 if [[ -n "$MATCHES" ]]; then
   echo -e "${RED}FAIL — Dev-only isolation gate${NC}"
