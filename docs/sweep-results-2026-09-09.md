@@ -1,10 +1,11 @@
-# ASP-580 Daily Implementation Sweep — 2026-09-09 15:10 UTC
+# ASP-580 Daily Implementation Sweep — 2026-09-09
 
 ## Summary
 
 - **Nightly check:** 107 passed, 1 known failure (C11 p50 benchmark deviation) — same baseline
-- **Commits pushed:** 7 commits (merge + 6 new)
-- **Python tests:** 303 passed, 4 skipped, 0 failures
+- **Commits pushed:** 8 commits (merge + 7 new)
+- **Python tests:** 19 passed, 1 skipped (sentinel consumer), 0 failures
+- **Shell scripts:** all syntax-verified (check-nightly, check-no-devonly-in-prod, update)
 - **Outstanding changes:** clean workspace
 
 ## Nightly Check Results
@@ -51,3 +52,11 @@ dc6cd87 merge: integrate origin/master (ASP-563 weekly architecture review + ADR
 ## API Note
 
 Paperclip API unreachable (`10.242.32.120:3100` connection refused). Disposition written locally.
+
+## Re-verification (15:30 UTC follow-up)
+
+- Re-ran nightly check: 107/108 pass, same C11 p50 known deviation
+- Re-ran sentinel consumer tests: 19 passed, 1 skipped
+- Verified all modified shell scripts have valid syntax
+- Repo clean: `master` up to date with `origin/master`
+- No new untracked code files (only `.paperclip/` and run scratch dirs)
