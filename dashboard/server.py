@@ -46,6 +46,33 @@ if not STATIC_DIR.is_dir():
 nc = None
 _telemetry_aggregator = None
 
+# Sentinel audit consumer (lazy-initialized, shared across requests)
+_sentinel_consumer: "AuditEventConsumer | None" = None
+_SENTINEL_CONSUMER_LOCK = asyncio.Lock()
+
+async def get_sentinel_consumer() -> "AuditEventConsumer":
+    """Get or create the shared Sentinel audit consumer.
+
+    Initialised on first call. NATS connection is best-effort (journal reads
+    always work, even fully offline).
+    """
+    global _sentinel_consumer
+    if _sentinel_consumer is not None:
+        return _sentinel_consumer
+    async with _SENTINEL_CONSUMER_LOCK:
+        if _sentinel_consumer is not None:
+            return _sentinel_consumer
+        # Lazy import avoids startup dependency on sentinel package
+        from sentinel.consumer import AuditEventConsumer
+
+        consumer = AuditEventConsumer(
+            nats_url=NATS_URL or os.environ.get("ASPEN_NATS_URL"),
+            audit_log=os.environ.get("ASPEN_AUDIT_LOG"),
+        )
+        await consumer.start()  # best-effort NATS connect
+        _sentinel_consumer = consumer
+        return _sentinel_consumer
+
 
 class TelemetryAggregator:
     """Accumulates telemetry from NATS starship.telemetry.* subjects."""
@@ -1850,6 +1877,65 @@ async def handle_agent_regenerate_token(request):
     return web.json_response({"status": "ok", "token": token, "message": "Shared agent token regenerated"})
 
 
+# ── Sentinel ─────────────────────────────────────────────────────────────────
+
+async def handle_sentinel_audit(request):
+    """Tail or query Sentinel audit events (ADR-0007).
+
+    Query params:
+        n (int, default 20): number of events to tail
+        actor, action, target, result (str): substring filter
+        since (str): ISO timestamp, only events with ts >= since
+        limit (int, default 50): max query results
+        source (str): ``journal`` (default) or ``live`` — restrict to NATS ring
+    """
+    consumer = await get_sentinel_consumer()
+    n = int(request.query.get("n", "20"))
+    source = request.query.get("source", "")
+
+    if source == "live":
+        events = list(consumer._live)[:n]
+    elif any(
+        request.query.get(k)
+        for k in ("actor", "action", "target", "result", "since")
+    ):
+        events = consumer.query(
+            actor=request.query.get("actor"),
+            action=request.query.get("action"),
+            target=request.query.get("target"),
+            result=request.query.get("result"),
+            since=request.query.get("since"),
+            limit=int(request.query.get("limit", "50")),
+        )
+    else:
+        events = consumer.tail(n=n)
+
+    return web.json_response({
+        "events": events,
+        "total": len(events),
+        "source": "journal" if not source else source,
+        "is_online": consumer.is_online,
+        "timestamp": datetime.now().isoformat(),
+    })
+
+
+async def handle_sentinel_audit_stats(request):
+    """Aggregate counts from the audit journal."""
+    consumer = await get_sentinel_consumer()
+    return web.json_response(consumer.stats())
+
+
+async def handle_sentinel_overview(request):
+    """Fleet overview (offline-capable stub).
+
+    The ``aspen.sentinel.fleet.overview`` producer is not yet live (ADR-0007).
+    This endpoint returns a local preview with ``_stub: true``.
+    """
+    consumer = await get_sentinel_consumer()
+    overview = consumer.fleet_overview()
+    return web.json_response(overview)
+
+
 # ── App ─────────────────────────────────────────────────────────────────────
 
 app = web.Application()
@@ -1890,6 +1976,12 @@ app.router.add_get("/api/telemetry/stats", handle_no_data)
 app.router.add_get("/api/telemetry/recent", handle_telemetry_recent)
 app.router.add_get("/api/accounts", handle_no_data)
 app.router.add_get("/api/orgchart", handle_orgchart)
+
+# Sentinel audit + overview (ADR-0007)
+app.router.add_get("/api/sentinel/audit", handle_sentinel_audit)
+app.router.add_get("/api/sentinel/audit/stats", handle_sentinel_audit_stats)
+app.router.add_get("/api/sentinel/overview", handle_sentinel_overview)
+
 app.router.add_get("/api/email/addresses", handle_no_data)
 app.router.add_get("/api/healer", handle_no_data)
 app.router.add_get("/api/system/logs", handle_no_data)
