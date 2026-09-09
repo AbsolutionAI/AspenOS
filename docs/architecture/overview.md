@@ -2,7 +2,7 @@
 
 **Canonical product SoR:** [`docs/sor/MASTER_SPEC.md`](../sor/MASTER_SPEC.md) (AspenGrove v4.0 — Three Organs).  
 **ADRs:** [`docs/adr/README.md`](../adr/README.md)  
-**Last architecture review:** [`docs/ops/WEEKLY_ARCHITECTURE_REVIEW_2026-08-24.md`](../ops/WEEKLY_ARCHITECTURE_REVIEW_2026-08-24.md)
+**Last architecture review:** [`docs/ops/WEEKLY_ARCHITECTURE_REVIEW_2026-09-07.md`](../ops/WEEKLY_ARCHITECTURE_REVIEW_2026-09-07.md) (ASP-563)
 
 This monorepo is the **AspenOS / Starship Alpha** implementation tree. Product boundaries:
 
@@ -32,9 +32,10 @@ OS:           Ubuntu 24.04 · systemd · AppArmor · cgroups · optional C11 san
 
 ## Safety (non-negotiable)
 
-- Safety-adjacent bus path: agents emit **`propose_act` only** until **dual human authorization** (G8 wired in `aspen_edge.gate` / EdgeRRM; contract `docs/security/ACT_GATE_CONTRACT.md`).
+- Safety-adjacent bus path: agents emit **`propose_act` only** until **dual human authorization** (G8 wired in `aspen_edge.gate` / EdgeRRM; monorepo gatekeeper Phase 1 in `src/python/gatekeeper/`; contract `docs/security/ACT_GATE_CONTRACT.md`; ADR-0009 Accepted design+P1).
 - E-stop: `aspen.safety.estop` highest precedence on every RRM; clear requires dual `authorize_clear`.
-- Sim default under fiscal freeze: `ASPEN_SIM=1`; plant-range cell `status: sim_only` until G9/physical gate (ASP-418).
+- Sim default under fiscal freeze: `ASPEN_SIM=1`; plant-range cell `status: sim_only` until G9/physical gate (ASP-418). Operator-of-record binding for non-sim is **ADR-0012 (Proposed)**.
+- Single-plant arm guard (H-018): emit-side LangGraph + scheduler busy-plant — **closed** ASP-533.
 
 ## Runtime paths (target)
 
@@ -49,11 +50,13 @@ Legacy `/opt/agnetic` may still appear in Alpha installs — treat as migration 
 
 ## Bus subjects
 
-| Family | Canonical (ADR-0003) | Legacy bridge |
+| Family | Canonical (ADR-0003 / 0007) | Legacy bridge |
 |--------|----------------------|---------------|
 | Fleet | `aspen.fleet.*` | `starship.fleet.*`, `agnetic.fleet.*` |
 | Edge | `aspen.edge.<node>.*` | — |
 | Safety | `aspen.safety.*` | — |
+| Authz | `aspen.authz.*` (ADR-0007/0009) | — |
+| Sentinel | `aspen.sentinel.*` (ADR-0007) | — |
 | Worker | `aspen.worker.langgraph.*` | — |
 | Alpha agents | `starship.agent.*` | `agnetic.agent.*` |
 

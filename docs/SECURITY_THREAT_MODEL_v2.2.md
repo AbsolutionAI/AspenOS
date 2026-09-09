@@ -201,9 +201,14 @@
 
 | Change | Impact | New threats | Status |
 |--------|--------|-------------|--------|
+| ADR-0007 (NATS subject contracts) | Added `aspen.sentinel.*` + `aspen.authz.*` subjects | H-013, H-015, H-021 | Wired: ACLs (ASP-536), audit publisher (ASP-537); H-015 closed |
+| ADR-0008 (Package classification) | Core/Plugin/Dev-only tiers | H-019 | **Accepted** (ASP-530/563); CI gate residual |
+| ADR-0009 (Capability-based gatekeepers) | Eliminates broad credentials | H-008, H-010, H-020 | Phase 1 implemented (proposal interception + dual-human gate, ASP-540); full token lifecycle + credential strip Phase 2 |
+| ADR-0006 (Memory store tiering) | T1 local-first + optional T2 PG | (none new) | Accepted |
+| H-018 (ASP-533) completed | Dual-guard single-plant scheduler | H-016 → closed | **CLOSED** |
+| `aspen.` prefix migration in progress | Dual-publish during transition | H-013, H-021 | Mid-flight |
+| Dual-human gate design in ADR-0003 | Rejected duplicate principals | H-009 | Implemented (ASP-540): distinct-principal enforcement + audited duplicates |
 | ASP-568 H-011/H-013 reconciliation | Verified gen-nats-accounts nkey-only mode; validated per-role aspen.* ACL template | None (H-011 → Partial, H-013 → Closed) | Closed: checklist reconciled vs delivery evidence |
-| Nightly check ASP-562 (2026-09-07) | 101 passed, 1 known failure | None — same baseline | PASS — no security regression |
-| ADR-0009 gatekeeper status doc update | c4dade7 documents ADR-0009 state across threat model, FLEET, ADR-0007 | N/A | Reflected |
 
 ### Threats closed this cycle (since 2026-08-31)
 

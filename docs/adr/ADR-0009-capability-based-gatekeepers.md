@@ -1,7 +1,11 @@
 # ADR-0009: Capability-Based Gatekeepers (No Broad API Keys)
 
-**Status:** Proposed — 2026-08-29  
+**Status:** Accepted (design + Phase 1) — 2026-08-31 / 2026-09-07  
+**Accepted by:** ASP-530 Weekly Architecture Review (design)  
+**Phase 1:** ASP-540 — dual-human propose_act interception + audit (reconfirmed ASP-563)  
+**Implementation residual:** BEL-215 Phase 2 — token lifecycle, Hermes/Paperclip credential strip, immutable proxy  
 **Linear:** BEL-215 (Urgent) · Related BEL-196 (NATS contracts), ADR-0003 (Safety Contracts), Master Spec v4.0 hard rules  
+**Prototype:** `src/python/gatekeeper/minimal_shim.py`, `nats_client.py`  
 **Target Products:** AspenOS (primary), Aspen Sentinel, aspen-dev
 
 ## Context
