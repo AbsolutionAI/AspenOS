@@ -65,6 +65,7 @@ mkdir -p "$PKG_ROOT/opt/starship/lib/starship/souls"
 mkdir -p "$PKG_ROOT/opt/starship/lib/starship/services"
 mkdir -p "$PKG_ROOT/etc/starship/nats"
 mkdir -p "$PKG_ROOT/etc/starship/opencode"
+mkdir -p "$PKG_ROOT/etc/apparmor.d"
 mkdir -p "$PKG_ROOT/lib/systemd/system"
 mkdir -p "$PKG_ROOT/usr/local/bin"
 mkdir -p "$PKG_ROOT/var/lib/starship/nats"
@@ -138,6 +139,17 @@ for f in config.yaml proxy.yaml romi.yaml ergo.yaml orchestrator.yaml; do
     cp "$REPO_DIR/agents/$f" "$PKG_ROOT/etc/starship/" 2>/dev/null || true
 done
 
+# AppArmor profiles
+log "Staging AppArmor profiles..."
+for profile in agnetic-agent nats ollama; do
+    if [[ -f "$REPO_DIR/security/apparmor/$profile" ]]; then
+        cp "$REPO_DIR/security/apparmor/$profile" "$PKG_ROOT/etc/apparmor.d/$profile"
+        chmod 644 "$PKG_ROOT/etc/apparmor.d/$profile"
+    else
+        warn "AppArmor profile $profile not found at security/apparmor/$profile"
+    fi
+done
+
 # Systemd
 for u in agnetic-nats.service agnetic-staragent.service agnetic-agent@.service \
          agnetic-dashboard.service agnetic-status-bridge.service \
@@ -173,6 +185,8 @@ for need in \
     "etc/starship/nats/agent-bus.conf" \
     "lib/systemd/system/starship-fleet.service" \
     "lib/systemd/system/starship-health-checker.service" \
+    "etc/apparmor.d/agnetic-agent" \
+    "etc/apparmor.d/nats" \
     "usr/local/bin/starshipctl"; do
     if [[ ! -e "$PKG_ROOT/$need" && ! -L "$PKG_ROOT/$need" ]]; then
         err "missing required path in package: $need"

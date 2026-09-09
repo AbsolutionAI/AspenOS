@@ -103,7 +103,26 @@ if command -v systemctl &>/dev/null; then
     fi
 fi
 
-# ─── 6. GPU detection (optional) ────────────────────────────────────
+echo ""
+
+# ─── 6. AppArmor profiles (load, NOT enforce) ──────────────────────
+if command -v apparmor_parser &>/dev/null; then
+    echo "[OK] apparmor_parser found — loading profiles"
+    for profile in agnetic-agent nats ollama; do
+        if [[ -f "/etc/apparmor.d/${profile}" ]]; then
+            apparmor_parser -r "/etc/apparmor.d/${profile}" 2>/dev/null && \
+                echo "  Loaded: ${profile}" || \
+                echo "  [WARN] Failed to load ${profile}"
+        else
+            echo "  [WARN] Profile file missing: /etc/apparmor.d/${profile}"
+        fi
+    done
+else
+    echo "[WARN] apparmor_parser not found (install apparmor-utils). Profiles staged but not loaded."
+    echo "  To load manually: apparmor_parser -r /etc/apparmor.d/<profile>"
+fi
+
+# ─── 7. GPU detection (optional) ────────────────────────────────────
 if [[ -x /opt/starship/bin/detect-gpu.sh ]]; then
     /opt/starship/bin/detect-gpu.sh detect 2>/dev/null || true
 fi
@@ -115,5 +134,7 @@ echo "  Firstboot: STARSHIP_PROFILE=ops /opt/starship/bin/starship-firstboot.sh"
 echo "  Start:     systemctl start agnetic-mesh.target"
 echo "  CLI:       starshipctl fleet status"
 echo "  Dashboard: http://localhost:8788"
+echo ""
+echo "  GPU:       /opt/starship/bin/detect-gpu.sh (section 7)"
 echo ""
 exit 0

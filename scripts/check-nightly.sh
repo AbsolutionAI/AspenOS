@@ -170,6 +170,13 @@ check "dashboard boot.js" test -f dashboard/static/boot.js
 echo -e "\n${YELLOW}── Section 16: Dev-only package isolation (H-019) ──${NC}"
 check "no Dev-only in production paths" bash scripts/check-no-devonly-in-prod.sh
 
+# ─── Section 17: AppArmor profiles in deb (H-010) ───────────
+echo -e "\n${YELLOW}── Section 17: AppArmor profiles in deb (H-010) ──${NC}"
+check "apparmor profiles in security/apparmor" bash -c 'test -f security/apparmor/agnetic-agent && test -f security/apparmor/nats && test -f security/apparmor/ollama'
+check "build-deb stages apparmor profiles" bash -c 'grep -q "etc/apparmor.d" scripts/build-deb.sh'
+check "postinst has apparmor_parser" bash -c 'grep -q "apparmor_parser -r" debian/DEBIAN/postinst'
+check "postinst avoids aa-enforce" bash -c '! grep -q "aa-enforce" debian/DEBIAN/postinst'
+
 # ─── Summary ─────────────────────────────────────────────────
 TIMING_END=$(date +%s%N)
 ELAPSED_MS=$(( (TIMING_END - TIMING_BEGIN) / 1000000 ))
