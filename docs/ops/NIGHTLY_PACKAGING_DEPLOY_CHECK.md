@@ -13,7 +13,7 @@
 2. **Toolchain**: ensure `nats-server` is on PATH:
    `export PATH="$HOME/go/bin:$HOME/.local/bin:$PATH"`.
 3. **Smoke suites** (record pass/fail counts):
-   - `bash scripts/check-nightly.sh` (~92 checks across 15 sections)
+   - `bash scripts/check-nightly.sh` (108 checks across 17 sections — 107 pass, 1 known C11 p50 failure)
 4. **Static inventory**:
    - systemd unit count (`*.service`/`*.timer`/`*.socket` across `systemd/`, `dist/pkgroot/lib/systemd/system/`, `deploy/`, `config/`)
    - Debian metadata presence (`debian/DEBIAN/{control,postinst,postrm,prerm}`)
@@ -31,14 +31,14 @@ On failure: diagnose, fix if well-scoped, otherwise mark the run issue blocked n
 
 ## What gets checked
 
-The nightly check runs in 15 sections:
+The nightly check runs in 17 sections:
 
 | Section | Checks |
 |---------|--------|
 | 1. Go build | `make build`, `starshipctl version` |
 | 2. Rust build | `cargo build --release` for staragent |
 | 3. C11 components | sandbox_spike, policyexec, starshipd, heald |
-| 4. Smoke tests | Full suite via `scripts/smoke-test.sh` (58 tests, including iso-firstboot-smoke, fleet-bus smoke against pinned sibling repos) |
+| 4. Smoke tests | Full suite via `scripts/smoke-test.sh` (61 tests, including iso-firstboot-smoke, fleet-bus smoke against pinned sibling repos, H-007 dual-human clear gate) |
 | 5. Debian package | `scripts/build-deb.sh`, package size > 1MB |
 | 6. Systemd units | All 9 canonical units exist on disk |
 | 7. Shell syntax | `bash -n` on every `scripts/*.sh` and `packaging/*.sh` |
@@ -50,6 +50,8 @@ The nightly check runs in 15 sections:
 | 13. Python test suite | pytest importable, test suite runs (150+ pass), no pytest errors |
 | 14. ISO build structure | autoinstall profiles (user-data.edge.yaml, user-data.server.yaml, user-data.ops.yaml), hooks, package lists |
 | 15. Dashboard static assets | style.css, ui.js, dashboard.js, agents.js, chat.js, panels.js, incidents.js, boot.js |
+| 16. Dev-only package isolation (H-019) | `scripts/check-no-devonly-in-prod.sh` gate |
+| 17. AppArmor profiles in deb (H-010) | profiles in `security/apparmor/`, staged by build-deb, loaded via `apparmor_parser -r` in postinst (no `aa-enforce`) |
 
 ## CI infrastructure
 
@@ -65,11 +67,11 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 
 | Check | Baseline |
 | --- | --- |
-| `scripts/check-nightly.sh` total | **101 passed, 1 known failure** (C11 p50 benchmark deviation = known, hardware-dependent) |
-| Of which: smoke test suite | 58 passed, 1 failed (C11 p50 benchmark) |
-| Python test suite | 152+ passed, 3 skipped (optional deps: aiohttp, mcp.server), 0 failures |
+| `scripts/check-nightly.sh` total | **107 passed, 1 known failure** (C11 p50 benchmark deviation = known, hardware-dependent) |
+| Of which: smoke test suite | 60 passed, 1 failed (C11 p50 benchmark) |
+| Python test suite | 303 passed, 4 skipped (optional deps: aiohttp, mcp.server), 0 failures |
 | nats-server | v2.14.5 |
-| systemd unit files | 16 (8 in `systemd/`, 8 in `dist/pkgroot/lib/systemd/system/`) |
+| systemd unit files | 18 (9 in `systemd/`, 9 in `dist/pkgroot/lib/systemd/system/`) |
 | Debian metadata | `debian/DEBIAN/`: control (starship-os 2.2.0 amd64), postinst, postrm, prerm |
 | `scripts/update.sh` | present, executable |
 | Windows packaging | `packaging/windows/`: install.bat, configure.bat, uninstall.bat, staragent.exe, staragent.yaml, README.txt |
@@ -77,20 +79,20 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 | Gatekeeper module | `src/python/gatekeeper/minimal_shim.py` present, valid Python syntax |
 | ISO build structure | 3 autoinstall profiles (edge/server/ops YAMLs), chroot hooks present, package lists present |
 | Dashboard static assets | 8 files present (style.css, ui.js, dashboard.js, agents.js, chat.js, panels.js, incidents.js, boot.js) |
-| Shell syntax coverage | 35 scripts (34 in `scripts/`, 1 in `packaging/`), all pass `bash -n` |
+| Shell syntax coverage | 36 scripts (35 in `scripts/`, 1 in `packaging/`), all pass `bash -n` |
 
 Update this table when suites gain or lose checks so future nightly runs can report meaningful deviations.
 
 ## Known deviations
 
-### C11 sandbox p50 benchmark (`make smoke` check 53 of 59)
+### C11 sandbox p50 benchmark (`make smoke` check 53 of 61)
 
 The ADR 0001 criterion requires `c11_internal p50 < 2ms`. On this control-plane host,
 the measured p50 is ~3.451ms. This is a hardware-dependent benchmark: the threshold may
 be met on dedicated CI runners with newer processors or lower latency profiles.
 
 **Not actionable** unless the sandbox is moved to a different host or optimized. The
-nightly check records this as a single known failure (1 of 59 smoke tests).
+nightly check records this as a single known failure (1 of 61 smoke tests).
 
 ## What is NOT checked
 
