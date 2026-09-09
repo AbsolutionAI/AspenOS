@@ -82,7 +82,7 @@ The organism metaphor remains: an aspen grove is one living system connected by 
 
 **Primary repo (to be elevated / created as canonical):** `aspen-dev`  
 **Dev-only packages:**  
-- `aspen-process-workers` (Aider, Agent Zero, etc.)  
+- `aspen-process-workers` (Aider, etc.)  
 - `aspen-paperclip-blueprints`  
 - `aspen-hermes-profile-template`  
 - `aspen-agent-personas`  

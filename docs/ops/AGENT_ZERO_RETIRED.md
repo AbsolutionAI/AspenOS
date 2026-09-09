@@ -1,18 +1,16 @@
-# Agent Zero — Retired (Captain 2026-08-27)
+# Agent Zero — Removed from this host
 
-**Status:** Paused + retired from Paperclip service.
+**Status:** Gone from bt-asp-srv (Captain 2026-08-30/31). Linear **BEL-262** / CHG-0006. Leftover data dir + worker deleted 2026-09-07.
 
-Captain directive: Agent Zero has not been working and is no longer planned for use.
+Do **not** start `agent0ai/agent-zero`. Do **not** reclaim :50080. Do **not** mention it in morning briefs.
 
-## Actions taken
-- Agent paused (`pausedAt` set)
-- Title updated to “Retired — Agent Zero (no longer in service)”
-- Note issue created (ASP-518 or equivalent)
-- No further wakes or assignments
+## What was done
+- Container and image removed
+- Compose retired, then leftover dir deleted
+- `paperclip-agent-zero-worker.py` deleted
+- Paperclip agent paused / retired earlier (2026-08-27)
 
-## Grove note
-- Do not re-enable without explicit Captain OK
-- Replace functionality with aspen + OpenCode + Runtime + robotics + langgraph-worker where needed
-- Documentation updated in AGENTS.md and references
+## Grove
+Replacement: aspen + OpenCode + Runtime + robotics + langgraph-worker.
 
-See Master Spec v4.0 and Paperclip skill `paperclip-board-ops`.
+See Paperclip skill `paperclip-board-ops` → `references/agent_zero_retired.md`.

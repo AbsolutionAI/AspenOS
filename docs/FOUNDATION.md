@@ -1,7 +1,7 @@
 # Aspen OS / Paperclip Foundation Snapshot
 
 **Linear:** BEL-132  
-**Paperclip proof tickets:** ASP-2 (foundation), ASP-5 (Aider), ASP-6 (Agent Zero)  
+**Paperclip proof tickets:** ASP-2 (foundation), ASP-5 (Aider). ASP-6 (Agent Zero) is historical — A0 **removed** BEL-262.  
 **Captured by:** Aspen Hermes (board-assisted foundation harden)
 
 ## Versions
@@ -30,7 +30,6 @@
 | Opencode | opencode_local | Implementation |
 | Aspen Fast Coder | opencode_local | Fast coding |
 | Aider | process | Aider CLI worker (BEL-134) |
-| Agent Zero | process | Docker A0 lifecycle (BEL-134) |
 | Runtime | hermes_local | Core runtime |
 | robotics | hermes_local | ROS2 |
 | packndeploy | hermes_local | Packaging |
@@ -50,11 +49,11 @@
 3. Cleared agent errors; budget plus hire approval
 4. Updated aspen AGENTS.md
 5. Compound Engineering gates (BEL-133)
-6. Aider + Agent Zero process workers (BEL-134)
+6. Aider process worker (BEL-134). Agent Zero later **removed** (BEL-262).
 
 ## Known follow-ups
 - [x] Aider process worker online (BEL-134 / ASP-5)
-- [x] Agent Zero docker image pull + UI config (ASP-6)
+- [x] Agent Zero docker image pull + UI config (ASP-6) — later **removed** from host (BEL-262)
 - [ ] GitHub auth for push/PR
 - [ ] Google Workspace OAuth
 - [ ] BEL-135+ stack items

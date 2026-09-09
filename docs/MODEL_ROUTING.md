@@ -32,7 +32,6 @@ Local models remain optional for offline experiments only.
 | Opencode | opencode_local | opencode/deepseek-v4-flash-free | $150 |
 | Aspen Fast Coder | opencode_local | opencode/deepseek-v4-flash-free | $100 |
 | Aider | process | openrouter/deepseek/deepseek-v4-flash | $75 |
-| Agent Zero | process + Docker UI | configure Flash in A0 UI | $75 |
 | Summarizer | claude_local | claude-haiku-4-5 | $25 |
 | Reflection Coach | claude_local | (profile default) | $25 |
 
@@ -49,5 +48,4 @@ Local models remain optional for offline experiments only.
 - Grok: aspen profile `xai-oauth` tokens in `auth.json`
 - Do not put keys in Paperclip issue comments
 
-## Agent Zero UI (manual once)
-Open http://127.0.0.1:50080 → set chat model provider to OpenRouter / DeepSeek V4-Flash (or Grok if preferred for that session).
+Agent Zero was **removed** from this host (BEL-262 / CHG-0006). Do not document or start it.
