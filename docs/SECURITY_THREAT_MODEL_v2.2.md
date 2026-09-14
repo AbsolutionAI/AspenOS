@@ -69,11 +69,11 @@
 | H-012 | **scheduler.py hardcoded NATS URL** | Bus | 5.5 (AV:L/AC:H) | `nats://[IP_ADDRESS]:4222` hardcoded — should use env or config | **Closed** (ASP-539) |
 | H-013 | **No aspen.* subject ACL in NATS config** | Bus | 7.0 (AV:N/AC:L) | Per-role `aspen.*` ACLs committed in template (ASP-536): ops=sentinel+authz+fleet+safety, edge=fleet+edge+estop+clear, range=scoped fleet/heartbeat; cross-account imports/exports wired | **CLOSED (ASP-536)** — template ACLs for all roles; residual: clients still dual-publish `starship.*` during migration |
 | H-014 | **Missing AppArmor profiles in deployment** | Host | 6.5 (AV:L/AC:M) | Profiles exist in `security/apparmor/` but install script may not run | Check gap |
-| H-015 | **Audit trail not yet connected to aspen.sentinel.audit.event** | Forensics | 6.0 (AV:N/AC:L) | Subject defined (ADR-0007) but no publisher; no forensic query path | **Open** — publisher wired (ASP-537); Sentinel-dashboard consumer pending |
+| H-015 | **Audit trail not yet connected to aspen.sentinel.audit.event** | Forensics | 6.0 (AV:N/AC:L) | Subject defined (ADR-0007); publisher (ASP-537) + monorepo consumer/dashboard routes | **CLOSED** — residual: `aspen.sentinel.fleet.overview` producer |
 | H-016 | **LangGraph worker emit-side guard (H-018 completed)** | Mission subjects | 8.0 (AV:N/AC:L) | `aspen_lgw/guard.py`: blocks mission publish; `SwarmManager._busy_plants` prevents dual arm | **CLOSED** (ASP-533) |
 | H-017 | **NATS credential rotation — no automatic rotation** | Credentials | 5.5 (AV:A/AC:H) | Manual `gen-nats-accounts.sh` only; no expiry enforcement | **Open** |
 | H-018 | **Single-plant dual-arm prevention (H-018)** | Scheduler | 8.0 (AV:N/AC:M) | Dual guard layers: emit-side + scheduler-side | **CLOSED** (ASP-533) |
-| H-019 | **Package classification bypass — Dev-only in production** | Supply chain | 6.0 (AV:N/AC:H) | ADR-0008 declares tiers; no CI enforcement yet | ADR-0008 proposed |
+| H-019 | **Package classification bypass — Dev-only in production** | Supply chain | 6.0 (AV:N/AC:H) | ADR-0008 Accepted; `scripts/check-no-devonly-in-prod.sh` + CI `security-devonly-isolation` + nightly §16 (ASP-574) | **CLOSED (ASP-574)** — residual: package-manifest `classification` field enforcement (BEL-164) |
 | H-020 | **Gatekeeper single point of failure** | Availability | 7.0 (AV:N/AC:H) | Mitigate with local fallback + redundant instances (ADR-0009) | Design only |
 | H-021 | **No dual-publish on aspen.sentinel.* subjects yet** | Observability | 5.0 (AV:N/AC:L) | Migration incomplete; `starship.*` still primary | Mid-migration |
 
@@ -181,7 +181,7 @@
 - [x] **H-012:** Replace hardcoded `nats://[IP_ADDRESS]:4222` in `agents/scheduler.py` with config/env.
 - [ ] **H-014:** Verify AppArmor profiles load on all deployment targets; fail build if missing.
 - [ ] **H-017:** Implement NATS credential rotation procedure or script. Document rotation window.
-- [ ] **H-019:** Add CI gate to block Dev-only packages from production images.
+- [x] **H-019:** Add CI gate to block Dev-only packages from production images. — **ASP-574:** `scripts/check-no-devonly-in-prod.sh` parses PACKAGES.md Dev-only list, scans debian/iso/packaging/systemd/Dockerfiles; CI job `security-devonly-isolation` + nightly §16.
 - [ ] **H-HOST-04:** Replace env-based master password with prompt, keyring, or TPM-backed secret.
 - [ ] **F-017:** Add node fingerprint/PKI for fleet heartbeat to prevent registration spoofing.
 
@@ -202,8 +202,9 @@
 | Change | Impact | New threats | Status |
 |--------|--------|-------------|--------|
 | ADR-0007 (NATS subject contracts) | Added `aspen.sentinel.*` + `aspen.authz.*` subjects | H-013, H-015, H-021 | Wired: ACLs (ASP-536), audit publisher (ASP-537); H-015 closed |
-| ADR-0008 (Package classification) | Core/Plugin/Dev-only tiers | H-019 | **Accepted** (ASP-530/563); CI gate residual |
-| ADR-0009 (Capability-based gatekeepers) | Eliminates broad credentials | H-008, H-010, H-020 | Phase 1 implemented (proposal interception + dual-human gate, ASP-540); full token lifecycle + credential strip Phase 2 |
+| ADR-0008 (Package classification) | Core/Plugin/Dev-only tiers | H-019 | **Accepted** (ASP-530/563); **H-019 CLOSED** (ASP-574 CI/nightly gate) |
+| ADR-0009 (Capability-based gatekeepers) | Eliminates broad credentials | H-008, H-010, H-020 | **Accepted P1+P2** (ASP-540/564); Phase 3 durable token store residual |
+| ASP-595 Weekly Architecture Review | Status truth + H-019/H-015 checklist | (docs) | 2026-09-14 review + ADR-0009 P2 accept on tip |
 | ADR-0006 (Memory store tiering) | T1 local-first + optional T2 PG | (none new) | Accepted |
 | H-018 (ASP-533) completed | Dual-guard single-plant scheduler | H-016 → closed | **CLOSED** |
 | `aspen.` prefix migration in progress | Dual-publish during transition | H-013, H-021 | Mid-flight |
@@ -230,16 +231,16 @@
 | Item | Priority | Status | Action |
 |------|----------|--------|--------|
 | H-007 (EStop single-human clear) | **Critical** | Covered | Integration test added (ASP-573) |
-| H-008 (Propose_act self-auth) | **Critical** | Gap | Gatekeeper implementation |
-| H-009 (Dual-human collision) | High | Design spec | Verify identity uniqueness logic |
+| H-008 (Propose_act self-auth) | **Critical** | **Implemented P1+P2 (ASP-540/564)** | Gatekeeper dual-human + token/proxy |
+| H-009 (Dual-human collision) | High | **Implemented (ASP-540)** | Distinct principal + audited duplicates |
 | H-010 (Stale capability tokens) | Medium | **Implemented (ASP-564)** | Short TTL + lifecycle; refuse if expired |
 | H-011 (Plaintext NATS creds) | **High** | **Partial (ASP-536)** | nkey-only gen mode; residual: `nk` at gen time, SYS password |
 | H-012 (Hardcoded NATS URL) | Medium | Closed (ASP-539) | Config/env refactor |
 | H-013 (Missing aspen.* ACL) | **High** | **Closed (ASP-536)** | Template ACLs committed for all roles |
 | H-014 (AppArmor deployment) | Medium | Check gap | Verify install script |
-| H-015 (Audit trail) | **High** | **Closed** (ASP-537) | Wire audit publisher |
+| H-015 (Audit trail) | **High** | **Closed** (ASP-537 + consumer) | Publisher + monorepo/dashboard consumer |
 | H-017 (Credential rotation) | Medium | Open | Rotation procedure |
-| H-019 (Package classification CI) | Medium | Open | CI gate |
+| H-019 (Package classification CI) | Medium | **Closed (ASP-574)** | CI + nightly Dev-only gate |
 | H-020 (Gatekeeper SPOF) | Medium | Design only | Redundancy plan |
 | H-021 (No aspen.sentinel permissions) | Medium | Open | Add to NATS config |
 | H-HOST-01 (NATS store access) | Low | Active | Existing systemd hardening |
@@ -290,7 +291,7 @@
 
 1. **[x] Add integration test for estop dual-human clear (H-007).** Dedicated negative-case integration test added in `scripts/smoke-fleet-bus.py` (H-007 block, ASP-573): bare `clear` refused, single `authorize_clear` + `clear` refused, dual distinct `authorize_clear` + `clear` unlatches; audit verified. `aspen-edge-rrm` pin bumped in `third_party/pins.json` to the gated master (`f4f2c8d`+) so CI/nightly clone the gated RRM.
 
-2. **[ ] Implement H-019 CI gate — block Dev-only packages from production images.** PACKAGES.md defines three tiers (Core/Plugin/Dev-only). No CI gate enforces that Dev-only packages (`aspen-dev/` tree items) never land in production Debian packages or ISO images. Check pattern: `scripts/check-no-devonly-in-prod.sh` parsing PACKAGES.md, scanning production paths, failing the build if any Dev-only path is found. Add to `.github/workflows/ci.yml` and `scripts/check-nightly.sh`.
+2. **[x] Implement H-019 CI gate — block Dev-only packages from production images.** **ASP-574:** `scripts/check-no-devonly-in-prod.sh` parses PACKAGES.md Dev-only list, scans production surfaces (debian/iso/packaging/systemd/Dockerfiles), CI job `security-devonly-isolation` + nightly §16. Residual: package-manifest `classification` field enforcement when BEL-164 mesh lands.
 
 3. **[ ] Verify AppArmor profiles load on all deployment targets (H-014).** Profiles exist at `security/apparmor/`, but `install-daemon.sh` may not copy them. Verify: add a nightly check (`check-nightly.sh` section) that confirms profiles are present in the installed system path and `aa-status` shows them loaded. Fail the build if profiles are present in source but absent from the installed target.
 

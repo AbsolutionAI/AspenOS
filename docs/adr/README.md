@@ -23,7 +23,7 @@ Aspen OS / AspenGrove architecture decisions. Prefer short, statused markdown in
 | [ADR-0006](./ADR-0006-memory-store-tiering.md) | Tiered memory store (LanceDB vs PG+AGE) | **Accepted** | BEL-154 + Master Spec §3.1 — accepted ASP-426 |
 | [ADR-0007](./ADR-0007-nats-subject-contracts-sentinel-c2.md) | NATS subject contracts for Sentinel + C2 | **Accepted** | BEL-196 — ASP-530 accept; ASP-563 reconfirm; aspen-contracts mirror residual |
 | [ADR-0008](./ADR-0008-package-classification-core-plugin-devonly.md) | AspenGrove package classification (core/plugin/dev-only) | **Accepted** | BEL-195 — ASP-530 accept; ASP-563 reconfirm; PACKAGES.md SoR |
-| [ADR-0009](./ADR-0009-capability-based-gatekeepers.md) | Capability-based gatekeepers (no broad API keys) | **Accepted (design + Phase 1)** | BEL-215 — ASP-540 P1; Phase 2 token/credential strip residual |
+| [ADR-0009](./ADR-0009-capability-based-gatekeepers.md) | Capability-based gatekeepers (no broad API keys) | **Accepted (design + Phase 1 + Phase 2)** | BEL-215 — ASP-540 P1; ASP-564 P2; Phase 3 durable token store residual |
 | [ADR-0010](./0001-c11-agent-runtime.md) | C11 agent runtime (legacy file `0001-…`) | Accepted | Logical **0010**; file keeps historic name |
 | [ADR-0012](./ADR-0012-operator-of-record-binding.md) | Authenticated operator-of-record binding for DualHumanGate | **Proposed** | ASP-534 / ASP-530 — NATS `human_id` SoR; before G9+ non-sim arm |
 
@@ -40,7 +40,7 @@ Aspen OS / AspenGrove architecture decisions. Prefer short, statused markdown in
 - Fleet subject inventory: `docs/ops/FLEET_SUBJECT_PUBLISHERS.md`
 - Memory design: `docs/architecture/MEMORY_LAYER.md` (BEL-154)
 - ABS path ownership: `docs/ops/ABS_MIRROR_ROUTING.md`
-- Weekly reviews: `docs/ops/WEEKLY_ARCHITECTURE_REVIEW_*.md` (latest: 2026-09-07 / ASP-563)
+- Weekly reviews: `docs/ops/WEEKLY_ARCHITECTURE_REVIEW_*.md` (latest: 2026-09-14 / ASP-595)
 
 ## How to add an ADR
 

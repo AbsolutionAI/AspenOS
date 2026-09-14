@@ -1,10 +1,11 @@
 # Fleet subject publishers inventory (ASP-362)
 
 **Paperclip:** ASP-362 (parent ASP-166 Weekly Architecture Review)  
-**Date:** 2026-08-22 · **Reviewed:** 2026-09-07 (ASP-563)  
+**Date:** 2026-08-22 · **Reviewed:** 2026-09-14 (ASP-595) · prior 2026-09-07 (ASP-563)  
 **Scope:** Inventory only — **no subject deletions**  
 **Purpose:** Support future **ADR-0011** dual-publish deprecation window (candidate; not filed)  
-**Canonical contracts:** [ADR-0003](../adr/ADR-0003-fleet-edge-safety-contracts.md) · [ADR-0007](../adr/ADR-0007-nats-subject-contracts-sentinel-c2.md) · `docs/FLEET.md`
+**Canonical contracts:** [ADR-0003](../adr/ADR-0003-fleet-edge-safety-contracts.md) · [ADR-0007](../adr/ADR-0007-nats-subject-contracts-sentinel-c2.md) · `docs/FLEET.md`  
+**ASP-595 note:** monorepo `services/fleet.py` still dual-publishes `starship.*`/`agnetic.*` only. Next eng step (follow-up): **add** `aspen.fleet.*` alongside dual before any sunset.
 
 ## Naming trees
 
