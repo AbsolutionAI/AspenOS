@@ -1,7 +1,7 @@
 # Fleet subject publishers inventory (ASP-362)
 
 **Paperclip:** ASP-362 (parent ASP-166 Weekly Architecture Review)  
-**Date:** 2026-08-22 · **Reviewed:** 2026-09-07 (ASP-563)  
+**Date:** 2026-08-22 · **Reviewed:** 2026-09-14 (ASP-596)  
 **Scope:** Inventory only — **no subject deletions**  
 **Purpose:** Support future **ADR-0011** dual-publish deprecation window (candidate; not filed)  
 **Canonical contracts:** [ADR-0003](../adr/ADR-0003-fleet-edge-safety-contracts.md) · [ADR-0007](../adr/ADR-0007-nats-subject-contracts-sentinel-c2.md) · `docs/FLEET.md`
@@ -34,8 +34,11 @@ Subject shape mismatch (not just prefix):
 | Code path | Direction | Subjects emitted | Mechanism | Notes |
 |-----------|-----------|------------------|-----------|-------|
 | `services/fleet.py` `_nats_register` | **PUB** | `starship.fleet.register`, `agnetic.fleet.register`, `starship.fleet.status`, `agnetic.fleet.status` | `dual_publish` | CLI `register` / dashboard register subprocess |
+| `services/fleet.py` `_nats_register` (aspen) | **PUB** | `aspen.fleet.node.register`, `aspen.fleet.ops.status` | direct `nc.publish` | ADR-0003 bridge alongside dual (ASP-596) |
 | `services/fleet.py` `daemon_loop` | **PUB** | `starship.fleet.heartbeat`, `agnetic.fleet.heartbeat` | `dual_publish` every `STARSHIP_FLEET_HB` (default 30s) | Always on when daemon runs |
+| `services/fleet.py` `daemon_loop` (aspen) | **PUB** | `aspen.fleet.node.heartbeat` | direct `nc.publish` | ADR-0003 bridge alongside dual (ASP-596) |
 | `services/fleet.py` `daemon_loop` (ops) | **PUB** | `starship.fleet.ops.status`, `agnetic.fleet.ops.status` | `dual_publish` when `fleet.ops_manager.enabled` | Aggregate summary JSON (not event-envelope) |
+| `services/fleet.py` `daemon_loop` (aspen ops) | **PUB** | `aspen.fleet.ops.status` | direct `nc.publish` when `fleet.ops_manager.enabled` | ADR-0003 bridge alongside dual (ASP-596) |
 | `services/fleet.py` `_nats_exercise` | **PUB** | `starship.fleet.exercise`, `agnetic.fleet.exercise` | `dual_publish` | start/stop exercise |
 | `dashboard/server.py` `handle_api_fleet_exercise` | **PUB** | `starship.fleet.exercise`, `agnetic.fleet.exercise` | explicit dual loop | Mirrors state file; NATS optional |
 | `src/python/lib/dashboard/server.py` | **PUB** | same exercise pair | same | Install/layout twin of dashboard |
@@ -47,7 +50,7 @@ Subject shape mismatch (not just prefix):
 | `src/c/starshipd` | — | dual-publish map print | not a live fleet publisher | |
 | `src/python/lib/tools.py` | **PUB** (unrelated) | `agnetic.flamingo.fleet` | one-off tool | **Not** the fleet control plane |
 
-**Monorepo does not publish any `aspen.fleet.*` subjects today.**
+**Monorepo now publishes `aspen.fleet.node.register`, `aspen.fleet.node.heartbeat`, and `aspen.fleet.ops.status` alongside starship/agnetic dual (ASP-596). `aspen.fleet.mission.*` remains swarm-manager only.**
 
 ### Config / ACL surface (not publishers)
 
@@ -110,19 +113,19 @@ Paths on this host: `/home/tech/repos/{aspen-edge-rrm,aspen-swarm-manager,aspen-
 
 | ADR-0003 expectation | Status | Gap |
 |----------------------|--------|-----|
-| Prefer `aspen.` for new work | Packages OK; monorepo still starship/agnetic | No monorepo → aspen bridge |
-| `aspen.fleet.node.register` | edge-rrm only | Monorepo uses `*.fleet.register` (no `.node.`) |
-| `aspen.fleet.node.heartbeat` | edge-rrm only | Monorepo uses `*.fleet.heartbeat` |
-| `aspen.fleet.ops.status` | both trees, **disjoint buses** | Same leaf name; different prefix + payload shape; no shared consumer |
+| Prefer `aspen.` for new work | Packages OK; monorepo bridges aspen alongside dual (ASP-596) | Resolved — no deprecation yet |
+| `aspen.fleet.node.register` | edge-rrm + **monorepo now publishes** | **Resolved** (ASP-596) |
+| `aspen.fleet.node.heartbeat` | edge-rrm + **monorepo now publishes** | **Resolved** (ASP-596) |
+| `aspen.fleet.ops.status` | **all three trees now publish** | **Resolved** (ASP-596) |
 | `aspen.fleet.mission.*` | swarm-manager only | Monorepo has no mission graph subjects |
 | `aspen.edge.<node>.*` | edge-rrm | Not in monorepo NATS ACL/subjects.yaml |
 | `aspen.safety.estop\|clear` | edge-rrm | Not in monorepo fleet daemon |
 | Event envelope (`id, source, type, time, data`) | packages ~yes | `services/fleet.py` publishes raw node/summary JSON |
-| Dual-publish only when bridging Alpha | monorepo dual always on for fleet | No `aspen` dual; starship↔agnetic always |
+| Dual-publish only when bridging Alpha | monorepo dual always on for fleet | **Resolved** (ASP-596: aspen published alongside; ADR-0011 deferred) |
 | JetStream streams FLEET / EDGE / SAFETY | lab packages | Monorepo accounts stream `starship.fleet.>` / `agnetic.fleet.>` only |
 | `*.fleet.status` / `*.fleet.exercise` | monorepo only | **Extra** vs ADR-0003 — keep until ADR-0007 maps or retires them |
 | `config/fleet.yaml` ops.command / ops.event | declared | **No code publishers found** in this pass |
-| Single mesh visibility | broken | Starship C2 and plant packages do not share subjects without a future bridge |
+| Single mesh visibility | improving | **Improved** — monorepo and plant packages now share `aspen.fleet.*` subjects |
 
 ---
 

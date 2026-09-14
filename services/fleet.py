@@ -94,6 +94,11 @@ SUBJECT_STATUS = f"{PRIMARY}.fleet.status"
 SUBJECT_OPS = f"{PRIMARY}.fleet.ops.status"
 SUBJECT_EXERCISE = f"{PRIMARY}.fleet.exercise"
 
+# ADR-0003 canonical aspen.fleet.* subjects (bridge alongside dual-publish)
+ASPEN_FLEET_REGISTER = "aspen.fleet.node.register"
+ASPEN_FLEET_HEARTBEAT = "aspen.fleet.node.heartbeat"
+ASPEN_FLEET_OPS_STATUS = "aspen.fleet.ops.status"
+
 
 def _utcnow() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -324,9 +329,13 @@ async def _nats_register(node: FleetNode) -> None:
     payload = json.dumps(node.to_dict()).encode()
     await dual_publish(nc, SUBJECT_REGISTER, payload)
     await dual_publish(nc, SUBJECT_STATUS, payload)
+    # ADR-0003: aspen.fleet.node.register + status (alongside starship/agnetic dual)
+    await nc.publish(ASPEN_FLEET_REGISTER, payload)
+    await nc.publish(ASPEN_FLEET_OPS_STATUS, payload)
     await nc.flush()
     await nc.close()
     print(f"nats: dual-published register on {dual(SUBJECT_REGISTER)} via {safe_url()}")
+    print(f"nats: aspen-published on {ASPEN_FLEET_REGISTER}, {ASPEN_FLEET_OPS_STATUS}")
 
 
 def cmd_exercise(cfg: dict, action: str) -> int:
@@ -438,6 +447,8 @@ async def daemon_loop(cfg: dict) -> None:
         node.status = "online"
         payload = json.dumps(node.to_dict()).encode()
         await dual_publish(nc, SUBJECT_HEARTBEAT, payload)
+        # ADR-0003: aspen.fleet.node.heartbeat (alongside starship/agnetic dual)
+        await nc.publish(ASPEN_FLEET_HEARTBEAT, payload)
         if ops.get("enabled", True):
             summary = {
                 "ops_manager": True,
@@ -449,6 +460,8 @@ async def daemon_loop(cfg: dict) -> None:
                 "timestamp": _utcnow(),
             }
             await dual_publish(nc, SUBJECT_OPS, json.dumps(summary).encode())
+            # ADR-0003: aspen.fleet.ops.status (alongside starship/agnetic dual)
+            await nc.publish(ASPEN_FLEET_OPS_STATUS, json.dumps(summary).encode())
         await asyncio.sleep(interval)
 
 
