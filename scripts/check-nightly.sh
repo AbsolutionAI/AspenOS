@@ -137,9 +137,15 @@ check "gatekeeper shim syntax" python3 -c "import ast; ast.parse(open('src/pytho
 
 # ─── Section 13: Python test suite ──────────────────────────
 echo -e "\n${YELLOW}── Section 13: Python test suite ──${NC}"
-check "pytest importable" python3 -c "import pytest"
+# Prefer repo .venv so bare-host PATH without pytest does not false-fail (ASP-600).
+if [ -x "$REPO_DIR/.venv/bin/python3" ]; then
+  PY="$REPO_DIR/.venv/bin/python3"
+else
+  PY="python3"
+fi
+check "pytest importable" "$PY" -c "import pytest"
 PYTEST_OUT=$(mktemp)
-check "python test suite" bash -c "python3 -m pytest tests/ -v --tb=no 2>&1 | tee '$PYTEST_OUT' | tail -3"
+check "python test suite" bash -c "'$PY' -m pytest tests/ -v --tb=no 2>&1 | tee '$PYTEST_OUT' | tail -3"
 check "pytest pass count >= 150" bash -c "grep -Eo '[0-9]+ passed' '$PYTEST_OUT' 2>/dev/null | awk '{s+=\$1} END {exit(s<150)}'"
 check "no pytest failures" bash -c "grep -q 'FAILED' '$PYTEST_OUT' 2>/dev/null && exit 1; exit 0"
 rm -f "$PYTEST_OUT"
