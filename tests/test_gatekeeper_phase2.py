@@ -46,14 +46,16 @@ from gatekeeper.safety_enforcer import SafetySubjectEnforcer
 @pytest.fixture(autouse=True)
 def _clean_state():
     """Reset global state before and after every test."""
-    from gatekeeper import AUDIT_LOG
+    from gatekeeper import AUDIT_LOG, _reset_rate_limits
     AUDIT_LOG.clear()
     PROPOSALS.clear()
     TOKEN_REGISTRY.clear()
+    _reset_rate_limits()
     yield
     AUDIT_LOG.clear()
     PROPOSALS.clear()
     TOKEN_REGISTRY.clear()
+    _reset_rate_limits()
 
 
 def _make_token(

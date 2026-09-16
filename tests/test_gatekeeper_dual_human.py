@@ -29,6 +29,7 @@ from gatekeeper.minimal_shim import (
     DUAL_HUMAN_REQUIRED,
     PROPOSALS,
     _is_expired,
+    _reset_rate_limits,
     authorize_gate_request,
     forward_proposal,
     is_safety_capability,
@@ -53,10 +54,12 @@ def _clean_state():
 
     AUDIT_LOG.clear()
     PROPOSALS.clear()
+    _reset_rate_limits()
     set_audit_publisher(None)
     yield
     AUDIT_LOG.clear()
     PROPOSALS.clear()
+    _reset_rate_limits()
     set_audit_publisher(None)
 
 

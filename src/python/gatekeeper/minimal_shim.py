@@ -32,9 +32,10 @@ import json
 import logging
 import os
 import sys
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("gatekeeper.shim")
 
@@ -79,6 +80,41 @@ TOKEN_REFRESH_DELTA_MINUTES = 15
 
 # Stale token cleanup age — tokens expired longer than this are purged.
 TOKEN_CLEANUP_MAX_AGE_SECONDS = 3600  # 1 hour
+
+# ---------------------------------------------------------------------------
+# Sliding-window rate limiter (per agent_id)
+# ---------------------------------------------------------------------------
+RATE_LIMIT_WINDOW_SECONDS: int = int(os.environ.get("ASPEN_GATE_RATE_LIMIT_WINDOW", "60"))
+RATE_LIMIT_MAX_REQUESTS: int = int(os.environ.get("ASPEN_GATE_RATE_LIMIT_MAX", "30"))
+
+RATE_LIMIT_STATE: Dict[str, List[float]] = {}
+
+
+def _prune_rate_window(now: float) -> None:
+    """Remove timestamps older than the window from all agents."""
+    cutoff = now - RATE_LIMIT_WINDOW_SECONDS
+    empty_agents = [aid for aid, stamps in RATE_LIMIT_STATE.items() if stamps[-1] < cutoff]
+    for aid in empty_agents:
+        del RATE_LIMIT_STATE[aid]
+    remaining = {aid: stamps for aid, stamps in RATE_LIMIT_STATE.items() if stamps[0] >= cutoff}
+    RATE_LIMIT_STATE.clear()
+    RATE_LIMIT_STATE.update(remaining)
+
+
+def _check_rate_limit(agent_id: str) -> bool:
+    """Return True if the request is allowed, False if rate-limited."""
+    now = time.time()
+    _prune_rate_window(now)
+    stamps = RATE_LIMIT_STATE.setdefault(agent_id, [])
+    if len(stamps) >= RATE_LIMIT_MAX_REQUESTS:
+        return False
+    stamps.append(now)
+    return True
+
+
+def _reset_rate_limits() -> None:
+    """Clear all rate-limit state (for tests and daemon resets)."""
+    RATE_LIMIT_STATE.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -712,6 +748,27 @@ def request_capability(
     """
     request_id = str(uuid.uuid4())
     profile = context.get("profile", "light-cell")
+
+    # 0. Per-agent rate limit (sliding window)
+    if not _check_rate_limit(agent_id):
+        log_audit({
+            "type": "gate.rate_limited",
+            "request_id": request_id,
+            "agent_id": agent_id,
+            "capability": capability,
+            "resource": resource,
+            "decision": "deny",
+            "reason": "rate_limited",
+            "window_seconds": RATE_LIMIT_WINDOW_SECONDS,
+            "max_requests": RATE_LIMIT_MAX_REQUESTS,
+        })
+        return {
+            "decision": "deny",
+            "reason": "rate_limited",
+            "request_id": request_id,
+            "window_seconds": RATE_LIMIT_WINDOW_SECONDS,
+            "max_requests": RATE_LIMIT_MAX_REQUESTS,
+        }
 
     # 1. Basic capability check
     allowed_caps = CAPABILITY_STORE.get(agent_id, [])

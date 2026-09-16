@@ -2,7 +2,7 @@
 
 ## Summary
 
-- **Python test suite:** 303 passed, 4 skipped, 0 failures
+- **Python test suite:** 316 passed, 4 skipped, 0 failures (was 303 before rate limiting)
 - **Shell scripts:** 35/35 syntax OK (`bash -n`)
 - **Nightly check:** ASP-606 ran 2026-09-16 08:01 UTC — not re-run
 - **Workspace:** `master` 2 commits ahead of `origin/master` (docs-only); uncommitted Auditor update to `docs/SECURITY_THREAT_MODEL_v2.2.md` plus two untracked marketing docs and `.paperclip/`
@@ -10,11 +10,12 @@
 
 ## Actions Taken
 
-1. Ran Python test suite: 303 passed, 4 skipped, 0 failures
+1. Ran Python test suite: 316 passed, 4 skipped, 0 failures
 2. Syntax-checked all `scripts/*.sh`: 35/35 OK
 3. Verified `master` up to date; last commit: ASP-606 nightly results
 4. Reviewed workspace diff — security threat model has Auditor biweekly refresh (H-014, H-015, H-019, CR 3.4, CR 4.2 updated); left uncommitted (Auditor-owned)
 5. Deep codebase sweep: TODO/FIXME/HACK/XXX search, branch audit, stub/placeholder inventory
+6. **Implemented gatekeeper rate limiting** (ASP-540 residual): sliding-window per-agent limiter on `request_capability()`, `gate.rate_limited` audit event, env-overridable window/max (`ASPEN_GATE_RATE_LIMIT_WINDOW`, `ASPEN_GATE_RATE_LIMIT_MAX`). Plan: `docs/plans/ASP-607-gatekeeper-rate-limiting.md`. Tests: 13 new in `tests/test_gatekeeper_rate_limiting.py`; 4 existing gatekeeper test files updated to reset rate-limit state between tests.
 
 ## Pending Implementation Work (Backlog)
 
@@ -36,9 +37,10 @@
 5. Optional Matrix bot
 6. G9 checklist row
 
-### Gatekeeper Rate Limiting
+### Gatekeeper Rate Limiting — **DONE this sweep**
 
-- Noted in `.paperclip/todos/ASP-540-liveness-disposition.md` as "not yet implemented (no issue filed)"
+- ~~Noted in `.paperclip/todos/ASP-540-liveness-disposition.md` as "not yet implemented (no issue filed)"~~
+- Implemented 2026-09-16: sliding-window, per-agent, `gate.rate_limited` audit + deny. See plan above.
 
 ### Docs Drift
 
@@ -52,7 +54,7 @@
 
 ## Test Health
 
-- **pytest:** 303 passed, 4 skipped, 0 failures (skips are optional-dependency guards only)
+- **pytest:** 316 passed, 4 skipped, 0 failures (skips are optional-dependency guards only)
 - **make smoke:** 60/61 — single known C11 p50 benchmark failure (hardware-dependent, no fix ticket)
 - **make iso-smoke:** 32/32 pass
 
@@ -60,4 +62,4 @@
 
 **ASP-607 Daily Sweep: COMPLETE**
 
-No regressions. Tests and scripts pass. Repo stable. Security threat model has pending Auditor updates (uncommitted). Backlog is well-documented with explicit stubs. Next sweep: tomorrow.
+Rate limiting cleared from backlog. No regressions. Tests and scripts pass. Repo stable. Security threat model has pending Auditor updates (uncommitted). Backlog remaining: documented stubs (fleet-overview producer, plugin marketplace, HybridIntel), ADR-0012 follow-ups, docs-drift items. Next sweep: tomorrow.

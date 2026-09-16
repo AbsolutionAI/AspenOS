@@ -54,6 +54,7 @@ def _reset_audit_log():
     from gatekeeper import AUDIT_LOG, minimal_shim
     AUDIT_LOG.clear()
     minimal_shim._OFFLINE_BUFFER.clear()
+    minimal_shim._reset_rate_limits()
 
 
 # =========================================================================
@@ -68,6 +69,7 @@ class TestDecisionEngine:
         gk = _import_gatekeeper()
         from gatekeeper import AUDIT_LOG
         AUDIT_LOG.clear()
+        gk["minimal_shim"]._reset_rate_limits()
 
     def test_grant_known_capability(self):
         """A known agent with a matching capability should get a grant."""
