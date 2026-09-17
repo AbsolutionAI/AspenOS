@@ -88,6 +88,41 @@ idempotently on first connect. The gatekeeper shim
 (`src/python/gatekeeper/minimal_shim.py`) fans every capability decision into
 this trail. Sentinel dashboard / SIEM consumers are follow-up (ADR-0007).
 
+## Fleet overview (`aspen.sentinel.fleet.overview`)
+
+ADR-0007 overview events carry the aggregate plants/nodes/status shape with a
+`degraded[]` list. The producer (ASP-597,
+`src/python/sentinel/fleet_overview.py`) fans in from the existing fleet
+subjects — `aspen.fleet.node.heartbeat`, `aspen.fleet.node.register`, and
+`aspen.fleet.ops.status` — and publishes an overview snapshot every
+`ASPEN_FLEET_OVERVIEW_INTERVAL` seconds (default 30). A node whose `last_seen`
+is older than `ASPEN_FLEET_OVERVIEW_STALE_AFTER` seconds (default 70 — >2 missed
+heartbeats) is reported in `degraded[]`; overall fleet `status` is `offline`
+(no nodes known), `degraded`, or `ok`.
+
+Each snapshot is appended to a JSONL journal (always durable, fsync'd) and
+mirrored into the `ASPEN_SENTINEL` JetStream stream on subject
+`aspen.sentinel.fleet.overview` when a broker is reachable. Only the newest
+snapshot matters to consumers, so there is no replay path.
+
+```bash
+# Publish one aggregate now (JSON printed; fully offline-capable)
+python3 scripts/sentinel-fleet-overview.py emit
+
+# Run the fan-in + periodic publish daemon
+python3 scripts/sentinel-fleet-overview.py daemon --nats-url nats://localhost:4222
+
+# Read the journal / state
+python3 scripts/sentinel-fleet-overview.py tail -n 5
+python3 scripts/sentinel-fleet-overview.py check --online
+```
+
+Configuration: `ASPEN_NATS_URL`, `ASPEN_FLEET_OVERVIEW_LOG` (journal path,
+default `/var/lib/aspen/sentinel/fleet-overview.jsonl`). The dashboard consumer
+(`dashboard/server.py` → `GET /api/sentinel/overview`) returns the newest live
+overview, then the producer journal, and only falls back to a local preview stub
+(`_stub: true`) when no producer data exists.
+
 ## Gatekeeper dual-human gate (`aspen.authz.*`)
 
 ADR-0009 Phase 1 (ASP-540): the gatekeeper shim intercepts `propose_act` on

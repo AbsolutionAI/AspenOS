@@ -58,6 +58,14 @@ Aspen Sentinel requires dedicated subjects for authorization gates, audit feeds,
   on subject `aspen.sentinel.audit.event` (best-effort, idempotent replay). The
   gatekeeper shim (`ADR-0009`) fans capability decisions into this trail.
   Consumer (Sentinel dashboard) is follow-up.
+- `aspen.sentinel.fleet.overview` — producer live:
+  `src/python/sentinel/fleet_overview.py` (`FleetOverviewProducer`) +
+  `scripts/sentinel-fleet-overview.py` CLI. Aggregates plants/nodes/status with
+  `degraded[]`, fans in from `aspen.fleet.node.heartbeat` / `.register` /
+  `aspen.fleet.ops.status`, journals every snapshot (JSONL, fsync) and mirrors
+  to JetStream on `aspen.sentinel.fleet.overview`. The dashboard consumer
+  (`GET /api/sentinel/overview`) prefers live → producer journal → local preview
+  stub (`src/python/sentinel/consumer.py` `fleet_overview()`).
 - `aspen.authz.gate.request/decision`, `aspen.authz.capability.grant` — subscribed
   / published by the gatekeeper shim (`src/python/gatekeeper/nats_client.py`).
   Since ASP-540 the gatekeeper intercepts safety-adjacent `propose_act`

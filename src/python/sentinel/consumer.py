@@ -7,11 +7,12 @@ Aspen Sentinel consumer — reads ``aspen.sentinel.audit.event`` (ADR-0007).
   :class:`AuditEventPublisher`. No broker required. ``tail()`` / ``query()``
   work fully offline (local-first per ASP-566 constraints).
 - **NATS subscription (online, optional):** subscribes to
-  ``aspen.sentinel.audit.event`` for real-time event delivery into an in-memory
-  ring buffer. Falls back silently when offline.
-- **Fleet overview stub:** returns local node/plant aggregate. The producer for
-  ``aspen.sentinel.fleet.overview`` does not yet exist; this is an offline-capable
-  preview. When the producer lands, switch to NATS subscription.
+  ``aspen.sentinel.audit.event`` and ``aspen.sentinel.fleet.overview`` for
+  real-time delivery into in-memory ring buffers. Falls back silently when offline.
+- **Fleet overview (producer-aware):** ``fleet_overview()`` returns the newest
+  aggregate from the live NATS ring, then the producer's JSONL journal
+  (``ASPEN_FLEET_OVERVIEW_LOG``), and only falls back to a local preview stub
+  when no producer data exists (producer: ``sentinel.fleet_overview`` / ASP-597).
 
 **Gatekeeper awareness:** the consumer requires no NATS credentials for journal
 reads (local-first). Online NATS access uses the same unprivileged role as the
@@ -38,11 +39,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from sentinel.fleet_overview import (
+    DEFAULT_OVERVIEW_LOG,
+    SUBJECT_FLEET_OVERVIEW,
+)
+
 logger = logging.getLogger("sentinel.consumer")
 
 # ADR-0007 envelope
 SUBJECT_AUDIT_EVENT = "aspen.sentinel.audit.event"
-SUBJECT_FLEET_OVERVIEW = "aspen.sentinel.fleet.overview"
 
 DEFAULT_AUDIT_LOG = "/var/lib/aspen/sentinel/audit.jsonl"
 DEFAULT_RING_SIZE = 500  # in-memory live-event buffer
@@ -68,6 +73,9 @@ class AuditEventConsumer:
     Args:
         audit_log: Path to the JSONL journal. Defaults to ``ASPEN_AUDIT_LOG``
             or ``/var/lib/aspen/sentinel/audit.jsonl``.
+        overview_log: Path to the fleet overview producer journal. Defaults to
+            ``ASPEN_FLEET_OVERVIEW_LOG`` or
+            ``/var/lib/aspen/sentinel/fleet-overview.jsonl``.
         nats_url: Broker URL (None/empty = journal-only). Falls back to
             ``ASPEN_NATS_URL``.
         ring_size: Max in-memory live events (default 500).
@@ -77,6 +85,7 @@ class AuditEventConsumer:
     def __init__(
         self,
         audit_log: Optional[str] = None,
+        overview_log: Optional[str] = None,
         nats_url: Optional[str] = None,
         ring_size: int = DEFAULT_RING_SIZE,
         stream: Optional[str] = None,
@@ -84,6 +93,10 @@ class AuditEventConsumer:
         env_log = os.environ.get("ASPEN_AUDIT_LOG", "")
         self._log_path = Path(
             audit_log or env_log or DEFAULT_AUDIT_LOG
+        ).expanduser()
+        env_overview = os.environ.get("ASPEN_FLEET_OVERVIEW_LOG", "")
+        self._overview_log_path = Path(
+            overview_log or env_overview or DEFAULT_OVERVIEW_LOG
         ).expanduser()
         self._nats_url = nats_url or os.environ.get("ASPEN_NATS_URL", "") or None
         self._ring_size = ring_size
@@ -93,11 +106,12 @@ class AuditEventConsumer:
 
         # NATS state
         self._nc: Any = None
-        self._sub: Any = None
+        self._subs: list = []
         self._consumer_task: Any = None
 
-        # In-memory ring buffer for live NATS events (newest first)
+        # In-memory ring buffers for live NATS events (newest first)
         self._live: deque = deque(maxlen=ring_size)
+        self._overview_live: deque = deque(maxlen=10)
 
     # ---- lifecycle -------------------------------------------------------
 
@@ -170,11 +184,11 @@ class AuditEventConsumer:
             pass  # stream already exists — ok
 
     async def _subscribe(self) -> None:
-        """Subscribe to the audit event subject and feed the ring buffer."""
+        """Subscribe to the audit event + fleet overview subjects."""
         if self._nc is None or not self._nc.is_connected:
             return
 
-        async def _on_msg(msg: Any) -> None:
+        async def _on_audit(msg: Any) -> None:
             try:
                 data = json.loads(msg.data.decode())
                 data["_nats_ts"] = msg.metadata.timestamp.isoformat() if msg.metadata else None
@@ -182,16 +196,28 @@ class AuditEventConsumer:
             except (json.JSONDecodeError, UnicodeDecodeError):
                 logger.debug("Ignoring non-JSON message on %s", msg.subject)
 
-        self._sub = await self._nc.subscribe(SUBJECT_AUDIT_EVENT, cb=_on_msg)
+        async def _on_overview(msg: Any) -> None:
+            try:
+                data = json.loads(msg.data.decode())
+                self._overview_live.appendleft(data)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                logger.debug("Ignoring non-JSON message on %s", msg.subject)
+
+        self._subs = []
+        for subject, cb in (
+            (SUBJECT_AUDIT_EVENT, _on_audit),
+            (SUBJECT_FLEET_OVERVIEW, _on_overview),
+        ):
+            self._subs.append(await self._nc.subscribe(subject, cb=cb))
 
     async def close(self) -> None:
-        """Drain NATS connection and stop the live subscription."""
-        if self._sub is not None:
+        """Drain NATS connection and stop the live subscriptions."""
+        for sub in self._subs:
             try:
-                await self._sub.unsubscribe()
+                await sub.unsubscribe()
             except Exception:
                 pass
-            self._sub = None
+        self._subs = []
         if self._nc is not None:
             try:
                 await self._nc.drain()
@@ -368,23 +394,53 @@ class AuditEventConsumer:
             "is_online": self.is_online,
         }
 
-    # ---- fleet overview stub (offline-capable) ---------------------------
+    # ---- fleet overview (producer-aware) --------------------------------
 
     def fleet_overview(self) -> Dict[str, Any]:
-        """Return a **stub** fleet overview.
+        """Return the fleet overview: live NATS → producer journal → preview.
 
-        The ``aspen.sentinel.fleet.overview`` producer does not yet exist
-        (ADR-0007 "Next"). This method provides an offline-capable preview
-        built from local state:
+        Preference order (producer: ``sentinel.fleet_overview`` / ASP-597):
+
+        1. Newest live aggregate from ``aspen.sentinel.fleet.overview`` (online
+           only).
+        2. Newest aggregate from the producer's JSONL journal
+           (``ASPEN_FLEET_OVERVIEW_LOG``) — durable, offline-capable.
+        3. Local preview stub (``_stub: true``) when no producer data exists.
+        """
+        if self._overview_live:
+            return self._overview_live[0]
+        journal_overview = self._read_overview_journal()
+        if journal_overview is not None:
+            return journal_overview
+        return self._preview_overview()
+
+    def _read_overview_journal(self) -> Optional[Dict[str, Any]]:
+        """Newest producer overview from the JSONL journal, or None."""
+        if not self._overview_log_path.exists():
+            return None
+        try:
+            lines = self._overview_log_path.read_text(encoding="utf-8").strip().splitlines()
+        except OSError:
+            return None
+        for line in reversed(lines):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                return json.loads(line)
+            except json.JSONDecodeError:
+                continue
+        return None
+
+    def _preview_overview(self) -> Dict[str, Any]:
+        """Return a local **preview** fleet overview (no producer data yet).
+
+        Offline-capable preview built from local state:
 
         - Local machine hostname, uptime, plant (from fleet.yaml if present)
         - Count of audit events by plant/actor as a proxy for activity
         - A ``_stub: true`` marker so consumers know this is not live
           producer data.
-
-        When the fleet overview producer lands, this method should either
-        be replaced by a NATS subscription or enriched with the producer's
-        aggregate payload.
         """
         import platform
 

@@ -43,6 +43,7 @@ Subject shape mismatch (not just prefix):
 | `dashboard/server.py` `handle_api_fleet_exercise` | **PUB** | `starship.fleet.exercise`, `agnetic.fleet.exercise` | explicit dual loop | Mirrors state file; NATS optional |
 | `src/python/lib/dashboard/server.py` | **PUB** | same exercise pair | same | Install/layout twin of dashboard |
 | `dashboard/server.py` `handle_api_fleet_register` | **PUB** (indirect) | register + status via fleet.py | subprocess → `services/fleet.py register` | |
+| `src/python/sentinel/fleet_overview.py` `publish_now` / `run_loop` | **PUB** | `aspen.sentinel.fleet.overview` | JSONL journal + best-effort JetStream | Fan-in from `aspen.fleet.node.heartbeat` / `.register` / `aspen.fleet.ops.status` (ASP-597) |
 | `starshipctl/cmd/fleet.go` | **PUB** (indirect) | whatever fleet.py emits | exec `python3 services/fleet.py …` | No direct NATS |
 | `agents/nats_subjects.py` | helper | any subject under starship/agnetic | `dual` / `dual_publish` / `dual_subscribe` | Env: `STARSHIP_NATS_PREFIX`, `STARSHIP_NATS_LEGACY_PREFIX` |
 | `starshipctl/cmd/subjects.go` | helper | dual helpers in Go | library | Not fleet-specific publishers |
@@ -67,7 +68,10 @@ Subject shape mismatch (not just prefix):
 
 | Code path | Direction | Subjects | Notes |
 |-----------|-----------|----------|-------|
-| `services/fleet.py` `daemon_loop` | **SUB** | dual(`*.fleet.register`), dual(`*.fleet.heartbeat`) | Peer cache → `fleet-state.json` |
+| `services/fleet.py` `daemon_loop` | **SUB** | dual(`*.fleet.register`), dual(`*.fleet.heartbeat`) | Peer cache → `fleet-state.jsonl` |
+| `src/python/sentinel/fleet_overview.py` `_subscribe` | **SUB** | `aspen.fleet.node.heartbeat`, `aspen.fleet.node.register`, `aspen.fleet.ops.status` | Fan-in registry for the overview producer (ASP-597) |
+| `src/python/sentinel/consumer.py` `_subscribe` | **SUB** | `aspen.sentinel.audit.event`, `aspen.sentinel.fleet.overview` | Sentinel dashboard live ring; `fleet_overview()` reads live → producer journal → preview (ASP-597) |
+| Dashboard Sentinel APIs | **read file** | — | `GET /api/sentinel/overview` → `consumer.fleet_overview()` (producer-aware) |
 | Dashboard Fleet Map APIs | **read file** | — | `GET /api/fleet` reads local state / config; **no** NATS subscribe on fleet subjects |
 | TelemetryAggregator | **SUB** | `starship.telemetry.>` only | Not fleet |
 

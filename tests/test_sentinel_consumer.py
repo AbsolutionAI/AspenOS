@@ -21,7 +21,11 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SRC_PYTHON = os.path.join(REPO_ROOT, "src", "python")
 sys.path.insert(0, SRC_PYTHON)
 
-from sentinel.consumer import AuditEventConsumer, SUBJECT_AUDIT_EVENT
+from sentinel.consumer import (
+    AuditEventConsumer,
+    SUBJECT_AUDIT_EVENT,
+)
+from sentinel.fleet_overview import SUBJECT_FLEET_OVERVIEW
 
 
 # =========================================================================
@@ -34,6 +38,9 @@ def _make_log(tmp_path) -> str:
 
 
 def _make_consumer(tmp_path, **kwargs):
+    kwargs.setdefault(
+        "overview_log", str(tmp_path / "sentinel" / "fleet-overview.jsonl")
+    )
     return AuditEventConsumer(audit_log=_make_log(tmp_path), **kwargs)
 
 
@@ -231,20 +238,19 @@ class TestLiveSubscription:
             ok = await consumer.start()
         assert ok is True
         assert consumer.is_online is True
-        mock_conn.subscribe.assert_called_once()
-        subj = mock_conn.subscribe.call_args[0][0]
-        assert subj == SUBJECT_AUDIT_EVENT
+        subscribe_calls = [c.args[0] for c in mock_conn.subscribe.call_args_list]
+        assert SUBJECT_AUDIT_EVENT in subscribe_calls
+        assert SUBJECT_FLEET_OVERVIEW in subscribe_calls
         await consumer.close()
 
     async def test_live_event_feeds_ring_buffer(self, tmp_path, mock_nats):
         mock_mod, mock_conn, _, _ = mock_nats
 
-        # Capture the callback passed to subscribe
-        captured_cb = None
+        # Capture the callbacks passed to subscribe, by subject
+        captured: dict = {}
 
         async def _capture_sub(subject, cb=None):
-            nonlocal captured_cb
-            captured_cb = cb
+            captured[subject] = cb
             return MagicMock(unsubscribe=AsyncMock())
 
         mock_conn.subscribe = _capture_sub
@@ -272,8 +278,9 @@ class TestLiveSubscription:
         mock_msg.metadata.timestamp.isoformat.return_value = "2026-09-07T12:00:00Z"
 
         # Call the NATS callback
-        if captured_cb:
-            await captured_cb(mock_msg)
+        audit_cb = captured.get(SUBJECT_AUDIT_EVENT)
+        if audit_cb:
+            await audit_cb(mock_msg)
 
         assert consumer.live_buffer_size == 1
         live_event = consumer._live[0]
@@ -290,11 +297,10 @@ class TestLiveSubscription:
         """When a live event also exists in the journal, show only the live copy."""
         mock_mod, mock_conn, _, _ = mock_nats
 
-        captured_cb = None
+        captured: dict = {}
 
         async def _capture_sub(subject, cb=None):
-            nonlocal captured_cb
-            captured_cb = cb
+            captured[subject] = cb
             return MagicMock(unsubscribe=AsyncMock())
 
         mock_conn.subscribe = _capture_sub
@@ -327,8 +333,9 @@ class TestLiveSubscription:
         mock_msg.subject = SUBJECT_AUDIT_EVENT
         mock_msg.metadata = None
 
-        if captured_cb:
-            await captured_cb(mock_msg)
+        audit_cb = captured.get(SUBJECT_AUDIT_EVENT)
+        if audit_cb:
+            await audit_cb(mock_msg)
 
         # tail(5) should return one entry (deduped)
         tail = consumer.tail(5)
@@ -340,11 +347,10 @@ class TestLiveSubscription:
     async def test_invalid_json_message_ignored(self, tmp_path, mock_nats):
         mock_mod, mock_conn, _, _ = mock_nats
 
-        captured_cb = None
+        captured: dict = {}
 
         async def _capture_sub(subject, cb=None):
-            nonlocal captured_cb
-            captured_cb = cb
+            captured[subject] = cb
             return MagicMock(unsubscribe=AsyncMock())
 
         mock_conn.subscribe = _capture_sub
@@ -361,8 +367,9 @@ class TestLiveSubscription:
         mock_msg.subject = SUBJECT_AUDIT_EVENT
         mock_msg.metadata = None
 
-        if captured_cb:
-            await captured_cb(mock_msg)
+        audit_cb = captured.get(SUBJECT_AUDIT_EVENT)
+        if audit_cb:
+            await audit_cb(mock_msg)
 
         assert consumer.live_buffer_size == 0
         await consumer.close()
