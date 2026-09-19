@@ -987,7 +987,7 @@ manager = PluginManager(config_path=None)
 | `disable(name)` | `(name: str) -> bool` | Success flag | Disable a plugin (unloads if loaded) |
 | `uninstall(name)` | `(name: str) -> bool` | Success flag | Remove plugin and cleanup |
 | `install_from_path(source, name)` | `(source: Path, name: str \| None) -> bool` | Success flag | Install from local directory |
-| `update(name)` | `(name: str) -> bool` | Success flag | Check for and apply updates |
+| `update(name, source)` | `(name: str, source: Path \| None, force: bool = False) -> bool` | Success flag | Update from a local directory (newer version required unless forced); marketplace fetch not yet implemented |
 
 #### Security Methods
 

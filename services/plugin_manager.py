@@ -616,16 +616,94 @@ class PluginManager:
         print(f"[plugin_manager] Installed plugin '{plugin_name}' v{manifest.version}")
         return True
 
-    def update(self, name: str) -> bool:
-        """Update a plugin (placeholder for marketplace update)."""
+    def update(self, name: str, source: Path | str | None = None, force: bool = False) -> bool:
+        """Update an installed plugin from a local directory.
+
+        With ``source`` set to a directory, the plugin is atomically replaced
+        with the newer version at that path. Without a source, marketplace
+        fetching is not yet implemented (no backend exists) and this returns
+        False with a message.
+        """
         if name not in self.states:
             print(f"[plugin_manager] Plugin '{name}' not found.")
             return False
 
         state = self.states[name]
-        print(f"[plugin_manager] Checking updates for '{name}' v{state.version}...")
-        print(f"[plugin_manager] Marketplace update not yet implemented.")
-        return False
+        if source is None:
+            print(f"[plugin_manager] Checking updates for '{name}' v{state.version}...")
+            print(f"[plugin_manager] Marketplace update not yet implemented.")
+            return False
+
+        src = Path(source)
+        if not src.is_dir():
+            print(f"[plugin_manager] Source '{source}' is not a directory.")
+            return False
+
+        manifest_path = src / "plugin.yaml"
+        if not manifest_path.exists():
+            print(f"[plugin_manager] No plugin.yaml found in '{source}'.")
+            return False
+
+        new_manifest = self._parse_manifest(manifest_path)
+        if new_manifest.name != name:
+            print(f"[plugin_manager] Source is plugin '{new_manifest.name}', not '{name}'.")
+            return False
+
+        installed = self._version_key(state.version)
+        incoming = self._version_key(new_manifest.version)
+        if incoming < installed and not force:
+            print(f"[plugin_manager] Refusing downgrade to v{new_manifest.version} (installed v{state.version}).")
+            return False
+        if incoming == installed and not force:
+            print(f"[plugin_manager] Plugin '{name}' already at v{state.version}.")
+            return False
+
+        dest = self.plugins_dir / name
+        staging = dest.parent / f"{dest.name}.update-tmp"
+        backup = dest.parent / f"{dest.name}.bak"
+
+        try:
+            if staging.exists():
+                shutil.rmtree(staging)
+            shutil.copytree(src, staging)
+
+            if new_manifest.dependencies.python_packages:
+                self._install_python_deps(new_manifest.dependencies.python_packages)
+            self._run_setup_hook(staging)
+
+            if backup.exists():
+                shutil.rmtree(backup)
+            if dest.exists():
+                dest.rename(backup)
+            staging.rename(dest)
+            if backup.exists():
+                shutil.rmtree(backup)
+        except Exception as exc:
+            if not dest.exists() and backup.exists():
+                backup.rename(dest)
+            if staging.exists():
+                shutil.rmtree(staging)
+            print(f"[plugin_manager] Failed to update '{name}': {exc}")
+            return False
+
+        self.discover()
+        self._persist_enabled_state()
+        print(f"[plugin_manager] Updated plugin '{name}' v{state.version}")
+        return True
+
+    @staticmethod
+    def _version_key(version: str) -> tuple[int, int, int]:
+        """Parse a dotted version string into a comparable tuple."""
+        parts = version.strip().split(".")
+        nums: list[int] = []
+        for p in parts[:3]:
+            try:
+                nums.append(int(p))
+            except ValueError:
+                nums.append(0)
+        while len(nums) < 3:
+            nums.append(0)
+        return (nums[0], nums[1], nums[2])
 
     def verify(self, name: str) -> PluginSecurityReport:
         """Verify plugin integrity and generate a security report."""
@@ -1005,6 +1083,14 @@ def cmd_remove(manager: PluginManager, args: list[str]) -> None:
     manager.uninstall(args[0])
 
 
+def cmd_update(manager: PluginManager, args: list[str]) -> None:
+    if len(args) < 2:
+        print("Usage: plugin_manager.py update <name> <path>")
+        return
+    manager.discover()
+    manager.update(args[0], Path(args[1]))
+
+
 def cmd_info(manager: PluginManager, args: list[str]) -> None:
     if not args:
         print("Usage: plugin_manager.py info <name>")
@@ -1123,6 +1209,7 @@ Commands:
   enable <name>                     Enable a plugin
   disable <name>                    Disable a plugin
   remove <name>                     Uninstall a plugin
+  update <name> <path>              Update plugin from local directory
   info <name>                       Show plugin details
   verify <name>                     Verify plugin integrity
   load [name]                       Load a plugin (or all if no name given)
@@ -1153,6 +1240,7 @@ def main() -> None:
         "enable": lambda: cmd_enable(manager, extra_args),
         "disable": lambda: cmd_disable(manager, extra_args),
         "remove": lambda: cmd_remove(manager, extra_args),
+        "update": lambda: cmd_update(manager, extra_args),
         "info": lambda: cmd_info(manager, extra_args),
         "verify": lambda: cmd_verify(manager, extra_args),
         "load": lambda: cmd_load(manager, extra_args),
