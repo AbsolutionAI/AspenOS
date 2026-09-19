@@ -786,19 +786,7 @@ class PluginManager:
     @staticmethod
     def _check_version_compat(required: str) -> bool:
         """Simple semver comparison for min_version."""
-        def parse(v: str) -> tuple[int, int, int]:
-            parts = v.strip().split(".")
-            nums = []
-            for p in parts[:3]:
-                try:
-                    nums.append(int(p))
-                except ValueError:
-                    nums.append(0)
-            while len(nums) < 3:
-                nums.append(0)
-            return (nums[0], nums[1], nums[2])
-
-        return parse(AGNETIC_VERSION) >= parse(required)
+        return PluginManager._version_key(AGNETIC_VERSION) >= PluginManager._version_key(required)
 
     @staticmethod
     def _check_python_deps(packages: list[str]) -> list[str]:
