@@ -77,6 +77,22 @@ chmod 755 /etc/starship/nats 2>/dev/null || true
 chmod +x /opt/starship/bin/* 2>/dev/null || true
 echo "[OK] Permissions set"
 
+# ─── 4b. NATS secret paths → 600 (ASP-373 / F-009) ──────────────────
+FIXER=/opt/starship/lib/starship/scripts/fix-nats-secret-modes.sh
+if [[ -f "$FIXER" ]]; then
+    bash "$FIXER" 2>/dev/null || echo "[WARN] fix-nats-secret-modes.sh failed" >&2
+else
+    chmod 600 /etc/starship/nats.env /etc/starship/nats-token 2>/dev/null || true
+    chmod 600 /etc/starship/nats/fleet-accounts.conf \
+             /etc/starship/nats/fleet-bus.active.conf \
+             /etc/starship/nats/server.conf 2>/dev/null || true
+    if [[ -d /etc/starship/nats/creds ]]; then
+        chmod 700 /etc/starship/nats/creds
+        find /etc/starship/nats/creds -type f -exec chmod 600 {} + 2>/dev/null || true
+    fi
+fi
+echo "[OK] NATS secret paths → 600 (ASP-373/F-009)"
+
 # ─── 5. Systemd ─────────────────────────────────────────────────────
 if command -v systemctl &>/dev/null; then
     systemctl daemon-reload || true

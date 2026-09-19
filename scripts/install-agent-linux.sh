@@ -142,7 +142,7 @@ commands:
 $HOSTNAME_CFG
 YAMLEOF
 
-chmod 644 "$CONFIG_DIR/staragent.yaml"
+chmod 600 "$CONFIG_DIR/staragent.yaml"
 log "Config written to $CONFIG_DIR/staragent.yaml"
 
 SERVICE_OK=false

@@ -97,6 +97,9 @@ commands:
 hostname: "$HOST_ID"
 YAMLEOF
 
+# ASP-373 / F-009: creds in staragent.yaml must not be world-readable
+chmod 600 "$DEPLOY_DIR/etc/starship/agents/staragent.yaml"
+
 # Systemd service
 cat > "$DEPLOY_DIR/etc/systemd/system/agnetic-staragent.service" <<UNIT
 [Unit]

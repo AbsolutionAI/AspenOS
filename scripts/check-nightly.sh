@@ -183,6 +183,15 @@ check "build-deb stages apparmor profiles" bash -c 'grep -q "etc/apparmor.d" scr
 check "postinst has apparmor_parser" bash -c 'grep -q "apparmor_parser -r" debian/DEBIAN/postinst'
 check "postinst avoids aa-enforce" bash -c '! grep -q "aa-enforce" debian/DEBIAN/postinst'
 
+# ─── Section 18: NATS creds & secret paths mode 600 (ASP-373/F-009) ──
+echo -e "\n${YELLOW}── Section 18: NATS secret paths mode 600 (ASP-373/F-009) ──${NC}"
+check "firstboot uses chmod 600 on nats.env/nats-token" bash -c 'grep -q "chmod 600 /etc/starship/nats-token" scripts/starship-firstboot.sh && grep -q "chmod 600 /etc/starship/nats.env" scripts/starship-firstboot.sh'
+check "firstboot has no 640/644 on nats.env/nats-token" bash -c '! grep -E "chmod (640|644) /etc/starship/(nats-token|nats\.env)" scripts/starship-firstboot.sh'
+check "postinst hardens NATS secret paths" bash -c 'grep -q "fix-nats-secret-modes.sh" debian/DEBIAN/postinst'
+check "build-deb stages & verifies 600 payload" bash -c 'grep -q "fix-nats-secret-modes.sh" scripts/build-deb.sh && grep -q "mode != 600" scripts/build-deb.sh'
+check "install-agent staragent.yaml is 600" bash -c 'grep -q "chmod 600 \"\$CONFIG_DIR/staragent.yaml\"" scripts/install-agent-linux.sh'
+check "nats secret mode fixture tests" "$PY" -m pytest tests/test_nats_secret_modes.py -q --tb=short 2>&1 | grep -E '[0-9]+ passed'
+
 # ─── Summary ─────────────────────────────────────────────────
 TIMING_END=$(date +%s%N)
 ELAPSED_MS=$(( (TIMING_END - TIMING_BEGIN) / 1000000 ))

@@ -91,6 +91,7 @@ cp "$REPO_DIR/scripts/starship-firstboot.sh" "$PKG_ROOT/opt/starship/bin/"
 cp "$REPO_DIR/scripts/select-profile.sh" "$PKG_ROOT/opt/starship/bin/" 2>/dev/null || true
 cp "$REPO_DIR/scripts/gen-nats-accounts.sh" "$PKG_ROOT/opt/starship/bin/" 2>/dev/null || true
 cp "$REPO_DIR/scripts/gen-nats-tls.sh" "$PKG_ROOT/opt/starship/bin/" 2>/dev/null || true
+cp "$REPO_DIR/scripts/fix-nats-secret-modes.sh" "$PKG_ROOT/opt/starship/bin/" 2>/dev/null || true
 if [[ -x "$REPO_DIR/src/c/sandbox_spike/sandbox_run" ]]; then
     cp "$REPO_DIR/src/c/sandbox_spike/sandbox_run" "$PKG_ROOT/opt/starship/bin/"
     ln -sf /opt/starship/bin/sandbox_run "$PKG_ROOT/usr/local/bin/sandbox_run"
@@ -121,6 +122,7 @@ cp "$REPO_DIR/scripts/agent-health-checker.py" "$PKG_ROOT/opt/starship/lib/stars
 cp "$REPO_DIR/scripts/starship-firstboot.sh" "$PKG_ROOT/opt/starship/lib/starship/scripts/"
 cp "$REPO_DIR/scripts/gen-nats-accounts.sh" "$PKG_ROOT/opt/starship/lib/starship/scripts/" 2>/dev/null || true
 cp "$REPO_DIR/scripts/gen-nats-tls.sh" "$PKG_ROOT/opt/starship/lib/starship/scripts/" 2>/dev/null || true
+cp "$REPO_DIR/scripts/fix-nats-secret-modes.sh" "$PKG_ROOT/opt/starship/lib/starship/scripts/" 2>/dev/null || true
 
 cp -r "$REPO_DIR/skills/"* "$PKG_ROOT/opt/starship/lib/starship/skills/" 2>/dev/null || true
 cp -r "$REPO_DIR/souls/"* "$PKG_ROOT/opt/starship/lib/starship/souls/" 2>/dev/null || true
@@ -165,6 +167,12 @@ chmod 755 "$PKG_ROOT/opt/starship/lib/starship/agents/run_agent.sh" 2>/dev/null 
 chmod 755 "$PKG_ROOT/opt/starship/lib/starship/dashboard/server.py" 2>/dev/null || true
 chmod 755 "$PKG_ROOT/opt/starship/lib/starship/services/fleet.py" 2>/dev/null || true
 chmod 755 "$PKG_ROOT/opt/starship/lib/starship/scripts/"* 2>/dev/null || true
+
+# ASP-373 / F-009: lock NATS secret paths in the payload to 600 / dirs 700
+# (never ship a world-readable server.conf or generated cred).
+if [[ -f "$REPO_DIR/scripts/fix-nats-secret-modes.sh" ]]; then
+    bash "$REPO_DIR/scripts/fix-nats-secret-modes.sh" "$PKG_ROOT"
+fi
 
 # Legacy symlinks in package (postinst also creates live ones)
 ln -sfn /opt/starship "$PKG_ROOT/opt/agnetic" 2>/dev/null || true
@@ -224,6 +232,12 @@ fi
 if ! grep -q 'opt/starship/bin/starshipctl' "$LIST"; then
     rm -f "$LIST"
     err "package missing opt/starship/bin/starshipctl"
+fi
+# ASP-373 / F-009: no NATS secret path may ship world/group readable.
+# Matches exact paths; "fleet-accounts.conf.tmpl" (placeholder) is not a secret.
+if grep -E 'etc/starship/nats\.env |etc/starship/nats-token |/creds/ |nats/server\.conf |fleet-accounts\.conf ' "$LIST" | grep -vE '^[-d]rw-------'; then
+    rm -f "$LIST"
+    err "package ships a NATS secret path readable by group/other (mode != 600); run fix-nats-secret-modes.sh against \$PKG_ROOT and rebuild"
 fi
 FILE_COUNT=$(wc -l < "$LIST")
 rm -f "$LIST"
