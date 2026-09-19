@@ -31,7 +31,7 @@ On failure: diagnose, fix if well-scoped, otherwise mark the run issue blocked n
 
 ## What gets checked
 
-The nightly check runs in 17 sections:
+The nightly check runs in 18 sections:
 
 | Section | Checks |
 |---------|--------|
@@ -52,6 +52,7 @@ The nightly check runs in 17 sections:
 | 15. Dashboard static assets | style.css, ui.js, dashboard.js, agents.js, chat.js, panels.js, incidents.js, boot.js |
 | 16. Dev-only package isolation (H-019) | `scripts/check-no-devonly-in-prod.sh` gate |
 | 17. AppArmor profiles in deb (H-010) | profiles in `security/apparmor/`, staged by build-deb, loaded via `apparmor_parser -r` in postinst (no `aa-enforce`) |
+| 18. NATS secret paths mode 600 (ASP-373/F-009) | `fix-nats-secret-modes.sh` called from firstboot/postinst/build-deb, no `640/644` on nats-token/nats.env, `staragent.yaml` chmod 600, fixture tests pass |
 
 ## CI infrastructure
 
@@ -67,9 +68,9 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 
 | Check | Baseline |
 | --- | --- |
-| `scripts/check-nightly.sh` total | **107 passed, 1 known failure** (C11 p50 benchmark deviation = known, hardware-dependent) |
+| `scripts/check-nightly.sh` total | **114 passed, 1 known failure** (C11 p50 benchmark deviation = known, hardware-dependent); 115 checks across 18 sections |
 | Of which: smoke test suite | 60 passed, 1 failed (C11 p50 benchmark) |
-| Python test suite | 335 passed, 4 skipped (optional deps: aiohttp, mcp.server), 0 failures |
+| Python test suite | 338 passed, 4 skipped (optional deps: aiohttp, mcp.server), 0 failures |
 | nats-server | v2.14.5 |
 | systemd unit files | 18 (9 in `systemd/`, 9 in `dist/pkgroot/lib/systemd/system/`) |
 | Debian metadata | `debian/DEBIAN/`: control (starship-os 2.2.0 amd64), postinst, postrm, prerm |
@@ -79,7 +80,8 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 | Gatekeeper module | `src/python/gatekeeper/minimal_shim.py` present, valid Python syntax |
 | ISO build structure | 3 autoinstall profiles (edge/server/ops YAMLs), chroot hooks present, package lists present |
 | Dashboard static assets | 8 files present (style.css, ui.js, dashboard.js, agents.js, chat.js, panels.js, incidents.js, boot.js) |
-| Shell syntax coverage | 36 scripts (35 in `scripts/`, 1 in `packaging/`), all pass `bash -n` |
+| Shell syntax coverage | 37 scripts (36 in `scripts/`, 1 in `packaging/`), all pass `bash -n` |
+| NATS secret paths (ASP-373/F-009) | section 18 checks pass (600 modes via `fix-nats-secret-modes.sh`, no 640/644, staragent.yaml 600, 3 fixture tests) |
 
 Update this table when suites gain or lose checks so future nightly runs can report meaningful deviations.
 
@@ -88,8 +90,9 @@ Update this table when suites gain or lose checks so future nightly runs can rep
 ### C11 sandbox p50 benchmark (`make smoke` check 53 of 61)
 
 The ADR 0001 criterion requires `c11_internal p50 < 2ms`. On this control-plane host,
-the measured p50 is ~3.451ms. This is a hardware-dependent benchmark: the threshold may
-be met on dedicated CI runners with newer processors or lower latency profiles.
+the measured p50 is ~3.4–3.5ms (e.g. 3.428 ms on 2026-09-19). This is a hardware-dependent
+benchmark: the threshold may be met on dedicated CI runners with newer processors or lower
+latency profiles.
 
 **Not actionable** unless the sandbox is moved to a different host or optimized. The
 nightly check records this as a single known failure (1 of 61 smoke tests).
