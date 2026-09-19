@@ -1,18 +1,22 @@
-# Grok Build — parked (2026-08-27)
+# Grok Build — TERMINATED (2026-09-18)
 
-**Captain:** Do not assign Paperclip work to **Grok Build** until unparked.
+**Captain 2026-09-18:** ASP Grok Build agent `b02d3fba` is **terminated** (0 assignments).
+Park ticket **ASP-516** cancelled as obsolete.
 
-## Later role (not now)
-Sandbox test environment (`sandboxes/aspen-os-sim`, `ASPEN_SIM=1`):
+## Standing rules
+- **No wakes** to Grok Build
+- **No assignments** (sim-prod sandbox lane closed)
+- **No Grok CLI** as a Paperclip coding lane
+- Do **not** rehire or unpark without explicit Captain OK
 
-1. Compile Aspen OS in the sim worktree  
-2. Audit live  
-3. Submit GitHub issues for the Aspen team (`sandbox-audit`, `grok-build`, `sim-prod`, `needs-aspen-review`)
-
-Agent stays **paused**. Paperclip **ASP-516**.
+## Historical role (obsolete)
+Was intended as sandbox compile/audit in `sandboxes/aspen-os-sim` (`ASPEN_SIM=1`), filing GitHub issues (`sandbox-audit`, `grok-build`, `sim-prod`, `needs-aspen-review`). That lane is **not** active.
 
 ## ASP development now
-aspen · OpenCode · Runtime · robotics · packndeploy · Auditor  
+aspen · OpenCode · Aider (QA) · Auditor · Runtime · robotics · packndeploy · Dashboard  
 (Flash volume; aspen Grok 4.5 for architecture gates only)
 
-Unpark = explicit Captain OK.
+## Related
+- Paperclip: ASP-516 (cancelled)
+- Linear: BEL-247 (Done — historical sim-prod setup); BEL-223 evaluate ticket should stay Backlog/Canceled unless Captain reopens
+- Skill note: `paperclip-board-ops` → `references/grok_build_parked.md`
