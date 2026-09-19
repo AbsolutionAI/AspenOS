@@ -190,7 +190,7 @@ check "firstboot has no 640/644 on nats.env/nats-token" bash -c '! grep -E "chmo
 check "postinst hardens NATS secret paths" bash -c 'grep -q "fix-nats-secret-modes.sh" debian/DEBIAN/postinst'
 check "build-deb stages & verifies 600 payload" bash -c 'grep -q "fix-nats-secret-modes.sh" scripts/build-deb.sh && grep -q "mode != 600" scripts/build-deb.sh'
 check "install-agent staragent.yaml is 600" bash -c 'grep -q "chmod 600 \"\$CONFIG_DIR/staragent.yaml\"" scripts/install-agent-linux.sh'
-check "nats secret mode fixture tests" "$PY" -m pytest tests/test_nats_secret_modes.py -q --tb=short 2>&1 | grep -E '[0-9]+ passed'
+check "nats secret mode fixture tests" bash -c "'$PY' -m pytest tests/test_nats_secret_modes.py -q --tb=short 2>&1 | grep -E '[0-9]+ passed'"
 
 # ─── Summary ─────────────────────────────────────────────────
 TIMING_END=$(date +%s%N)
