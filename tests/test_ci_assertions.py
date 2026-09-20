@@ -127,3 +127,14 @@ def test_nightly_section_17_apparmor_deb_shipped():
     assert "postinst has apparmor_parser" in nightly
     assert "apparmor_parser -r" in nightly
     assert "postinst avoids aa-enforce" in nightly
+
+
+def test_nightly_section_19_nats_rate_limits_present():
+    """F-011: nightly asserts NATS rate limits + per-account connection caps."""
+    nightly = _nightly()
+    assert "Section 19: NATS rate limits & connection caps" in nightly
+    assert "max_pending: 16MB" in nightly
+    assert "max_closed_clients: 4096" in nightly
+    assert "fleet-bus auth timeout hardened" in nightly
+    assert "accounts template per-account limits" in nightly
+    assert "test_nats_rate_limits.py" in nightly

@@ -192,6 +192,14 @@ check "build-deb stages & verifies 600 payload" bash -c 'grep -q "fix-nats-secre
 check "install-agent staragent.yaml is 600" bash -c 'grep -q "chmod 600 \"\$CONFIG_DIR/staragent.yaml\"" scripts/install-agent-linux.sh'
 check "nats secret mode fixture tests" bash -c "'$PY' -m pytest tests/test_nats_secret_modes.py -q --tb=short 2>&1 | grep -E '[0-9]+ passed'"
 
+# ─── Section 19: NATS rate limits & connection caps (ASP-375/F-011) ──
+echo -e "\n${YELLOW}── Section 19: NATS rate limits & connection caps (ASP-375/F-011) ──${NC}"
+check "agent-bus has rate limiting keys" bash -c 'grep -q "max_pending: 16MB" nats/agent-bus.conf && grep -q "max_subscriptions: 512" nats/agent-bus.conf && grep -q "max_closed_clients: 4096" nats/agent-bus.conf && grep -q "write_deadline: 5s" nats/agent-bus.conf'
+check "fleet-bus has rate limiting keys" bash -c 'grep -q "max_pending: 16MB" nats/fleet-bus.conf && grep -q "max_subscriptions: 512" nats/fleet-bus.conf && grep -q "max_closed_clients: 4096" nats/fleet-bus.conf && grep -q "write_deadline: 5s" nats/fleet-bus.conf'
+check "fleet-bus auth timeout hardened" bash -c 'grep -q "timeout: 2.0" nats/fleet-bus.conf'
+check "accounts template per-account limits" bash -c 'grep -q "limits {" nats/fleet-accounts.conf.tmpl && for a in SYS STARSHIP_OPS STARSHIP_EDGE STARSHIP_RANGE STARSHIP_TELEM; do grep -q "max_connections:" nats/fleet-accounts.conf.tmpl || exit 1; done && grep -q "max_connections: 64" nats/fleet-accounts.conf.tmpl && grep -q "max_connections: 128" nats/fleet-accounts.conf.tmpl && grep -q "max_connections: 32" nats/fleet-accounts.conf.tmpl'
+check "NATS rate limit fixture tests" bash -c "'$PY' -m pytest tests/test_nats_rate_limits.py -q --tb=short 2>&1 | grep -E '[0-9]+ passed'"
+
 # ─── Summary ─────────────────────────────────────────────────
 TIMING_END=$(date +%s%N)
 ELAPSED_MS=$(( (TIMING_END - TIMING_BEGIN) / 1000000 ))

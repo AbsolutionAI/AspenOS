@@ -24,8 +24,22 @@ jetstream {
   max_file_store: 4GB
 }
 
+# Rate limiting + connection caps (ASP-375 F-011)
+# Server-wide per-connection hardening + per-account limits below. max_pending
+# stays >= max_payload (8MB). Accounts mode already binds auth handshakes to the
+# 2s default timeout, so a failed-auth flood is dropped without holding slots.
 max_payload: 8MB
 max_connections: 256
+max_pending: 16MB
+max_control_line: 4KB
+max_subscriptions: 512
+max_closed_clients: 4096
+max_traced_msg_len: 512
+write_deadline: 5s
+ping_interval: 30s
+ping_max: 3
+connect_error_reports: 3600
+reconnect_error_reports: 4
 debug: false
 trace: false
 
@@ -36,8 +50,15 @@ trace: false
 # Resolve system account
 system_account: SYS
 
+# Per-account limits (F-011): bound each role's blast radius below the
+# server-wide max_connections=256. Sum = 4+64+128+32+32 = 260 max per-role caps
+# coexist under the global cap; clients always hit the global cap first.
 accounts {
   SYS {
+    limits {
+      max_connections: 4
+      max_subscriptions: 16
+    }
     users: [
       {user: "sys", password: "__SYS_PASS__"}
     ]
@@ -45,6 +66,10 @@ accounts {
 
   STARSHIP_OPS {
     jetstream: enabled
+    limits {
+      max_connections: 64
+      max_subscriptions: 512
+    }
     users: [
       {user: "ops", password: "__OPS_PASS__"
        permissions: {
@@ -94,6 +119,10 @@ accounts {
 
   STARSHIP_EDGE {
     jetstream: enabled
+    limits {
+      max_connections: 128
+      max_subscriptions: 512
+    }
     users: [
       {user: "edge", password: "__EDGE_PASS__"
        permissions: {
@@ -146,6 +175,10 @@ accounts {
 
   STARSHIP_RANGE {
     # Isolated red/blue plant — no imports from OPS/EDGE
+    limits {
+      max_connections: 32
+      max_subscriptions: 256
+    }
     users: [
       {user: "red", password: "__RED_PASS__"
        permissions: {
@@ -195,6 +228,10 @@ accounts {
   }
 
   STARSHIP_TELEM {
+    limits {
+      max_connections: 32
+      max_subscriptions: 16
+    }
     users: [
       {user: "telem", password: "__TELEM_PASS__"
        permissions: {
