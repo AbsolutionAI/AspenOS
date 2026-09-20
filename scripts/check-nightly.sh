@@ -208,6 +208,16 @@ check "build-deb stages service.d drop-in dirs" bash -c 'grep -qF "systemd/*.ser
 check "install-systemd installs drop-ins to /etc" bash -c 'grep -q "svc}.service.d" scripts/install-systemd.sh'
 check "cgroup fixture tests" bash -c "'$PY' -m pytest tests/test_cgroup_limits.py -q --tb=short 2>&1 | grep -E '[0-9]+ passed'"
 
+# ─── Section 21: Package signature gate (ASP-378/F-014) ──────────────
+echo -e "\n${YELLOW}── Section 21: Package signature gate (ASP-378/F-014) ──${NC}"
+check "verify script exists" test -f scripts/verify-deb-signature.sh
+check "sign script exists" test -f scripts/sign-deb.sh
+check "trust anchor keyring committed" test -s security/packages/starship-release.gpg
+check "ceremony vs verify documented" bash -c 'grep -q "Signing ceremony" security/packages/README.md && grep -q "Verify path" security/packages/README.md'
+check "update.sh supports --verify-signature" bash -c 'grep -q -- "--verify-signature" scripts/update.sh && grep -q "verify-deb-signature.sh" scripts/update.sh'
+check "CI runs signature gate" bash -c 'grep -q "verify-package-signature" .github/workflows/ci.yml && grep -q "test_package_signatures.py" .github/workflows/ci.yml'
+check "package signature fixture tests" bash -c "'$PY' -m pytest tests/test_package_signatures.py -q --tb=short 2>&1 | grep -E '[0-9]+ passed'"
+
 # ─── Summary ─────────────────────────────────────────────────
 TIMING_END=$(date +%s%N)
 ELAPSED_MS=$(( (TIMING_END - TIMING_BEGIN) / 1000000 ))

@@ -16,9 +16,12 @@ info() { echo -e "${BLUE}[UPDATE]${NC} $*"; }
 
 PACKAGE="starship-os"
 BACKUP_BASE="/var/lib/starship/updates"
+REPO_SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 DEB_PATH=""
 DEB_URL=""
 DRY_RUN=false
+VERIFY_SIG=false
+VERIFY_KEYRING=""
 
 usage() {
     echo "Usage: $0 [OPTIONS]"
@@ -27,11 +30,18 @@ usage() {
     echo "  -f, --file FILE    Path to the new .deb package"
     echo "  -u, --url URL      URL to download the new .deb from"
     echo "  -d, --dry-run      Check versions and show what would happen without installing"
+    echo "  -v, --verify-signature [KEYRING]"
+    echo "                     Verify the package signature before installing"
+    echo "                     (F-014 / ASP-378). Defaults to"
+    echo "                     security/packages/starship-release.gpg. Refuses"
+    echo "                     unsigned or tampered packages. Off until the"
+    echo "                     release signing ceremony stands up."
     echo "  -h, --help         Show this help"
     echo ""
     echo "Examples:"
     echo "  sudo $0 --file dist/starship-os_2.2.0_amd64.deb"
     echo "  sudo $0 --url https://example.com/starship-os_2.2.0_amd64.deb"
+    echo "  sudo $0 --file dist/starship-os_2.2.0_amd64.deb --verify-signature"
     exit 0
 }
 
@@ -41,6 +51,12 @@ while [[ $# -gt 0 ]]; do
         -f|--file)  DEB_PATH="${2:-}"; shift 2 ;;
         -u|--url)   DEB_URL="${2:-}"; shift 2 ;;
         -d|--dry-run) DRY_RUN=true; shift ;;
+        -v|--verify-signature)
+            VERIFY_SIG=true
+            if [[ $# -ge 2 && "$2" != -* ]]; then
+                VERIFY_KEYRING="$2"; shift
+            fi
+            shift ;;
         -h|--help)  usage ;;
         *)          err "Unknown option: $1" ;;
     esac
@@ -93,6 +109,19 @@ fi
 if [[ "$DRY_RUN" == "true" ]]; then
     info "DRY RUN — no changes made. Would install $pkg_version."
     exit 0
+fi
+
+# ─── Signature verification (F-014 / ASP-378, opt-in) ─────────────────
+# Enforce a signed update chain when the operator passes --verify-signature;
+# refuse unsigned, tampered, or unknown-key packages before any state change.
+if [[ "$VERIFY_SIG" == "true" ]]; then
+    VERIFY_CMD="$REPO_SCRIPTS/verify-deb-signature.sh"
+    if [[ -n "$VERIFY_KEYRING" ]]; then
+        "$VERIFY_CMD" --keyring "$VERIFY_KEYRING" "$DEB_PATH"
+    else
+        "$VERIFY_CMD" "$DEB_PATH"
+    fi
+    log "Signature verified for $DEB_PATH — proceeding with install."
 fi
 
 # ─── Back up config ───────────────────────────────────────────────────
