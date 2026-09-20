@@ -13,7 +13,7 @@
 2. **Toolchain**: ensure `nats-server` is on PATH:
    `export PATH="$HOME/go/bin:$HOME/.local/bin:$PATH"`.
 3. **Smoke suites** (record pass/fail counts):
-   - `bash scripts/check-nightly.sh` (85 checks across 19 sections — C11 p50 is a known hardware-dependent failure)
+   - `bash scripts/check-nightly.sh` (90 checks across 20 sections — C11 p50 is a known hardware-dependent failure)
 4. **Static inventory**:
    - systemd unit count (`*.service`/`*.timer`/`*.socket` across `systemd/`, `dist/pkgroot/lib/systemd/system/`, `deploy/`, `config/`)
    - Debian metadata presence (`debian/DEBIAN/{control,postinst,postrm,prerm}`)
@@ -31,7 +31,7 @@ On failure: diagnose, fix if well-scoped, otherwise mark the run issue blocked n
 
 ## What gets checked
 
-The nightly check runs in 19 sections:
+The nightly check runs in 20 sections:
 
 | Section | Checks |
 |---------|--------|
@@ -54,6 +54,7 @@ The nightly check runs in 19 sections:
 | 17. AppArmor profiles in deb (H-010) | profiles in `security/apparmor/`, staged by build-deb, loaded via `apparmor_parser -r` in postinst (no `aa-enforce`) |
 | 18. NATS secret paths mode 600 (ASP-373/F-009) | `fix-nats-secret-modes.sh` called from firstboot/postinst/build-deb, no `640/644` on nats-token/nats.env, `staragent.yaml` chmod 600, fixture tests pass |
 | 19. NATS rate limits & connection caps (ASP-375/F-011) | hardening keys in `agent-bus.conf`/`fleet-bus.conf` (`max_pending`, `max_subscriptions`, `max_closed_clients`, `write_deadline`), fleet-bus auth `timeout: 2.0`, per-account `limits` in `fleet-accounts.conf.tmpl`, rate-limit fixture tests pass |
+| 20. cgroup per-agent resource limits (ASP-376/F-012) | `systemd/<unit>.service.d/10-cgroup-limits.conf` drop-ins exist for all 8 units with CPU/Memory/Tasks keys, `build-deb.sh` stages `.service.d` dirs, `install-systemd.sh` installs them to `/etc`, fixture tests pass |
 
 ## CI infrastructure
 
@@ -69,7 +70,7 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 
 | Check | Baseline |
 | --- | --- |
-| `scripts/check-nightly.sh` total | **85 checks across 19 sections** (**84 pass, 1 known failure** = C11 p50 benchmark deviation, hardware-dependent) |
+| `scripts/check-nightly.sh` total | **90 checks across 20 sections** (**89 pass, 1 known failure** = C11 p50 benchmark deviation, hardware-dependent) |
 | Of which: smoke test suite | 60 passed, 1 failed (C11 p50 benchmark) |
 | Python test suite | 338 passed, 4 skipped (optional deps: aiohttp, mcp.server), 0 failures |
 | nats-server | v2.14.5 |
@@ -84,6 +85,7 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 | Shell syntax coverage | 37 scripts (36 in `scripts/`, 1 in `packaging/`), all pass `bash -n` |
 | NATS secret paths (ASP-373/F-009) | section 18 checks pass (600 modes via `fix-nats-secret-modes.sh`, no 640/644, staragent.yaml 600, 3 fixture tests) |
 | NATS rate limits & connection caps (ASP-375/F-011) | section 19 checks pass (hardening keys in agent/fleet configs, auth timeout 2.0, per-account limits, 5 fixture tests) |
+| cgroup per-agent resource limits (ASP-376/F-012) | section 20 checks pass (drop-ins exist for 8 units with CPU/Memory/Tasks keys, build-deb stages `.service.d`, install-systemd installs to `/etc`, 5 fixture tests) |
 
 Update this table when suites gain or lose checks so future nightly runs can report meaningful deviations.
 

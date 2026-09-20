@@ -200,6 +200,14 @@ check "fleet-bus auth timeout hardened" bash -c 'grep -q "timeout: 2.0" nats/fle
 check "accounts template per-account limits" bash -c 'grep -q "limits {" nats/fleet-accounts.conf.tmpl && for a in SYS STARSHIP_OPS STARSHIP_EDGE STARSHIP_RANGE STARSHIP_TELEM; do grep -q "max_connections:" nats/fleet-accounts.conf.tmpl || exit 1; done && grep -q "max_connections: 64" nats/fleet-accounts.conf.tmpl && grep -q "max_connections: 128" nats/fleet-accounts.conf.tmpl && grep -q "max_connections: 32" nats/fleet-accounts.conf.tmpl'
 check "NATS rate limit fixture tests" bash -c "'$PY' -m pytest tests/test_nats_rate_limits.py -q --tb=short 2>&1 | grep -E '[0-9]+ passed'"
 
+# ─── Section 20: cgroup per-agent resource limits (ASP-376/F-012) ──
+echo -e "\n${YELLOW}── Section 20: cgroup per-agent resource limits (ASP-376/F-012) ──${NC}"
+check "cgroup drop-ins exist for every unit" bash -c 'for u in agnetic-agent@.service agnetic-message-history.service agnetic-nats.service agnetic-dashboard.service agnetic-staragent.service agnetic-status-bridge.service starship-fleet.service starship-health-checker.service; do test -f "systemd/$u.d/10-cgroup-limits.conf" || exit 1; done'
+check "agent drop-in carries cgroup keys" bash -c 'grep -q "CPUQuota=150%" systemd/agnetic-agent@.service.d/10-cgroup-limits.conf && grep -q "MemoryMax=1G" systemd/agnetic-agent@.service.d/10-cgroup-limits.conf && grep -q "MemoryHigh=768M" systemd/agnetic-agent@.service.d/10-cgroup-limits.conf && grep -q "TasksMax=128" systemd/agnetic-agent@.service.d/10-cgroup-limits.conf'
+check "build-deb stages service.d drop-in dirs" bash -c 'grep -q "systemd/*.service.d" scripts/build-deb.sh && grep -q "10-cgroup-limits.conf" scripts/build-deb.sh'
+check "install-systemd installs drop-ins to /etc" bash -c 'grep -q "svc}.service.d" scripts/install-systemd.sh'
+check "cgroup fixture tests" bash -c "'$PY' -m pytest tests/test_cgroup_limits.py -q --tb=short 2>&1 | grep -E '[0-9]+ passed'"
+
 # ─── Summary ─────────────────────────────────────────────────
 TIMING_END=$(date +%s%N)
 ELAPSED_MS=$(( (TIMING_END - TIMING_BEGIN) / 1000000 ))

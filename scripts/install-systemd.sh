@@ -31,6 +31,13 @@ for svc in "${SERVICES[@]}"; do
     else
         echo "  WARNING: $src not found, skipping"
     fi
+    # ASP-376 / F-012: install cgroup-limit drop-ins (overrideable, /etc wins over /usr/lib)
+    dropin_dir="$SYSTEMD_DIR/${svc}.service.d"
+    if compgen -G "$SERVICES_DIR/$svc.service.d/*.conf" >/dev/null; then
+        echo "  Installing ${svc} cgroup-limit drop-in..."
+        sudo mkdir -p "$dropin_dir"
+        sudo cp "$SERVICES_DIR/$svc.service.d/"*.conf "$dropin_dir/"
+    fi
 done
 
 if [ -f "$SERVICES_DIR/agnetic-mesh.target" ]; then

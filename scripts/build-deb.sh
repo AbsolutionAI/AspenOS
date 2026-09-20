@@ -160,6 +160,15 @@ for u in agnetic-nats.service agnetic-staragent.service agnetic-agent@.service \
     cp "$REPO_DIR/systemd/$u" "$PKG_ROOT/lib/systemd/system/" 2>/dev/null || true
 done
 
+# ASP-376 / F-012: stage cgroup-limit drop-in dirs next to their units
+# (systemd merges "<unit>.d/*.conf" drop-ins from the unit search path).
+for d in "$REPO_DIR"/systemd/*.service.d; do
+    if [ -d "$d" ] && [ -n "$(ls "$d"/*.conf 2>/dev/null)" ]; then
+        cp -r "$d" "$PKG_ROOT/lib/systemd/system/"
+    fi
+done
+chmod 644 "$PKG_ROOT/lib/systemd/system/"*.d/*.conf 2>/dev/null || true
+
 # Permissions
 chmod 755 "$PKG_ROOT/opt/starship/bin/"* 2>/dev/null || true
 chmod 755 "$PKG_ROOT/opt/starship/lib/starship/agents/agent_daemon.py" 2>/dev/null || true
@@ -193,6 +202,7 @@ for need in \
     "etc/starship/nats/agent-bus.conf" \
     "lib/systemd/system/starship-fleet.service" \
     "lib/systemd/system/starship-health-checker.service" \
+    "lib/systemd/system/agnetic-agent@.service.d/10-cgroup-limits.conf" \
     "etc/apparmor.d/agnetic-agent" \
     "etc/apparmor.d/nats" \
     "usr/local/bin/starshipctl"; do
@@ -232,6 +242,11 @@ fi
 if ! grep -q 'opt/starship/bin/starshipctl' "$LIST"; then
     rm -f "$LIST"
     err "package missing opt/starship/bin/starshipctl"
+fi
+# ASP-376 / F-012: cgroup-limit drop-ins must ship for every staged unit.
+if ! grep -q 'agnetic-agent@.service.d/10-cgroup-limits.conf' "$LIST"; then
+    rm -f "$LIST"
+    err "package missing cgroup-limit drop-in lib/systemd/system/agnetic-agent@.service.d/10-cgroup-limits.conf"
 fi
 # ASP-373 / F-009: no NATS secret path may ship world/group readable.
 # Matches exact paths; "fleet-accounts.conf.tmpl" (placeholder) is not a secret.

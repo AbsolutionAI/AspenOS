@@ -138,3 +138,14 @@ def test_nightly_section_19_nats_rate_limits_present():
     assert "fleet-bus auth timeout hardened" in nightly
     assert "accounts template per-account limits" in nightly
     assert "test_nats_rate_limits.py" in nightly
+
+
+def test_nightly_section_20_cgroup_limits_present():
+    """F-012: nightly asserts cgroup per-agent resource limit drop-ins."""
+    nightly = _nightly()
+    assert "Section 20: cgroup per-agent resource limits" in nightly
+    assert "cgroup drop-ins exist for every unit" in nightly
+    assert "agent drop-in carries cgroup keys" in nightly
+    assert "build-deb stages service.d drop-in dirs" in nightly
+    assert "install-systemd installs drop-ins to /etc" in nightly
+    assert "test_cgroup_limits.py" in nightly
