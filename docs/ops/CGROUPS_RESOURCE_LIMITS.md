@@ -31,21 +31,23 @@ modification:
 
 ## Per-unit limits
 
-| Unit | Role | CPUQuota | MemoryHigh | MemoryMax | TasksMax |
-|------|------|----------|-----------|-----------|----------|
-| `agnetic-agent@.service` | agent daemon (each `%i` instance) | 150% | 768M | 1G | 128 |
-| `agnetic-message-history.service` | message persistence | 100% | 384M | 512M | 64 |
-| `agnetic-nats.service` | NATS bus | 100% | 384M | 512M | 128 |
-| `agnetic-dashboard.service` | web dashboard | 100% | 384M | 512M | 128 |
-| `agnetic-staragent.service` | guard binary | 50% | 192M | 256M | 64 |
-| `agnetic-status-bridge.service` | tray/status bridge | 50% | 192M | 256M | 64 |
-| `starship-fleet.service` | fleet manager | 100% | 384M | 512M | 128 |
-| `starship-health-checker.service` | health probe | 25% | 96M | 128M | 32 |
+| Unit | Role | CPUQuota | CPUWeight | MemoryHigh | MemoryMax | TasksMax | IO |
+|------|------|----------|-----------|-----------|-----------|----------|----|
+| `agnetic-agent@.service` | agent daemon (each `%i` instance) | 50% | 100 | 384M | 512M | 128 | yes |
+| `agnetic-message-history.service` | message persistence | 50% | 100 | 384M | 512M | 128 | yes |
+| `agnetic-nats.service` | NATS bus | 100% | 200 | 192M | 256M | 256 | yes |
+| `agnetic-dashboard.service` | web dashboard | 25% | 50 | 192M | 256M | 128 | no |
+| `agnetic-staragent.service` | guard binary | 25% | 50 | 96M | 128M | 64 | no |
+| `agnetic-status-bridge.service` | tray/status bridge | 25% | 50 | 96M | 128M | 64 | no |
+| `starship-fleet.service` | fleet manager | 50% | 100 | 384M | 512M | 128 | yes |
+| `starship-health-checker.service` | health probe | 25% | 25 | 96M | 128M | 32 | no |
 
 Rationale: the node runs Ollama/llama-server outside these units, so agent
-units (the per-instance orchestrators) get the headroom; infra daemons get one
-core; lightweight bridges a quarter core. `TasksMax` bounds the pids-controller
-risk (leaked threads / fork storms) the way NATS caps bound connection floods.
+units (the per-instance orchestrators) share a moderate 50% profile with the
+fleet manager so they cannot starve the host's LLM workers; NATS — the bus
+backbone — gets one full core and the highest CPU weight; lightweight bridges
+a quarter core. `TasksMax` bounds the pids-controller risk (leaked threads /
+fork storms) the way NATS caps bound connection floods.
 
 ## Overriding
 
