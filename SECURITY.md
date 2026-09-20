@@ -27,7 +27,7 @@ We aim to acknowledge reports within **7 days**.
 |-------|----------|
 | **Tool sandbox** | Python `CommandExecutor` + optional C11 `sandbox_run` (seccomp, namespaces) |
 | **Policy** | Shared JSON (`config/policy.default.json`) + C11 `policyexec` + fleet red/blue ACL |
-| **NATS** | Dual-prefix subjects; multi-tenant accounts + nkeys; optional TLS |
+| **NATS** | Dual-prefix subjects; multi-tenant accounts + nkeys; mTLS by default (H-006); per-node enrollment tokens + revocation list (H-002) |
 | **Secrets** | Gitignored credentials; AES-256-GCM secrets helper; output redaction |
 | **Runtime** | systemd `NoNewPrivileges`, `ProtectSystem=strict`; AppArmor profiles |
 | **Models** | Local Ollama only by default; abliterated models require policy + sandbox |
@@ -37,10 +37,11 @@ We aim to acknowledge reports within **7 days**.
 ```bash
 # Multi-tenant NATS (ops)
 bash scripts/gen-nats-accounts.sh --out /etc/starship/nats
-# Optional TLS
-STARSHIP_NATS_TLS=1 bash scripts/gen-nats-tls.sh --out /etc/starship/nats/tls
+# TLS+mTLS default-on since H-006 (firstboot auto-runs; opt out: STARSHIP_NATS_TLS=0)
+bash scripts/gen-nats-tls.sh --out /etc/starship/nats/tls
 # Native isolation
-export STARSHIP_SANDBOX_NATIVE=1 STARSHIP_POLICY_NATIVE=1
+# Native enforcement is default-on since H-003; opt out ONLY for dev:
+# export STARSHIP_SANDBOX_NATIVE=0 STARSHIP_POLICY_NATIVE=0
 # AppArmor
 sudo bash scripts/install-apparmor.sh
 ```

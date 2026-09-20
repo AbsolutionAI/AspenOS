@@ -10,12 +10,23 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 echo "=== Starship OS Agent Mesh ==="
 echo ""
 
-# 1. Ensure NATS is running
+# 1. Ensure NATS is running (accounts auth — H-001; no-auth mode removed)
 if ! pgrep -x nats-server > /dev/null 2>&1; then
     echo "[1/3] Starting NATS server..."
-    nats-server -c "$PROJECT_DIR/nats/agent-bus.conf" > /dev/null 2>&1 &
+    NATS_CONF=""
+    for c in /etc/starship/nats/active.conf \
+             "$PROJECT_DIR/nats/fleet-accounts.conf" ; do
+        [[ -f "$c" ]] && { NATS_CONF="$c"; break; }
+    done
+    if [[ -z "$NATS_CONF" ]]; then
+        # Materialize a local accounts conf (single-node dev migration path)
+        echo "  No accounts conf found — generating via gen-nats-accounts.sh"
+        bash "$PROJECT_DIR/scripts/gen-nats-accounts.sh" --out "$PROJECT_DIR/nats" >/dev/null
+        NATS_CONF="$PROJECT_DIR/nats/fleet-accounts.conf"
+    fi
+    nats-server -c "$NATS_CONF" > /dev/null 2>&1 &
     sleep 1
-    echo "  NATS started on port 4222"
+    echo "  NATS started on port 4222 (conf: $NATS_CONF)"
 else
     echo "[1/3] NATS server already running"
 fi

@@ -6,6 +6,8 @@ Documentation=https://github.com/AbsolutionAI/AspenOS
 
 [Service]
 Type=simple
+# H-003: fail closed at start if native C11 sandbox/policy binaries are missing
+ExecStartPre=/opt/starship/venv/bin/python3 -m native_check
 ExecStart=/opt/starship/venv/bin/python3 /opt/starship/lib/starship/services/fleet.py daemon
 Restart=always
 RestartSec=10

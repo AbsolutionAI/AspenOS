@@ -24,9 +24,9 @@ max_connections: 256
 debug: false
 trace: false
 
-# Optional TLS — firstboot/gen-nats-tls.sh writes tls/ and sets STARSHIP_NATS_TLS=1
-# Uncomment or include when TLS material exists:
-# include ./tls/tls.conf.snippet
+# TLS (H-006): on by default in new deployments — firstboot runs
+# gen-nats-tls.sh and appends the mTLS block (verify: true) to the
+# materialized conf. Opt out with STARSHIP_NATS_TLS=0.
 
 # Resolve system account
 system_account: SYS

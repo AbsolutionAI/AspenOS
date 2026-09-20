@@ -82,9 +82,9 @@ ln -sfn /opt/starship /opt/agnetic
 ln -sfn /etc/starship /etc/agnetic
 ln -sfn /var/lib/starship /var/lib/agnetic
 ln -sfn /var/log/starship /var/log/agnetic
-# active.conf default if missing
-if [[ ! -e /etc/starship/nats/active.conf ]]; then
-    ln -sfn /etc/starship/nats/agent-bus.conf /etc/starship/nats/active.conf
+# active.conf default if missing (H-001: accounts, never no-auth agent-bus)
+if [[ ! -e /etc/starship/nats/active.conf && -f /etc/starship/nats/fleet-accounts.conf ]]; then
+    ln -sfn /etc/starship/nats/fleet-accounts.conf /etc/starship/nats/active.conf
 fi
 log "Legacy aliases created (/opt/agnetic -> /opt/starship, ...)"
 
@@ -163,12 +163,24 @@ log "Configs installed to /etc/starship/"
 # ─── 6. Install NATS config ────────────────────────────────────────
 log "Installing NATS configuration..."
 
-cp "$REPO_DIR/nats/agent-bus.conf" /etc/starship/nats/
+cp "$REPO_DIR/nats/fleet-bus.conf" /etc/starship/nats/ 2>/dev/null || true
+cp "$REPO_DIR/nats/fleet-accounts.conf.tmpl" /etc/starship/nats/ 2>/dev/null || true
 cp "$REPO_DIR/nats/server.conf" /etc/starship/nats/ 2>/dev/null || true
 cp "$REPO_DIR/nats/subjects.yaml" /etc/starship/nats/ 2>/dev/null || true
 
-# Update NATS config to use correct paths
-sed -i 's|/home/tech/agnetic-os/nats|/etc/starship/nats|g' /etc/starship/nats/agent-bus.conf 2>/dev/null || true
+# Materialize accounts conf (H-001: no-auth agent-bus removed)
+if [[ ! -f /etc/starship/nats/fleet-accounts.conf && -f /etc/starship/nats/fleet-accounts.conf.tmpl ]]; then
+    GEN=""
+    for g in "$REPO_DIR/scripts/gen-nats-accounts.sh" \
+             /opt/starship/lib/starship/scripts/gen-nats-accounts.sh; do
+        [[ -f "$g" ]] && { GEN="$g"; break; }
+    done
+    if [[ -n "$GEN" ]]; then
+        bash "$GEN" --out /etc/starship/nats --host "${STARSHIP_NATS_HOST:-127.0.0.1}" 2>/dev/null || true
+        [[ -f /etc/starship/nats/fleet-accounts.conf ]] && \
+            ln -sfn /etc/starship/nats/fleet-accounts.conf /etc/starship/nats/active.conf
+    fi
+fi
 
 log "NATS config installed to /etc/starship/nats/"
 

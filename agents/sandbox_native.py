@@ -1,6 +1,7 @@
-"""Optional C11 sandbox_run bridge (ADR 0001).
+"""C11 sandbox_run bridge (ADR 0001) — mandatory by default (H-003).
 
-Enabled when STARSHIP_SANDBOX_NATIVE=1 and sandbox_run is on PATH or at
+Native enforcement is on unless STARSHIP_SANDBOX_NATIVE is explicitly set to
+0/false/no/off. sandbox_run is looked up on PATH or at
 src/c/sandbox_spike/sandbox_run / /opt/starship/bin/sandbox_run.
 
 Uses subprocess (not ctypes) for the spike binary; a .so bridge can replace
@@ -48,11 +49,26 @@ def sandbox_binary() -> Optional[str]:
     return None
 
 
-def native_enabled() -> bool:
+def native_opted_out() -> bool:
+    """True only when the operator explicitly disabled native sandboxing."""
     flag = os.getenv("STARSHIP_SANDBOX_NATIVE", "").strip().lower()
-    if flag not in ("1", "true", "yes", "on"):
-        return False
-    return sandbox_binary() is not None
+    return flag in ("0", "false", "no", "off")
+
+
+def native_enabled() -> bool:
+    """Native enforcement is default-on; only an explicit opt-out disables it."""
+    return not native_opted_out()
+
+
+def require_native() -> str:
+    """Fail closed: return the sandbox_run binary path or raise RuntimeError."""
+    binary = sandbox_binary()
+    if not binary:
+        raise RuntimeError(
+            "sandbox_run binary not found (required by default since H-003). "
+            "Install it at /opt/starship/bin/sandbox_run or set STARSHIP_SANDBOX_RUN."
+        )
+    return binary
 
 
 def run_native(

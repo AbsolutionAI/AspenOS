@@ -46,9 +46,9 @@ ln -sfn /opt/starship /opt/agnetic
 ln -sfn /etc/starship /etc/agnetic
 ln -sfn /var/lib/starship /var/lib/agnetic
 ln -sfn /var/log/starship /var/log/agnetic
-# active.conf default if missing
-if [[ ! -e /etc/starship/nats/active.conf ]]; then
-    ln -sfn /etc/starship/nats/agent-bus.conf /etc/starship/nats/active.conf
+# active.conf default if missing (H-001: accounts mode, never no-auth)
+if [[ ! -e /etc/starship/nats/active.conf && -f /etc/starship/nats/fleet-accounts.conf ]]; then
+    ln -sfn /etc/starship/nats/fleet-accounts.conf /etc/starship/nats/active.conf
 fi
 echo "[OK] Directories created"
 

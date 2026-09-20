@@ -32,15 +32,24 @@ uninstall:
 	sudo bash scripts/uninstall-daemon.sh
 
 # ─── Dev mode (user-level, no root) ────────────────────────────────
+# H-001: bus authenticates with multi-tenant accounts even in dev.
 dev: cli
 	@echo "Starting services in dev mode..."
-	setsid nats-server -c nats/agent-bus.conf > /dev/null 2>&1 < /dev/null &
+	@if [ ! -f nats/fleet-accounts.conf ]; then \
+		echo "Generating local NATS accounts creds (H-001)..."; \
+		bash scripts/gen-nats-accounts.sh --out nats >/dev/null; \
+	fi
+	setsid nats-server -c nats/fleet-accounts.conf > /dev/null 2>&1 < /dev/null &
 	sleep 1
+	set -a; . ./nats/nats.env; set +a; \
 	setsid .venv/bin/python3 agents/agent_daemon.py proxy > logs/agents-proxy.log 2>&1 < /dev/null &
+	set -a; . ./nats/nats.env; set +a; \
 	setsid .venv/bin/python3 agents/agent_daemon.py romi > logs/agents-romi.log 2>&1 < /dev/null &
+	set -a; . ./nats/nats.env; set +a; \
 	setsid .venv/bin/python3 agents/agent_daemon.py ergo > logs/agents-ergo.log 2>&1 < /dev/null &
-	setsid .venv/bin/python3 agents/agent_daemon.py robotics > logs/agents-robotics.log 2>&1 < /dev/null &
+	set -a; . ./nats/nats.env; set +a; \
 	setsid .venv/bin/python3 tray/agnetic-status.py > logs/status-bridge.log 2>&1 < /dev/null &
+	set -a; . ./nats/nats.env; set +a; \
 	setsid .venv/bin/python3 scripts/message_history.py > logs/message-history.log 2>&1 < /dev/null &
 	DASHBOARD_PORT=8788 setsid .venv/bin/python3 dashboard/server.py > logs/dashboard.log 2>&1 < /dev/null &
 	sleep 2

@@ -2,10 +2,9 @@
 # Secrets via env / nats/creds (gitignored); never commit real tokens.
 
 version: "2.1"
-# mode: disabled | token | accounts
-#   disabled  — agent-bus.conf (dev)
-#   token     — fleet-bus shared token (trusted LAN)
-#   accounts  — multi-tenant accounts + optional nkeys (untrusted multi-tenant)
+# mode: token | accounts
+#   token     — fleet-bus shared token (trusted LAN; explicit opt-in)
+#   accounts  — multi-tenant accounts + optional nkeys (default, H-001)
 mode: accounts
 
 url_env: NATS_URL

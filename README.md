@@ -25,7 +25,7 @@ AspenOS is a local-first, AI-native OS layer where autonomous agents communicate
 - **Install roots:** `/opt/starship`, `/etc/starship` (legacy `/opt/agnetic` symlinks)
 - **CLI:** `starshipctl` (compat `agneticctl`) · **Dashboard:** `:8788`
 - **Fleet:** multi-plant topology, red/blue policy, cross-plant ACL, exercise UI
-- **NATS:** dual-prefix `starship.*` / `agnetic.*`; ops multi-tenant accounts + nkeys; optional TLS
+- **NATS:** dual-prefix `starship.*` / `agnetic.*`; ops multi-tenant accounts + nkeys; mTLS by default (H-006); signed node enrollment + revocation (H-002)
 - **Packaging:** `make deb` → `dist/starship-os_*.deb`; ISO autoinstall edge/server/ops
 - **Plan:** `docs/plans/starship-os-streamline.md` · **Security:** [`SECURITY.md`](SECURITY.md)
 
@@ -182,7 +182,7 @@ The tool system enforces strict security constraints:
 - **Secret redaction**: Passwords, tokens, API keys automatically redacted from output
 - **Timeout enforcement**: 30-second default with process kill on timeout
 - **Output limits**: 50KB max output, 1MB max file size
-- **Optional C11:** `STARSHIP_SANDBOX_NATIVE=1` · `STARSHIP_POLICY_NATIVE=1`
+- **Mandatory C11 (H-003):** native sandbox + policyexec on by default; opt out with `STARSHIP_SANDBOX_NATIVE=0 STARSHIP_POLICY_NATIVE=0` (deprecated)
 
 ---
 
@@ -233,14 +233,15 @@ Full policy: **[SECURITY.md](SECURITY.md)** · architecture: **[docs/SECURITY.md
 | Tools | Sandbox blocklists, path allowlists, redaction |
 | C11 | `sandbox_run` (seccomp/NS), `policyexec` (shared JSON) |
 | Fleet | Red-team tool deny, cross-plant ACL, range isolation |
-| NATS | Dev open / token / multi-tenant accounts+nkeys / optional TLS |
+| NATS | Dev open / token / multi-tenant accounts+nkeys / mTLS by default (H-006) |
 | OS | systemd hardening, AppArmor profiles, non-root `agnetic` user |
 
 ```bash
-# Ops multi-tenant bus + optional TLS
+# Ops multi-tenant bus; TLS+mTLS is default-on since H-006 (opt out: STARSHIP_NATS_TLS=0)
 bash scripts/gen-nats-accounts.sh --out /etc/starship/nats
-STARSHIP_NATS_TLS=1 bash scripts/gen-nats-tls.sh --out /etc/starship/nats/tls
-export STARSHIP_SANDBOX_NATIVE=1 STARSHIP_POLICY_NATIVE=1
+bash scripts/gen-nats-tls.sh --out /etc/starship/nats/tls
+# Native enforcement is default-on since H-003; opt out ONLY for dev:
+# export STARSHIP_SANDBOX_NATIVE=0 STARSHIP_POLICY_NATIVE=0
 ```
 
 Report vulnerabilities via GitHub Security Advisories (see SECURITY.md) — not public issues.
@@ -274,9 +275,12 @@ Creates users `agnetic` / `nats`, Python venv, systemd units.
 
 | Profile | Intent | NATS (firstboot) |
 |---------|--------|------------------|
-| `edge` | Thin node | agent-bus |
-| `server` | Default mesh | agent-bus |
-| `ops` | Full mesh + fleet | multi-tenant accounts |
+| `edge` | Thin node | multi-tenant accounts + nkeys |
+| `server` | Default mesh | multi-tenant accounts + nkeys |
+| `ops` | Full mesh + fleet | multi-tenant accounts + nkeys |
+
+All profiles default to authenticated accounts mode (H-001); the old no-auth
+agent-bus mode was removed. Shared-token fleet bus: `STARSHIP_NATS_MODE=fleet`.
 
 ### ISO
 
