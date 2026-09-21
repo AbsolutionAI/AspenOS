@@ -178,7 +178,6 @@ acl:
   default: same_plant_only   # same_plant_only | deny | allow
   allow:
     plant-alpha: [plant-edge]
-    plant-edge: [plant-alpha]
     plant-range: []
 ```
 
@@ -189,6 +188,10 @@ Enforced by `fleet_policy.check_cross_plant` / `check_tool(..., target_plant=...
 3. Source or target `isolation: true` → deny  
 4. Explicit `acl.allow[source]` list  
 5. Default fail-closed (`same_plant_only` / `deny`)
+
+Directions are source-initiated. Ops (`plant-alpha`) may reach edge nodes for
+management, but edge nodes cannot initiate cross-plant traffic into
+`plant-alpha` (F-022/H-021: an edge compromise must not pivot to ops).
 
 `delegate_to_agent` accepts `plant` / `target_plant` for ACL checks.
 

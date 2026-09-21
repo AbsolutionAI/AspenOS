@@ -27,6 +27,7 @@ check "fleet register" bash -c 'python3 services/fleet.py register >/dev/null'
 check "red-team denies opencode" bash -c 'STARSHIP_FLEET_TEAM=red STARSHIP_FLEET_ROLES=red-team PYTHONPATH=agents python3 -c "from fleet_policy import check_tool; assert check_tool(\"opencode\")"'
 check "ops allows opencode" bash -c 'STARSHIP_FLEET_TEAM=ops STARSHIP_FLEET_ROLES=proxy PYTHONPATH=agents python3 -c "from fleet_policy import check_tool; assert check_tool(\"opencode\") is None"'
 check "cross-plant ACL allows alpha→edge" bash -c 'STARSHIP_FLEET_TEAM=ops STARSHIP_FLEET_PLANT=plant-alpha PYTHONPATH=agents python3 -c "from fleet_policy import clear_cache,check_cross_plant; clear_cache(); assert check_cross_plant(\"plant-alpha\",\"plant-edge\") is None"'
+check "cross-plant ACL denies edge→alpha (F-022)" bash -c 'STARSHIP_FLEET_TEAM=ops STARSHIP_FLEET_PLANT=plant-edge PYTHONPATH=agents python3 -c "from fleet_policy import clear_cache,check_cross_plant; clear_cache(); assert check_cross_plant(\"plant-edge\",\"plant-alpha\")"'
 check "cross-plant ACL denies alpha→range" bash -c 'STARSHIP_FLEET_TEAM=ops STARSHIP_FLEET_PLANT=plant-alpha PYTHONPATH=agents python3 -c "from fleet_policy import clear_cache,check_cross_plant; clear_cache(); assert check_cross_plant(\"plant-alpha\",\"plant-range\")"'
 check "fleet-bus.conf present" test -f nats/fleet-bus.conf
 check "fleet-auth.yaml present" test -f nats/fleet-auth.yaml

@@ -71,11 +71,12 @@ red_blue:
 # Cross-plant ACL (policy engine — agents/fleet_policy.py)
 # default: same_plant_only | deny | allow
 # allow: source_plant → [target plants] (explicit edges)
+# Direction is source-initiated. Edge never initiates into ops (F-022 / H-021:
+# edge compromise must not pivot to plant-alpha). Ops→edge stays for ops management.
 acl:
   default: same_plant_only
   allow:
-    plant-alpha: [plant-edge]      # ops → edge
-    plant-edge: [plant-alpha]      # edge → ops
+    plant-alpha: [plant-edge]      # ops → edge (ops-initiated only)
     plant-range: []                # range never leaves (also isolation: true)
 
 # This node (override via /etc/starship/fleet-node.yaml)
