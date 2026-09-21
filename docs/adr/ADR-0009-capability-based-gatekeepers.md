@@ -1,11 +1,13 @@
 # ADR-0009: Capability-Based Gatekeepers (No Broad API Keys)
 
-**Status:** Accepted (design + Phase 1) — 2026-08-31 / 2026-09-07  
+**Status:** Accepted (design + Phase 1 + Phase 2) — 2026-08-31 / 2026-09-07 / 2026-09-18  
 **Accepted by:** ASP-530 Weekly Architecture Review (design)  
 **Phase 1:** ASP-540 — dual-human propose_act interception + audit (reconfirmed ASP-563)  
-**Implementation residual:** BEL-215 Phase 2 — token lifecycle, Hermes/Paperclip credential strip, immutable proxy  
-**Linear:** BEL-215 (Urgent) · Related BEL-196 (NATS contracts), ADR-0003 (Safety Contracts), Master Spec v4.0 hard rules  
-**Prototype:** `src/python/gatekeeper/minimal_shim.py`, `nats_client.py`  
+**Phase 2:** ASP-564 — token lifecycle + credential-strip proxy + safety enforcer  
+**Packaging:** ASP-628 — production placement = **edge-adjacent plugin** `aspen-gatekeeper` (not core-edge always-on; not Dev-only). See `docs/plans/ASP-628.md` + `docs/PACKAGES.md`. Prod image/unit deferred pending captain.  
+**Implementation residual:** durable token backend (Redis/PG); live Hermes/Paperclip profile strip; systemd unit under captain gate  
+**Linear:** BEL-215 · Related BEL-196 (NATS contracts), ADR-0003 (Safety Contracts), Master Spec v4.0 hard rules  
+**Prototype / source:** `src/python/gatekeeper/` (`minimal_shim.py`, `nats_client.py`, `gatekeeper_proxy.py`, `safety_enforcer.py`)  
 **Target Products:** AspenOS (primary), Aspen Sentinel, aspen-dev
 
 ## Context
