@@ -1,11 +1,13 @@
 # ADR-0009: Capability-Based Gatekeepers (No Broad API Keys)
 
-**Status:** Accepted (design + Phase 1) — 2026-08-31 / 2026-09-07  
+**Status:** Accepted (design + Phase 1 + Phase 2) — 2026-08-31 / 2026-09-07 / 2026-09-21  
 **Accepted by:** ASP-530 Weekly Architecture Review (design)  
 **Phase 1:** ASP-540 — dual-human propose_act interception + audit (reconfirmed ASP-563)  
-**Implementation residual:** BEL-215 Phase 2 — token lifecycle, Hermes/Paperclip credential strip, immutable proxy  
-**Linear:** BEL-215 (Urgent) · Related BEL-196 (NATS contracts), ADR-0003 (Safety Contracts), Master Spec v4.0 hard rules  
-**Prototype:** `src/python/gatekeeper/minimal_shim.py`, `nats_client.py`  
+**Phase 2:** ASP-564 — token lifecycle + credential-strip proxy + safety subject enforcer (Accepted ASP-627)  
+**Rate limits:** ASP-607 — per-agent sliding-window on gate path  
+**Packaging residual:** **decided ASP-628** — production target = plugin `aspen-gatekeeper` (profile default ON for actuator plants); monorepo `src/python/gatekeeper/` remains source until extract; **not** a second always-on core-edge binary. Durable token store (Redis/PG) later. Plan: `docs/plans/ASP-628-gatekeeper-packaging.md`  
+**Linear:** BEL-215 · Related BEL-196 (NATS contracts), ADR-0003 (Safety Contracts), Master Spec v4.0 hard rules  
+**Implementation:** `src/python/gatekeeper/{minimal_shim,gatekeeper_proxy,safety_enforcer,nats_client}.py`  
 **Target Products:** AspenOS (primary), Aspen Sentinel, aspen-dev
 
 ## Context
@@ -64,8 +66,8 @@ flowchart TD
 - Full audit trail implemented and queryable from Sentinel
 - Modular per Light Cell / Full Plant profiles
 
-**Next**: Wire into BEL-196 NATS subjects; implement first gatekeeper shim; update Master Spec §4 (Security).
+**Next (eng, not redesign):** packaging placement for production images; optional durable token backend; wire Hermes/Paperclip adapters to proxy in plant profiles when free. Master Spec §4 security hard rules already match this ADR.
 
 ---
 
-**Agent Surface Items (BEL-237/238/239/240)**: These are now unblocked by the gatekeeper layer. Next sprint: implement "Invoke Preferred Agent" affordance + Crash → Agent Briefing once ADR-0009 is accepted. Daily brief cron already surfaces progress.
+**Agent Surface Items (BEL-237/238/239/240):** Unblocked by gatekeeper design. Implement only under freeze when they clear SME progressive-disclosure priority — not this cycle.
