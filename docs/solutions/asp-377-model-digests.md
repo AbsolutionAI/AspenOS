@@ -44,7 +44,8 @@ the resolver's `canon_digest()` is the shared pattern.
 
 | Decision | Why |
 |----------|-----|
-| **Registry-authoritative pins** (`registry.ollama.ai` manifest API first, local store fallback) | Fresh cells resolve real upstream digests; committed pins are correct everywhere, not just on this host |
+| **Local-first resolution, registry fallback** (`resolve-model-digests.py`: local manifest store → `/api/tags` → `registry.ollama.ai` manifest API) | Pins the revision a cell actually owns and verifies against; registry used only for models not yet present so fresh cells get a resolvable known-good pin |
+| **Drift is WARN, not tamper** | A cell may legitimately run an older pinned revision than the registry's current HEAD (e.g. Eve local `4d1fe4…` vs registry `dac84c6…`): `--check` reports it as a warning, and only `--strict`/`STARSHIP_STRICT_DIGESTS=1` turns it into an error |
 | **`--check` offline = structural, online = drift** | CI/nightly must be deterministic (offline); a human on an online cell sees `ERROR` when registry tag ≠ pin, `WARN` when registry unreachable |
 | **Fail-closed remediation** | Tampered/missing /api/tags entries still fail; resolver never returns a *wrong* digest, it returns nothing (exit ≠ 0) |
 | **Env-driven paths, no hardcoded cell paths** | `STARSHIP_MODELS_YAML` / `STARSHIP_PINS_YAML` / `STARSHIP_PROFILES_YAML` / `STARSHIP_OFFLINE` / `STARSHIP_STRICT_DIGESTS` / `OLLAMA_URL` / `OLLAMA_MODELS` keep fixtures hermetic in tests |
@@ -54,16 +55,17 @@ the resolver's `canon_digest()` is the shared pattern.
 ### New: `scripts/resolve-model-digests.py`
 
 One source of truth for pins. Subcommands: default (resolve `config/models.yaml`
-against registry → write/update pins), `--check` (offline structural or online
-drift), `--digest NAME` (print pin, exit 1 if unpinned), `--verify-local NAME`
-(exit 0 verified / 1 mismatch / 2 absent / 3 unpinned). Resolves sha256 of the
-OCI manifest JSON from the registry, falls back to the local manifest store and
-`/api/tags`. `DIGEST_RE = ^sha256:[0-9a-f]{64}$`.
+→ write/update pins), `--check` (offline structural or online drift),
+`--digest NAME` (print pin, exit 1 if unpinned), `--verify-local NAME`
+(exit 0 verified / 1 mismatch / 2 absent / 3 unpinned). Resolves the local
+revision first — sha256 of the stored `registry.ollama.ai` manifest, or the
+`/api/tags` digest — and falls back to the OCI manifest API for models not yet
+present. `DIGEST_RE = ^sha256:[0-9a-f]{64}$`.
 
 ### New: `config/models-digests.yaml`
 
-All 7 models pinned, `resolved: true` (registry digests, `sha256:`-prefixed),
-`version: 2.1-f013`. Examples:
+All 7 models pinned, `resolved: true` (sha256 manifest digests — local store
+where present, registry HEAD fallback), `version: 2.1-f013`. Examples:
 granite4.1-8b `sha256:4b7d9eae0407925a746a6723b479cc1f780878bdce255c2ee1b669ded31b9f55`
 (its local ID is `4b7d9eae0407…`); Eve-V2-Unleashed
 `sha256:dac84c6ab699dc0e6a1fd19144cb6f56a7f22b4b5ac694cdaef51124981f3124`.
@@ -86,7 +88,7 @@ unverified dev pulls. Canonical-digest comparison in both.
 `install-models.sh` no longer runs under `|| true` — digest failure stops the
 install.
 
-### `tests/test_model_digests.py` (20 tests, one skips without aiohttp)
+### `tests/test_model_digests.py` (17 hermetic tests)
 
 Hermetic fixtures (fake `ollama` shim, hand-written manifest store, real
 registry digests over `127.0.0.1` /api/tags where the model is legitimately
@@ -111,7 +113,7 @@ documentation/guards/no-swallow/CI wiring + fixture tests). The original
 | File | Change |
 |------|--------|
 | `scripts/resolve-model-digests.py` | New: resolve/check/digest/verify-local |
-| `config/models-digests.yaml` | New: 7 pins, registry-sourced |
+| `config/models-digests.yaml` | New: 7 pins, local/registry-sourced |
 | `scripts/install-models.sh` | Pull-by-tag + verify-after-pull fail-hard |
 | `config/models/Eve-V2-Unleashed.Modelfile` | `:latest` + documented pin |
 | `scripts/agent-health-checker.py` | Startup pins load, canonical compare, tamper refusal |
