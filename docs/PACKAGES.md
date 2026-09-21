@@ -44,7 +44,8 @@ aspen-plugin-langgraph/
 | **Not** | Always-on core-edge second binary (ADR-0004 light core) |
 | **Core residual** | `aspen-safety` keeps estop + propose_act **contracts**; G8 dual-human remains in `aspen-edge-rrm` |
 | **Deferred** | Durable token backend (Redis/PG); package extract + image matrix (needs Captain for prod image expand) |
-| **Plan** | `docs/plans/ASP-628-gatekeeper-packaging.md` |
+| **Extract status** | **Skeleton exists** (`plugins/aspen-gatekeeper/`, ASP-630) — thin re-export shell; **no image matrix** yet; SoR remains `src/python/gatekeeper/` until extract |
+| **Plan** | `docs/plans/ASP-628-gatekeeper-packaging.md` · `docs/plans/ASP-630.md` |
 
 ## Dev-only Examples (internal only)
 - aspen-package-mesh
@@ -56,4 +57,4 @@ aspen-plugin-langgraph/
 - Agents and packaging tools can query this matrix without ambiguity.
 - Updated whenever new packages are added or reclassified.
 
-**Next:** Wire into aspen-package-mesh (BEL-164) and Paperclip catalog install hook. Extract `aspen-gatekeeper` when packaging sprint + Captain allow image matrix work.
+**Next:** Wire into aspen-package-mesh (BEL-164) and Paperclip catalog install hook. Extract `aspen-gatekeeper` from `plugins/aspen-gatekeeper/` (skeleton, ASP-630) into its own package when packaging sprint + Captain allow image matrix work.

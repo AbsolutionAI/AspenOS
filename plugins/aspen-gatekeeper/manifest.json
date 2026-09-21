@@ -1,0 +1,26 @@
+{
+  "name": "aspen-gatekeeper",
+  "version": "0.1.0",
+  "classification": "plugin",
+  "source": "monorepo src/python/gatekeeper (SoR until extract)",
+  "description": "ADR-0009 capability-based authorization gatekeeper: capability tokens, credential-strip proxy, safety-subject enforcement, dual-human gate on safety proposals, rate limits.",
+  "capabilities": [
+    "capability_tokens",
+    "credential_strip_proxy",
+    "safety_subject_enforcement",
+    "dual_human_gate",
+    "rate_limiting"
+  ],
+  "subjects": {
+    "subscribe": [
+      "aspen.authz.gate.request",
+      "aspen.authz.gate.decision"
+    ],
+    "publish": [
+      "aspen.authz.gate.decision",
+      "aspen.authz.capability.grant",
+      "aspen.sentinel.audit.event"
+    ]
+  },
+  "profile": "default ON when plant has actuators; OFF for observation-only / Light-read profiles"
+}

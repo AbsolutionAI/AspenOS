@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aspen-gatekeeper"
+version = "0.1.0"
+description = "ADR-0009 capability-based authorization gatekeeper plugin (thin shell over monorepo src/python/gatekeeper)"
+authors = [{ name = "Aspen OS Development" }]
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+nats = ["nats-py>=2.6"]
+test = ["pytest>=7"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["aspen_gatekeeper*"]
+
+[tool.aspen]
+classification = "plugin"
