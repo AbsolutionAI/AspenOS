@@ -26,7 +26,7 @@ table inet cell_firewall {
         # tcp dport 22 ip saddr <CELL_ADMIN_NET> accept
 
         # Catch-all: log then drop unknown ingress
-        log prefix "CELL-INPUT-DROP: " limit rate 5/minute burst 10
+        log prefix "CELL-INPUT-DROP: " limit rate 5/minute burst 10 packets
         drop
     }
 
@@ -40,7 +40,7 @@ table inet cell_firewall {
         # composed example (cell-compose.example.nft).
 
         # Catch-all: log then drop unknown forward traffic
-        log prefix "CELL-FORWARD-DROP: " limit rate 5/minute burst 10
+        log prefix "CELL-FORWARD-DROP: " limit rate 5/minute burst 10 packets
         drop
     }
 
@@ -49,6 +49,6 @@ table inet cell_firewall {
 
         # Cells may initiate outbound control/telemetry toward plant network.
         # Combine with logging if outbound accounting is required:
-        # ct state new log prefix "CELL-OUT-NEW: " limit rate 5/minute burst 10
+        # ct state new log prefix "CELL-OUT-NEW: " limit rate 5/minute burst 10 packets
     }
 }

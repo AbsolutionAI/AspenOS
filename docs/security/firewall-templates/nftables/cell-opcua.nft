@@ -29,7 +29,7 @@ tcp dport 4840 ip saddr $PLANT_OPCUA_CLIENT ip daddr $CELL_OPCUA_SERVER ct state
 tcp sport 4840 ip saddr $CELL_OPCUA_SERVER ip daddr $PLANT_OPCUA_CLIENT ct state new accept
 
 # OPC-UA discovery (UDP multicast 239.255.x.x) — block at perimeter
-udp dport 4840 ip daddr 239.255.255.0/24 log prefix "CELL-OPCUA-DISCOVERY-BLOCK: " limit rate 5/minute burst 10 drop
+udp dport 4840 ip daddr 239.255.255.0/24 log prefix "CELL-OPCUA-DISCOVERY-BLOCK: " limit rate 5/minute burst 10 packets drop
 udp sport 4840 ip saddr 239.255.255.0/24 drop
 
 # --- input chain rules (cell-internal, insert before catch-all drop) --------

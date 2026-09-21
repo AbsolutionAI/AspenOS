@@ -31,7 +31,7 @@ tcp dport 8883 ip saddr $PLANT_MQTT_BROKER ip daddr $CELL_MQTT_CLIENT ct state n
 tcp sport 8883 ip saddr $CELL_MQTT_CLIENT ip daddr $PLANT_MQTT_BROKER ct state new accept
 
 # Cleartext MQTT crossing the perimeter: deny and log (never allowed)
-tcp dport 1883 ip daddr $CELL_MQTT_CLIENT log prefix "CELL-MQTT-CLEAR-BLOCK: " limit rate 5/minute burst 10 drop
+tcp dport 1883 ip daddr $CELL_MQTT_CLIENT log prefix "CELL-MQTT-CLEAR-BLOCK: " limit rate 5/minute burst 10 packets drop
 
 # --- input chain rules (cell-internal, insert before catch-all drop) --------
 

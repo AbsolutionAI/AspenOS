@@ -38,8 +38,8 @@ tcp dport 1180 ip saddr $PLANT_ROSMON ip daddr $CELL_ROS_BRIDGE ct state new acc
 tcp sport 1180 ip saddr $CELL_ROS_BRIDGE ip daddr $PLANT_ROSMON ct state new accept
 
 # All other DDS traffic crossing the perimeter: log then drop (DDS leaks)
-udp dport 49152-65535 log prefix "CELL-ROS2-CROSS-BLOCK: " limit rate 5/minute burst 10 drop
-udp dport 7410-7489 ip daddr 224.0.0.0/24 log prefix "CELL-ROS2-MCAST-BLOCK: " limit rate 5/minute burst 10 drop
+udp dport 49152-65535 log prefix "CELL-ROS2-CROSS-BLOCK: " limit rate 5/minute burst 10 packets drop
+udp dport 7410-7489 ip daddr 224.0.0.0/24 log prefix "CELL-ROS2-MCAST-BLOCK: " limit rate 5/minute burst 10 packets drop
 
 # --- audit notes ------------------------------------------------------------
 # - UDP/DDS has no connection state; the cross-perimeter drop-log is the only
