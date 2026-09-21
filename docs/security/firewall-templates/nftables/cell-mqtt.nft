@@ -1,0 +1,46 @@
+#!/usr/sbin/nft -f
+# =============================================================================
+# ASP-372 H-008 / F-008 — CELL PERIMETER MQTT — DRAFT
+#
+# DRAFT — DO NOT APPLY. Reference fragment only.
+# Applying this to any host requires physical cell commissioning, protocol-
+# driver confirmation, regression testing, and Captain approval of a separate
+# change order. No CI or host ever loads this file.
+#
+# MQTT fragment for a manufacturing cell perimeter. Inserted into the
+# cell_firewall forward/input chains from cell-base.nft (or include this file
+# from a composed single-file example).
+#
+# Cross-perimeter MQTT is TLS-only (8883). Cleartext MQTT (1883) is confined
+# to the cell-internal network and never crosses the firewall.
+# =============================================================================
+
+# Variables (substitute per cell; or move to the composed example):
+# define PLANT_MQTT_BROKER   10.50.1.10   # plant-level broker (DMZ)
+# define CELL_MQTT_CLIENT    192.168.100.5  # MQTT client inside the cell
+# define CELL_MQTT_GATEWAY   192.168.100.1  # cell-level MQTT gateway
+# define CELL_CTRL_NET       192.168.100.0/24  # cell control subnet
+
+# --- forward chain rules (cross-perimeter, insert before catch-all drop) ----
+
+# Plant broker -> cell client: TLS only
+tcp dport 8883 ip saddr $PLANT_MQTT_BROKER ip daddr $CELL_MQTT_CLIENT ct state new accept
+
+# Cell client -> plant broker: TLS only (return path handled by conntrack,
+# rule kept explicit for visibility and for NEW-state audit counting)
+tcp sport 8883 ip saddr $CELL_MQTT_CLIENT ip daddr $PLANT_MQTT_BROKER ct state new accept
+
+# Cleartext MQTT crossing the perimeter: deny and log (never allowed)
+tcp dport 1883 ip daddr $CELL_MQTT_CLIENT log prefix "CELL-MQTT-CLEAR-BLOCK: " limit rate 5/minute burst 10 drop
+
+# --- input chain rules (cell-internal, insert before catch-all drop) --------
+
+# Cleartext MQTT allowed only inside the cell control / gateway subnets
+tcp dport 1883 ip saddr $CELL_CTRL_NET ip daddr $CELL_MQTT_GATEWAY accept
+
+# --- audit notes ------------------------------------------------------------
+# - Port 8883 (MQTT over TLS) is the only MQTT path that may cross the cell
+#   perimeter. 1883 sends only toward the cell-internal gateway.
+# - NEW-state accounting on cross-perimeter flows satisfies ALCOA+ attributable
+#   audit reconstruction (which flows, when, between which endpoints).
+# - Rate-limited drop log prevents heartbeat storms from masking real denies.

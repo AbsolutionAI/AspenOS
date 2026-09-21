@@ -1,0 +1,48 @@
+#!/usr/sbin/nft -f
+# =============================================================================
+# ASP-372 H-008 / F-008 — CELL PERIMETER OPC-UA — DRAFT
+#
+# DRAFT — DO NOT APPLY. Reference fragment only.
+# Applying this to any host requires physical cell commissioning, protocol-
+# driver confirmation, regression testing, and Captain approval of a separate
+# change order. No CI or host ever loads this file.
+#
+# OPC-UA fragment for a manufacturing cell perimeter. Inserted into the
+# cell_firewall forward/input chains from cell-base.nft (or include this file
+# from a composed single-file example).
+#
+# OPC-UA binary protocol runs on TCP 4840. UDP discovery (4840 multicast/
+# broadcast) is blocked at the perimeter to prevent endpoint enumeration.
+# =============================================================================
+
+# Variables (substitute per cell; or move to the composed example):
+# define PLANT_OPCUA_CLIENT 10.50.1.20    # plant-side OPC-UA client
+# define CELL_OPCUA_SERVER  192.168.100.10  # OPC-UA server inside the cell
+# define CELL_PLC_NET       192.168.101.0/24  # PLC/RTU subnet within cell
+
+# --- forward chain rules (cross-perimeter, insert before catch-all drop) ----
+
+# Plant client -> cell OPC-UA server: TCP 4840 (binary protocol)
+tcp dport 4840 ip saddr $PLANT_OPCUA_CLIENT ip daddr $CELL_OPCUA_SERVER ct state new accept
+
+# Cell OPC-UA server -> plant client: return path (explicit for audit parity)
+tcp sport 4840 ip saddr $CELL_OPCUA_SERVER ip daddr $PLANT_OPCUA_CLIENT ct state new accept
+
+# OPC-UA discovery (UDP multicast 239.255.x.x) — block at perimeter
+udp dport 4840 ip daddr 239.255.255.0/24 log prefix "CELL-OPCUA-DISCOVERY-BLOCK: " limit rate 5/minute burst 10 drop
+udp sport 4840 ip saddr 239.255.255.0/24 drop
+
+# --- input chain rules (cell-internal, insert before catch-all drop) --------
+
+# PLC/RTU -> cell OPC-UA gateway: TCP 4840 inside the cell only
+tcp dport 4840 ip saddr $CELL_PLC_NET ip daddr $CELL_OPCUA_SERVER accept
+
+# --- audit notes ------------------------------------------------------------
+# - TCP 4840 is the IANA-assigned OPC-UA binary protocol port.
+# - UDP multicast discovery is blocked to satisfy IEC 62443-3-3 SR 5.1
+#   (endpoint enumeration / zone segmentation).
+# - OPC-UA security mode (sign-and-encrypt) is an application-layer control;
+#   the firewall enforces transport scoping only.
+# - OPC-UA sessions are long-lived TCP connections. Ensure conntrack keeps
+#   them (nf_conntrack_tcp_timeout_established, 24h recommended) so a valid
+#   session is not torn down mid-run.

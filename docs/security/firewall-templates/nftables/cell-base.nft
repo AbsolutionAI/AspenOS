@@ -1,0 +1,54 @@
+#!/usr/sbin/nft -f
+# =============================================================================
+# ASP-372 H-008 / F-008 — CELL PERIMETER BASE — DRAFT
+#
+# DRAFT — DO NOT APPLY. Reference fragment only.
+# Applying this to any host requires physical cell commissioning, protocol-
+# driver confirmation, regression testing, and Captain approval of a separate
+# change order. No CI or host ever loads this file.
+#
+# Single inet table for a manufacturing cell firewall. Default-deny ingress,
+# connection-state passthrough for established/related, rate-limited drop
+# logging, catch-all LOG-and-drop. Feed protocol fragments (cell-mqtt.nft,
+# cell-opcua.nft, cell-ros2.nft) into the forward/input chains per cell.
+# =============================================================================
+
+table inet cell_firewall {
+    chain input {
+        type filter hook input priority filter; policy drop;
+
+        # Loopback and management
+        ct state established,related accept
+        iif lo accept
+
+        # SSH management plane — cell operator only (ASP-370 deploys live UFW
+        # separately; this is the cell-boot baseline)
+        # tcp dport 22 ip saddr <CELL_ADMIN_NET> accept
+
+        # Catch-all: log then drop unknown ingress
+        log prefix "CELL-INPUT-DROP: " limit rate 5/minute burst 10
+        drop
+    }
+
+    chain forward {
+        type filter hook forward priority filter; policy drop;
+
+        # Established/related cross-perimeter traffic flows back
+        ct state established,related accept
+
+        # Protocol-specific rules are appended here by fragment or by the
+        # composed example (cell-compose.example.nft).
+
+        # Catch-all: log then drop unknown forward traffic
+        log prefix "CELL-FORWARD-DROP: " limit rate 5/minute burst 10
+        drop
+    }
+
+    chain output {
+        type filter hook output priority filter; policy accept;
+
+        # Cells may initiate outbound control/telemetry toward plant network.
+        # Combine with logging if outbound accounting is required:
+        # ct state new log prefix "CELL-OUT-NEW: " limit rate 5/minute burst 10
+    }
+}

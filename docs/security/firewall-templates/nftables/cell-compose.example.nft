@@ -1,0 +1,88 @@
+#!/usr/sbin/nft -f
+# =============================================================================
+# ASP-372 H-008 / F-008 — CELL PERIMETER COMPOSED EXAMPLE — DRAFT
+#
+# DRAFT — DO NOT APPLY. Example composition only.
+# Applying this to any host requires physical cell commissioning, protocol-
+# driver confirmation, regression testing, and Captain approval of a separate
+# change order. No CI or host ever loads this file. This is the file an
+# operator copies, substitutes cell-specific values for every `define`, then
+# syntax-checks with `nft -c -f` before any approval.
+#
+# Single-file example: base default-deny cell + MQTT + OPC-UA + ROS2.
+# Protocol details live in the per-protocol fragments under
+# docs/security/firewall-templates/nftables/.
+# =============================================================================
+
+# --- Cell-specific variables (substitute per cell at commissioning) ---------
+define PLANT_MQTT_BROKER = 10.50.1.10        # plant-level MQTT broker (DMZ)
+define CELL_MQTT_CLIENT = 192.168.100.5     # MQTT client inside the cell
+define CELL_MQTT_GATEWAY = 192.168.100.1     # cell-level MQTT gateway
+define PLANT_OPCUA_CLIENT = 10.50.1.20        # plant-side OPC-UA client
+define CELL_OPCUA_SERVER = 192.168.100.10    # OPC-UA server inside the cell
+define CELL_PLC_NET = 192.168.101.0/24  # PLC/RTU subnet within cell
+define CELL_ROSNET = 192.168.120.0/24  # cell ROS2 subnet
+define CELL_ROS_BRIDGE = 192.168.120.250   # ROS2 bridge/proxy IP
+define PLANT_ROSMON = 10.50.1.30        # plant monitoring/control IP
+define CELL_CTRL_NET = 192.168.100.0/24  # cell control subnet
+
+table inet cell_firewall {
+    chain input {
+        type filter hook input priority filter; policy drop;
+
+        # Loopback and management
+        ct state established,related accept
+        iif lo accept
+
+        # SSH management plane — cell operator only (comment out if not used)
+        # tcp dport 22 ip saddr $CELL_ADMIN_NET accept
+
+        # --- MQTT (cell-internal cleartext confined to cell) -----------------
+        tcp dport 1883 ip saddr $CELL_CTRL_NET ip daddr $CELL_MQTT_GATEWAY accept
+
+        # --- OPC-UA (PLC/RTU -> gateway inside cell) -------------------------
+        tcp dport 4840 ip saddr $CELL_PLC_NET ip daddr $CELL_OPCUA_SERVER accept
+
+        # --- ROS2 (cell-internal DDS + multicast confined to cell subnet) ----
+        udp dport 49152-65535 ip saddr $CELL_ROSNET ip daddr $CELL_ROSNET accept
+        udp dport 7410-7489 ip saddr $CELL_ROSNET ip daddr 224.0.0.0/24 accept
+
+        # Catch-all: log then drop unknown ingress
+        log prefix "CELL-INPUT-DROP: " limit rate 5/minute burst 10
+        drop
+    }
+
+    chain forward {
+        type filter hook forward priority filter; policy drop;
+
+        # Established/related cross-perimeter traffic flows back
+        ct state established,related accept
+
+        # --- MQTT (TLS-only cross-perimeter; clear blocked) ------------------
+        tcp dport 8883 ip saddr $PLANT_MQTT_BROKER ip daddr $CELL_MQTT_CLIENT ct state new accept
+        tcp sport 8883 ip saddr $CELL_MQTT_CLIENT ip daddr $PLANT_MQTT_BROKER ct state new accept
+        tcp dport 1883 ip daddr $CELL_MQTT_CLIENT log prefix "CELL-MQTT-CLEAR-BLOCK: " limit rate 5/minute burst 10 drop
+
+        # --- OPC-UA (plant client -> server; discovery multicast blocked) ----
+        tcp dport 4840 ip saddr $PLANT_OPCUA_CLIENT ip daddr $CELL_OPCUA_SERVER ct state new accept
+        tcp sport 4840 ip saddr $CELL_OPCUA_SERVER ip daddr $PLANT_OPCUA_CLIENT ct state new accept
+        udp dport 4840 ip daddr 239.255.255.0/24 log prefix "CELL-OPCUA-DISCOVERY-BLOCK: " limit rate 5/minute burst 10 drop
+
+        # --- ROS2 (bridge/proxy only cross-perimeter; DDS leaks blocked) -----
+        tcp dport 1180 ip saddr $PLANT_ROSMON ip daddr $CELL_ROS_BRIDGE ct state new accept
+        tcp sport 1180 ip saddr $CELL_ROS_BRIDGE ip daddr $PLANT_ROSMON ct state new accept
+        udp dport 49152-65535 log prefix "CELL-ROS2-CROSS-BLOCK: " limit rate 5/minute burst 10 drop
+
+        # Catch-all: log then drop unknown forward traffic
+        log prefix "CELL-FORWARD-DROP: " limit rate 5/minute burst 10
+        drop
+    }
+
+    chain output {
+        type filter hook output priority filter; policy accept;
+
+        # Cells may initiate outbound control/telemetry toward plant network.
+        # Combine with logging if outbound accounting is required:
+        # ct state new log prefix "CELL-OUT-NEW: " limit rate 5/minute burst 10
+    }
+}

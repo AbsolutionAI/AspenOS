@@ -1,0 +1,52 @@
+#!/usr/sbin/nft -f
+# =============================================================================
+# ASP-372 H-008 / F-008 — CELL PERIMETER ROS2 / DDS — DRAFT
+#
+# DRAFT — DO NOT APPLY. Reference fragment only.
+# Applying this to any host requires physical cell commissioning, protocol-
+# driver confirmation, regression testing, and Captain approval of a separate
+# change order. No CI or host ever loads this file.
+#
+# ROS2 / DDS fragment for a manufacturing cell perimeter. Inserted into the
+# cell_firewall forward/input chains from cell-base.nft (or include this file
+# from a composed single-file example).
+#
+# ROS2 uses the DDS middleware over UDP with an ephemeral port range
+# (49152-65535) and UDP multicast (224.0.0.0/24 default) for discovery and
+# data distribution. DDS has no connection tracking.
+# =============================================================================
+
+# Variables (substitute per cell; or move to the composed example):
+# define CELL_ROSNET       192.168.120.0/24  # cell ROS2 subnet
+# define CELL_ROS_BRIDGE   192.168.120.250   # ROS2 bridge/proxy IP
+# define PLANT_ROSMON      10.50.1.30        # plant monitoring/control IP
+# DDS domain ID -> port map: 7400 + (250 * domain_id); default multicast
+# range 224.0.0.0/24.
+
+# --- input chain rules (cell-internal, insert before catch-all drop) --------
+
+# Inter-node DDS within the cell — ephemeral UDP allowed, source-constrained
+udp dport 49152-65535 ip saddr $CELL_ROSNET ip daddr $CELL_ROSNET accept
+
+# DDS discovery multicast confined to the cell subnet
+udp dport 7410-7489 ip saddr $CELL_ROSNET ip daddr 224.0.0.0/24 accept
+
+# --- forward chain rules (cross-perimeter, insert before catch-all drop) ----
+
+# Plant monitoring <-> cell ROS2 bridge (explicit TCP bridge/proxy port)
+tcp dport 1180 ip saddr $PLANT_ROSMON ip daddr $CELL_ROS_BRIDGE ct state new accept
+tcp sport 1180 ip saddr $CELL_ROS_BRIDGE ip daddr $PLANT_ROSMON ct state new accept
+
+# All other DDS traffic crossing the perimeter: log then drop (DDS leaks)
+udp dport 49152-65535 log prefix "CELL-ROS2-CROSS-BLOCK: " limit rate 5/minute burst 10 drop
+udp dport 7410-7489 ip daddr 224.0.0.0/24 log prefix "CELL-ROS2-MCAST-BLOCK: " limit rate 5/minute burst 10 drop
+
+# --- audit notes ------------------------------------------------------------
+# - UDP/DDS has no connection state; the cross-perimeter drop-log is the only
+#   way to distinguish intentional bridged traffic from leaked DDS traffic.
+# - 1180 is a non-standard ROS2-over-TCP bridge port; confirm it against the
+#   actual deployment before commissioning. If unused, remove these two rules.
+# - DDS Security (participant-level auth) is required even inside the cell;
+#   the firewall is defence-in-depth, not a substitute (IEC 62443-3-3 SR 5.3).
+# - udp dport matching across a range uses nftables range syntax
+#   (dport 49152-65535), which is valid nft 0.9.3+.
