@@ -1,6 +1,12 @@
 # Starship OS default reasoning model alias
 # Upstream: jeffgreen311/Eve-V2-Unleashed-Qwen3.5-8B-Liberated-4K-4B-Merged
 # Create: ollama create Eve-V2-Unleashed -f /etc/starship/models/Eve-V2-Unleashed.Modelfile
+# Digest pin (F-013): config/models-digests.yaml is the single source of truth.
+#   pinned revision: sha256:4d1fe4fe01a49a9b476e275b2029cc5fdfc81779d12f86303d251a359228082b
+#   `FROM ...@sha256:` refs are rejected by Ollama 0.32.11 ("invalid model name"),
+#   so the tag is kept and the pinned digest is enforced by install-models.sh /
+#   agent-health-checker.py / dashboard after every pull. Re-pin:
+#   python3 scripts/resolve-model-digests.py
 #
 # Infrastructure default context: 16384 (server). Use 8192 edge / 32768 ops if VRAM allows.
 

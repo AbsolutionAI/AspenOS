@@ -86,7 +86,7 @@
 | F-017 | **Fleet heartbeat spoofing (register fake node)** | Identity | 7.5 (AV:N/AC:L) | NATS accounts + token; no PKI/fingerprint yet | **Open** |
 | F-018 | **Exercise state race — start/stop collision** | Exercise | 5.0 (AV:N/AC:H) | Atomic file write; poll-based check in fleet_policy.py | **Open** |
 | F-019 | **Delegated agent without plant tag** | Cross-plant | 6.0 (AV:N/AC:M) | `delegate_to_agent` accepts `plant`/`target_plant`; missing tag defaults no ACL | Informational |
-| F-013 | **Unpinned model digests — tag-only ollama pull** | Supply chain / Model integrity | 6.0 (AV:N/AC:H) | Pin all model `FROM` and `ollama pull` to SHA256 digests (`@sha256:...`); verify digest after pull; reject `:latest` tags in production | **Open (ASP-377)** — design spec at `docs/plans/ASP-377.md` |
+| F-013 | **Unpinned model digests — tag-only ollama pull** | Supply chain / Model integrity | 6.0 (AV:N/AC:H) | Pin model digests (`config/models-digests.yaml`); verify-after-pull fail-hard (`install-models.sh`/health-checker/dashboard); reject unpinned pulls in production | **Implemented (ASP-377)** — `scripts/resolve-model-digests.py` + CI/nightly gates; `@sha256:` refs rejected by Ollama 0.32.11, enforcement is post-pull verification per `docs/plans/ASP-377.md` |
 | F-020 | **Software data-diode missing for OSINT/ingest** | OSINT domain | 6.5 (AV:N/AC:M) | nftables/iptables one-way rules + process isolation + restricted NATS account — see recipe | **Recipe complete** — [Recipe](solutions/asp-368-data-diode-recipe.md) reviewed (AUDITOR_APPROVE); in_review — captain proof required |
 
 ### 2.4 Host-level threats
@@ -186,7 +186,7 @@
 - [x] **H-019:** Add CI gate to block Dev-only packages from production images.
 - [ ] **H-HOST-04:** Replace env-based master password with prompt, keyring, or TPM-backed secret.
 - [ ] **F-017:** Add node fingerprint/PKI for fleet heartbeat to prevent registration spoofing.
-- [ ] **F-013:** Pin all Ollama model pulls and `FROM` directives to SHA256 digests; reject `:latest` in production. — **ASP-377:** design spec at `docs/plans/ASP-377.md`
+- [x] **F-013:** Pin all Ollama model pulls and `FROM` directives to SHA256 digests; reject unpinned pulls in production. — **ASP-377:** implemented (`config/models-digests.yaml` + verify-after-pull); `@sha256:` refs rejected by Ollama 0.32.11.
 - [x] **F-020:** Draft software data-diode recipe for OSINT/ingest. — [Recipe](solutions/asp-368-data-diode-recipe.md) reviewed (AUDITOR_APPROVE); QUEUED — requires dual-human gate before any host firewall apply.
 
 ### 4.3 Medium-term (v2.3 planning)
@@ -258,7 +258,7 @@
 | F-015 (Red lateral) | **High** | Active | Existing isolation |
 | F-016 (ACL misconfig) | Medium | Active | Fail-closed default |
 | F-017 (Spoofed heartbeat) | Medium | Open | PKI fingerprint |
-| F-013 (Unpinned model digests) | Low | **Open (ASP-377)** | Pin to SHA256 digests; reject `:latest` in production |
+| F-013 (Unpinned model digests) | Low | Implemented (ASP-377) | Verify-after-pull fail-hard; reject unpinned in production |
 | F-018 (Exercise state race) | Low | Open | Atomic file write |
 | F-019 (Delegated agent no plant) | Low | Informational | Document default |
 | F-020 (Data-diode OSINT/ingest) | Medium | **Recipe complete** | [Recipe](solutions/asp-368-data-diode-recipe.md) reviewed (AUDITOR_APPROVE); in_review — captain proof required |

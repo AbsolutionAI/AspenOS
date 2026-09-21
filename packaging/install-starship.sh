@@ -111,9 +111,11 @@ pip install -q anthropic openai 2>/dev/null || true
 # ── Pull Models ──────────────────────────────────────────────────────
 header "AI Models"
 if [[ -x "$REPO_DIR/scripts/install-models.sh" ]]; then
-    bash "$REPO_DIR/scripts/install-models.sh" "$PROFILE" || true
+    # Digest-verified pulls (F-013): install-models.sh exits non-zero when a
+    # pinned model fails digest verification, so do not swallow the exit code.
+    bash "$REPO_DIR/scripts/install-models.sh" "$PROFILE"
 else
-    log "Pulling ${MODEL}..."
+    log "Pulling ${MODEL}... (install-models.sh missing — tag-only, unverified)"
     ollama pull "${MODEL}" 2>&1 | tail -1 || true
     log "Pulling ${EMBED_MODEL}..."
     ollama pull "${EMBED_MODEL}" 2>&1 | tail -1 || true

@@ -40,6 +40,20 @@ jobs:
       - name: F-014 signed-package gate (unsigned/tampered fixtures must fail)
         run: python -m pytest tests/test_package_signatures.py -q
 
+  security-model-digests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install digest-gate deps
+        run: pip install pyyaml pytest aiohttp
+      - name: F-013 pins validate offline (structural, strict)
+        run: STARSHIP_STRICT_DIGESTS=1 STARSHIP_OFFLINE=1 python3 scripts/resolve-model-digests.py --check --offline
+      - name: F-013 digest gate fixtures (tamper/mismatch must fail)
+        run: python -m pytest tests/test_model_digests.py -q
+
   smoke:
     runs-on: ubuntu-latest
     steps:

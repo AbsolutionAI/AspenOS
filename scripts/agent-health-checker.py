@@ -33,6 +33,21 @@ STATUS_FILE = Path(os.getenv("HEALTH_STATUS_FILE", "/tmp/starship-health.json"))
 AGENTS_DIR = PROJECT_DIR / "agents"
 START_AGENTS_SCRIPT = PROJECT_DIR / "scripts" / "start-agents.sh"
 
+_MODELS_DIGESTS_CANDIDATES = [
+    Path(os.getenv("STARSHIP_MODELS_DIGESTS", "")),
+    Path("/etc/starship/models-digests.yaml"),
+    PROJECT_DIR / "config" / "models-digests.yaml",
+    PROJECT_DIR.parent / "config" / "models-digests.yaml",
+]
+
+def _find_models_digests_file():
+    for candidate in _MODELS_DIGESTS_CANDIDATES:
+        if candidate and candidate.is_file():
+            return candidate
+    return None
+
+MODELS_DIGESTS_FILE = _find_models_digests_file()
+
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 logging.basicConfig(
@@ -92,6 +107,93 @@ def load_agent_configs():
     return configs
 
 
+def canon_digest(digest):
+    """Canonical sha256:<hex> form (tolerates bare-hex /api/tags digests)."""
+    digest = (digest or "").strip()
+    return digest if digest.startswith("sha256:") else f"sha256:{digest}"
+
+
+def load_models_digests():
+    """Return {alias: digest} and {upstream: digest} pins from models-digests.yaml."""
+    pins, upstream_pins = {}, {}
+    if not MODELS_DIGESTS_FILE or not MODELS_DIGESTS_FILE.is_file():
+        return pins, upstream_pins
+    try:
+        import yaml
+        data = yaml.safe_load(MODELS_DIGESTS_FILE.read_text()) or {}
+        for alias, entry in (data.get("models", {}) or {}).items():
+            digest = canon_digest((entry or {}).get("digest"))
+            if not digest:
+                continue
+            pins[alias] = digest
+            upstream = (entry or {}).get("upstream", alias)
+            upstream_pins[upstream] = digest
+    except Exception as e:
+        log.warning("Failed to load model digests %s: %s", MODELS_DIGESTS_FILE, e)
+    return pins, upstream_pins
+
+
+MODELS_DIGESTS = load_models_digests()
+
+
+def lookup_digest(name, digests):
+    """Return the /api/tags digest for a model name from a {name: digest} map."""
+    base = name.split(":")[0]
+    for mn, digest in digests.items():
+        if mn == name or mn.split(":")[0] == base:
+            return canon_digest(digest)
+    return None
+
+
+def expected_digest(name):
+    """Resolve the pinned digest for a model name (alias, upstream, or basename)."""
+    pins, upstream_pins = MODELS_DIGESTS
+    if not pins:
+        return None
+    if name in pins:
+        return pins[name]
+    if name in upstream_pins:
+        return upstream_pins[name]
+    base = name.split(":")[0]
+    for alias, digest in pins.items():
+        if alias.split("/")[-1] == base or alias == base:
+            return digest
+    return None
+
+
+async def actual_digest(name):
+    """Fetch the current /api/tags digest for a model, or None."""
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{OLLAMA_URL}/api/tags", timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                data = await resp.json()
+                for m in data.get("models", []):
+                    mn = m.get("name", "")
+                    if mn == name or mn == name.split(":")[0]:
+                        return canon_digest(m.get("digest"))
+    except Exception as e:
+        log.warning("Failed to resolve digest for %s: %s", name, e)
+    return None
+
+
+async def verify_model_digest(name):
+    """Return True if the model matches its pin; None when no pin (dev)."""
+    expected = expected_digest(name)
+    if not expected:
+        return None
+    actual = await actual_digest(name)
+    if not actual:
+        return False
+    if actual != expected:
+        log.error(
+            "SECURITY MODEL-DIGEST-MISMATCH model=%s expected=sha256:%s actual=sha256:%s",
+            name, expected[:16], actual[:16],
+        )
+        return False
+    return True
+
+
 async def check_ollama_alive():
     try:
         import aiohttp
@@ -100,10 +202,11 @@ async def check_ollama_alive():
                 if resp.status == 200:
                     data = await resp.json()
                     models = [m.get("name", "") for m in data.get("models", [])]
-                    return True, models
+                    digests = {m.get("name", ""): m.get("digest", "") for m in data.get("models", [])}
+                    return True, models, digests
     except Exception as e:
         log.warning("Ollama unreachable: %s", e)
-    return False, []
+    return False, [], {}
 
 
 def check_agent_process(name):
@@ -159,6 +262,7 @@ async def try_restart_agent(name):
 
 async def try_pull_model(model_name):
     log.warning("Attempting to pull missing model: %s", model_name)
+    expected = expected_digest(model_name)
     try:
         proc = await asyncio.create_subprocess_exec(
             "ollama", "pull", model_name,
@@ -166,10 +270,19 @@ async def try_pull_model(model_name):
             stderr=asyncio.subprocess.DEVNULL,
         )
         await asyncio.wait_for(proc.wait(), timeout=120)
-        if proc.returncode == 0:
-            log.info("Successfully pulled model: %s", model_name)
-            return True
-        log.error("ollama pull %s failed with code %d", model_name, proc.returncode)
+        if proc.returncode != 0:
+            log.error("ollama pull %s failed with code %d", model_name, proc.returncode)
+            return False
+        if expected:
+            ok = await verify_model_digest(model_name)
+            if ok is False:
+                log.error(
+                    "SECURITY refusing to load %s: digest does not match pin sha256:%s",
+                    model_name, expected[:16],
+                )
+                return False
+        log.info("Successfully pulled model: %s", model_name)
+        return True
     except asyncio.TimeoutError:
         log.error("Timeout pulling model: %s", model_name)
         try:
@@ -192,7 +305,7 @@ async def check_once():
     }
 
     # 1. Ollama status
-    ollama_ok, ollama_models = await check_ollama_alive()
+    ollama_ok, ollama_models, ollama_digests = await check_ollama_alive()
     results["ollama_alive"] = ollama_ok
     results["ollama_models"] = ollama_models
 
@@ -249,25 +362,46 @@ async def check_once():
             if not model or model == "unknown":
                 continue
             # Normalize model name for comparison
-            model_in_list = any(
-                model == m or model.split(":")[0] == m.split(":")[0]
-                for m in ollama_models
+            match = next(
+                (m for m in ollama_models if model == m or model.split(":")[0] == m.split(":")[0]),
+                None,
             )
-            if not model_in_list:
-                agent_info["model_available"] = False
-                agent_info["incidents"].append({
-                    "id": f"model-missing-{name}-{model.replace('/', '-')}",
-                    "severity": "high",
-                    "title": f"Model missing for {name}: {model}",
-                    "summary": f"Agent {name} requires model '{model}' but it is not in Ollama",
-                    "source": "model",
-                })
-                # Auto-recovery: try to pull
-                pulled = await try_pull_model(model)
-                if pulled:
-                    results["auto_recovery"]["pulls"] += 1
-                    agent_info["model_available"] = True
-                break  # One missing model is enough per agent
+            if match:
+                # Present: refuse to treat a tampered revision as available.
+                expected = expected_digest(model)
+                actual = lookup_digest(model, ollama_digests)
+                if expected and actual and actual != expected:
+                    agent_info["model_available"] = False
+                    agent_info["incidents"].append({
+                        "id": f"model-tampered-{name}-{model.replace('/', '-')}",
+                        "severity": "high",
+                        "title": f"Model digest mismatch for {name}: {model}",
+                        "summary": (
+                            f"Pinned revision for '{model}' (sha256:{expected[:16]}…) does not "
+                            f"match the loaded revision (sha256:{actual[:16]}…). Refusing to load."
+                        ),
+                        "source": "model",
+                    })
+                    log.error(
+                        "SECURITY MODEL-DIGEST-MISMATCH agent=%s model=%s expected=sha256:%s actual=sha256:%s",
+                        name, model, expected[:16], actual[:16],
+                    )
+                    break
+                continue
+            agent_info["model_available"] = False
+            agent_info["incidents"].append({
+                "id": f"model-missing-{name}-{model.replace('/', '-')}",
+                "severity": "high",
+                "title": f"Model missing for {name}: {model}",
+                "summary": f"Agent {name} requires model '{model}' but it is not in Ollama",
+                "source": "model",
+            })
+            # Auto-recovery: try to pull (digest verified inside try_pull_model)
+            pulled = await try_pull_model(model)
+            if pulled:
+                results["auto_recovery"]["pulls"] += 1
+                agent_info["model_available"] = True
+            break  # One missing model is enough per agent
 
         # OpenRouter check
         openrouter_models = cfg.get("openrouter_models", [])

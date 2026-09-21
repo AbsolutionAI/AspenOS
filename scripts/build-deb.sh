@@ -137,6 +137,7 @@ cp "$REPO_DIR/nats/subjects.yaml" "$PKG_ROOT/etc/starship/nats/" 2>/dev/null || 
 ln -sfn /etc/starship/nats/agent-bus.conf "$PKG_ROOT/etc/starship/nats/active.conf"
 cp "$REPO_DIR/config/fleet.yaml" "$PKG_ROOT/etc/starship/" 2>/dev/null || true
 cp "$REPO_DIR/config/profiles.yaml" "$PKG_ROOT/etc/starship/" 2>/dev/null || true
+cp "$REPO_DIR/config/models-digests.yaml" "$PKG_ROOT/etc/starship/" 2>/dev/null || true
 for f in config.yaml proxy.yaml romi.yaml ergo.yaml orchestrator.yaml; do
     cp "$REPO_DIR/agents/$f" "$PKG_ROOT/etc/starship/" 2>/dev/null || true
 done

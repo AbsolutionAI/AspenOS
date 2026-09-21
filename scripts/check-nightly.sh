@@ -218,6 +218,26 @@ check "update.sh supports --verify-signature" bash -c 'grep -q -- "--verify-sign
 check "CI runs signature gate" bash -c 'grep -q "verify-package-signature" .github/workflows/ci.yml && grep -q "test_package_signatures.py" .github/workflows/ci.yml'
 check "package signature fixture tests" bash -c "'$PY' -m pytest tests/test_package_signatures.py -q --tb=short 2>&1 | grep -E '[0-9]+ passed'"
 
+# ─── Section 22: Model digest pinning gate (ASP-377/F-013) ───────────
+echo -e "\n${YELLOW}── Section 22: Model digest pinning gate (ASP-377/F-013) ──${NC}"
+check "resolver script exists" test -x scripts/resolve-model-digests.py
+check "digest pins committed and non-empty" bash -c 'test -s config/models-digests.yaml'
+check "pins validate offline (strict)" bash -c 'STARSHIP_OFFLINE=1 STARSHIP_STRICT_DIGESTS=1 python3 scripts/resolve-model-digests.py --check --offline >/dev/null 2>&1'
+check "every models.yaml upstream pinned" bash -c "python3 -c \"
+import yaml
+m = yaml.safe_load(open('config/models.yaml'))['models']
+p = yaml.safe_load(open('config/models-digests.yaml'))['models']
+assert set(m) == set(p), 'unpinned models'
+assert all(e.get('resolved') for e in p.values())
+\""
+check "Modelfile documents pinned digest" bash -c 'grep -q "config/models-digests.yaml" config/models/Eve-V2-Unleashed.Modelfile && grep -q "sha256:" config/models/Eve-V2-Unleashed.Modelfile'
+check "install-models.sh verifies pulls" bash -c 'grep -q -- "--verify-local" scripts/install-models.sh && grep -q "resolve-model-digests.py" scripts/install-models.sh && grep -q "STARSHIP_STRICT_DIGESTS" scripts/install-models.sh'
+check "health checker refuses tampered models" bash -c 'grep -q "MODEL-DIGEST-MISMATCH" scripts/agent-health-checker.py && grep -q "refusing to load" scripts/agent-health-checker.py'
+check "dashboard guards production pulls" bash -c 'grep -q "production mode requires a pinned digest" dashboard/server.py && grep -q "MODEL-DIGEST-MISMATCH" dashboard/server.py'
+check "install-starship does not swallow digest failures" bash -c 'grep -q "install-models.sh" packaging/install-starship.sh && ! grep -q "install-models.sh.*|| true" packaging/install-starship.sh'
+check "CI runs digest gate" bash -c 'grep -q "security-model-digests" .github/workflows/ci.yml && grep -q "test_model_digests.py" .github/workflows/ci.yml'
+check "model digest fixture tests" bash -c "'$PY' -m pytest tests/test_model_digests.py -q --tb=short 2>&1 | grep -E '[0-9]+ passed'"
+
 # ─── Summary ─────────────────────────────────────────────────
 TIMING_END=$(date +%s%N)
 ELAPSED_MS=$(( (TIMING_END - TIMING_BEGIN) / 1000000 ))

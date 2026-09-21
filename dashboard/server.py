@@ -46,6 +46,62 @@ if not STATIC_DIR.is_dir():
 nc = None
 _telemetry_aggregator = None
 
+
+# ── F-013 model digest pins ───────────────────────────────────────────────
+_MODELS_DIGESTS_CANDIDATES = [
+    Path(os.getenv("STARSHIP_MODELS_DIGESTS", "")),
+    Path("/etc/starship/models-digests.yaml"),
+    PROJECT_DIR / "config" / "models-digests.yaml",
+    PROJECT_DIR.parent / "config" / "models-digests.yaml",
+]
+
+MODELS_DIGESTS = {}
+
+
+def _canon_digest(digest):
+    """Canonical sha256:<hex> form (tolerates bare-hex /api/tags digests)."""
+    digest = (digest or "").strip()
+    return digest if digest.startswith("sha256:") else f"sha256:{digest}"
+
+
+def _load_models_digests():
+    for candidate in _MODELS_DIGESTS_CANDIDATES:
+        if not candidate or not candidate.is_file():
+            continue
+        try:
+            import yaml
+            data = yaml.safe_load(candidate.read_text()) or {}
+            pins = {}
+            for alias, entry in (data.get("models", {}) or {}).items():
+                digest = _canon_digest((entry or {}).get("digest"))
+                if not digest or digest == "sha256:":
+                    continue
+                pins[alias] = digest
+                pins.setdefault((entry or {}).get("upstream", alias), digest)
+            return pins or {}
+        except Exception as e:
+            log.warning("Failed to load model digests %s: %s", candidate, e)
+            return {}
+    return {}
+
+
+MODELS_DIGESTS = _load_models_digests()
+
+
+def expected_model_digest(name):
+    """Pinned digest for a model name (alias, upstream, or basename), or None."""
+    if name in MODELS_DIGESTS:
+        return MODELS_DIGESTS[name]
+    base = name.split(":")[0]
+    for key, digest in MODELS_DIGESTS.items():
+        if key.split("/")[-1] == base or key.split(":")[0] == base:
+            return digest
+    return None
+
+
+def _is_production():
+    return os.getenv("STARSHIP_ENV", "").strip().lower() == "production"
+
 # Sentinel audit consumer (lazy-initialized, shared across requests)
 _sentinel_consumer: "AuditEventConsumer | None" = None
 _SENTINEL_CONSUMER_LOCK = asyncio.Lock()
@@ -464,6 +520,32 @@ async def handle_api_ollama_pull(request):
         if not model:
             return web.json_response({"error": "model name required"}, status=400)
 
+        _raw_digest = (body.get("digest") or "").strip()
+        digest = _canon_digest(_raw_digest) if _raw_digest else ""
+        expected = expected_model_digest(model)
+        production = _is_production()
+
+        if production and not expected:
+            return web.json_response(
+                {"error": f"production mode requires a pinned digest for '{model}' (none recorded)"},
+                status=400,
+            )
+        if production and not digest:
+            return web.json_response(
+                {"error": "production mode requires a 'digest' parameter matching the pinned digest"},
+                status=400,
+            )
+        if expected and digest and digest != expected:
+            return web.json_response(
+                {"error": f"digest mismatch: expected sha256:{expected}, got sha256:{digest}"},
+                status=400,
+            )
+
+        if expected:
+            log.info("DIGEST-VERIFIED pull request model=%s pin=sha256:%s", model, expected[:16])
+        else:
+            log.warning("AUDIT UNVERIFIED-PULL model=%s (no pin — dev mode)", model)
+
         async def pull_model():
             proc = await asyncio.create_subprocess_exec(
                 "ollama", "pull", model,
@@ -471,11 +553,46 @@ async def handle_api_ollama_pull(request):
                 stderr=asyncio.subprocess.STDOUT,
             )
             await proc.communicate()
+            if not expected:
+                return
+            actual = await _current_model_digest(model)
+            if actual != expected:
+                log.error(
+                    "SECURITY MODEL-DIGEST-MISMATCH model=%s expected=sha256:%s actual=sha256:%s",
+                    model, expected[:16], (actual or "unknown")[:16],
+                )
+                if production:
+                    log.error("SECURITY removing tampered model %s", model)
+                    try:
+                        await asyncio.create_subprocess_exec(
+                            "ollama", "rm", model,
+                            stdout=asyncio.subprocess.DEVNULL,
+                            stderr=asyncio.subprocess.DEVNULL,
+                        )
+                    except Exception:
+                        pass
 
         asyncio.create_task(pull_model())
         return web.json_response({"status": "pulling", "model": model})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
+
+
+async def _current_model_digest(model):
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{OLLAMA_URL}/api/tags", timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    base = model.split(":")[0]
+                    for m in data.get("models", []):
+                        mn = m.get("name", "")
+                        if mn == model or mn.split(":")[0] == base:
+                            return _canon_digest(m.get("digest"))
+    except Exception as e:
+        log.warning("Failed to resolve digest for %s: %s", model, e)
+    return None
 
 
 async def handle_api_ollama_delete(request):
