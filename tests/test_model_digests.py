@@ -3,8 +3,6 @@ import json
 import sys
 from pathlib import Path
 
-import pytest
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 
@@ -184,7 +182,7 @@ class TestHealthCheckerGuards:
         # Regression: pins must populate at import even though canon_digest is
         # defined in-module (ordering bug would leave them empty).
         assert health_checker.MODELS_DIGESTS
-        pins, upstream = health_checker.MODELS_DIGESTS
+        pins, _upstream = health_checker.MODELS_DIGESTS
         assert "Eve-V2-Unleashed" in pins
 
     def test_expected_digest_alias_lookup(self, monkeypatch):
