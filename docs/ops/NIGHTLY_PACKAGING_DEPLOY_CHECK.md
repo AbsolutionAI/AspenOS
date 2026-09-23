@@ -73,7 +73,7 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 
 | Check | Baseline |
 | --- | --- |
-| `scripts/check-nightly.sh` total | **149 checks across 22 sections** (**148 pass, 1 known failure** = C11 p50 benchmark deviation, hardware-dependent) |
+| `scripts/check-nightly.sh` total | **150 checks across 22 sections** (**149 pass, 1 known failure** = C11 p50 benchmark deviation, hardware-dependent) |
 | Of which: smoke test suite | 61 passed, 1 failed (C11 p50 benchmark), 62 total |
 | Python test suite | 429 passed, 4 skipped (optional deps: aiohttp, mcp.server), 0 failures |
 | nats-server | v2.14.5 |
@@ -85,7 +85,7 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 | Gatekeeper module | `src/python/gatekeeper/minimal_shim.py` present, valid Python syntax |
 | ISO build structure | 3 autoinstall profiles (edge/server/ops YAMLs), chroot hooks present, package lists present |
 | Dashboard static assets | 8 files present (style.css, ui.js, dashboard.js, agents.js, chat.js, panels.js, incidents.js, boot.js) |
-| Shell syntax coverage | 43 scripts (42 in `scripts/`, 1 in `packaging/`), all pass `bash -n` |
+| Shell syntax coverage | 44 scripts (43 in `scripts/`, 1 in `packaging/`), all pass `bash -n` |
 | NATS secret paths (ASP-373/F-009) | section 18 checks pass (600 modes via `fix-nats-secret-modes.sh`, no 640/644, staragent.yaml 600, 3 fixture tests) |
 | NATS rate limits & connection caps (ASP-375/F-011) | section 19 checks pass (hardening keys in agent/fleet configs, auth timeout 2.0, per-account limits, 5 fixture tests) |
 | cgroup per-agent resource limits (ASP-376/F-012) | section 20 checks pass (drop-ins exist for 8 units with CPU/Memory/Tasks keys, build-deb stages `.service.d`, install-systemd installs to `/etc`, 5 fixture tests) |
