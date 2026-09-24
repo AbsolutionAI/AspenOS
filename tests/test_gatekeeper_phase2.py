@@ -635,7 +635,7 @@ class TestSafetySubjectEnforcerInit:
         enforcer = SafetySubjectEnforcer(
             additional_subjects=["aspen.extra.test"]
         )
-        assert len(enforcer.patterns) == 4  # 3 defaults + 1 extra
+        assert len(enforcer.patterns) == 5  # 4 defaults (incl. edge act) + 1 extra
 
 
 class TestSafetySubjectEnforcerClassification:

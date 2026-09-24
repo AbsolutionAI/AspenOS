@@ -77,6 +77,7 @@
 | H-019 | **Package classification bypass — Dev-only in production** | Supply chain | 6.0 (AV:N/AC:H) | ADR-0008 declares tiers; CI gate `check-no-devonly-in-prod.sh` wired in CI (`security-devonly-isolation`) + nightly Section 16 (ASP-574) | **CLOSED (ASP-574)** — gate script committed; CI + nightly wired; verified clean on current tree |
 | H-020 | **Gatekeeper single point of failure** | Availability | 7.0 (AV:N/AC:H) | Mitigate with local fallback + redundant instances (ADR-0009) | **Design only** — Phase 2 (ASP-564) covers token lifecycle + credential strip; redundancy plan tracked separately |
 | H-021 | **No dual-publish on aspen.sentinel.* subjects yet** | Observability | 5.0 (AV:N/AC:L) | Migration incomplete; `starship.*` still primary | **Closed (ASP-369)** — edge→alpha ACL pivot removed; edge cross-plant fails closed; H-021 addressed via ACL change |
+| H-022 | **Physical cell act requires HITL vault approval** | Actuation / Safety | **8.5** (AV:N/AC:L) | Gatekeeper shim vault-gate: physical cell act subjects require durable HITL vault approval record before authorize grants; dual-human preserved as additional gate layer | **Implemented (ASP-432)** — 19/19 vault-gate tests + 99/99 phase2 pass; fail-closed on every vault failure path |
 
 ### 2.3 Fleet-specific threats (F- series)
 
@@ -150,7 +151,9 @@
 
 ### 3.4 IEC 62443 alignment
 
-| Requirement | Control | Status |
+| Requirement | Control | Mapping | Status |
+| --- | --- | --- | --- |
+| **FR 3.4** Software and information integrity | Hardware Root of Trust (meas boot) + OS Runtime Protection + embedded software update integrity; ASP-378 verification | IEC 62443 §3.4 FR 3.4 (DIN/SPEC) | Mapped + verified, no credentials |
 |-------------|---------|--------|
 | **CR 1.1** — Identify & authenticate users (all human+programmatic) | NATS accounts, per-agent tokens, fleet-node identity | **Partial** — agents authenticated; no MFA, no PKI device identity |
 | **CR 1.2** — Software process identity | Systemd `User=agnetic`, capability-based delegation (ADR-0009 proposed) | **Partial** — OS user identity; no code signing |
@@ -241,6 +244,7 @@
 | H-014 (AppArmor deployment) | Profiles staged + loaded in deb postinst; nightly Section 17 verifies wiring | ASP-374: `debian/DEBIAN/postinst` includes `apparmor_parser -r`; ASP-575: verification report confirming 4-nightly-check criteria met |
 | F-022 (Edge→alpha pivot) | ACL entry `plant-edge: [plant-alpha]` removed; 11 fixture tests verify edge→alpha denied | ASP-369: commit `201933f`, 6 files, 272 insertions, 11/11 fixture tests |
 | H-021 (aspen.sentinel permissions) | Resolved as aspect of ASP-369 ACL change | Edge cross-plant fails closed; no pivot path |
+| H-022 (Physical cell HITL vault) | Durable HITL vault approval gate for physical cell acts; 19/19 vault-gate tests, 99/99 phase2 pass; zero new secrets, fail-closed all paths | ASP-432: vault_gate.py, minimal_shim.py wiring, hitl_vault.py bugfix, test suite |
 
 ### Threats with status change this cycle
 
@@ -257,6 +261,7 @@
 | F-013 (Model digests) | Open | **Implemented (ASP-377)** | `config/models-digests.yaml` + verify-after-pull fail-hard |
 | F-014 (Signed packages) | Not tracked | **Implemented (ASP-378)** | `gpgv` verify gate + CI job; ceremony deferred |
 | F-022 (Edge→alpha pivot) | Not tracked | **Closed (ASP-369)** | ACL entry removed; edge→alpha denied |
+| H-022 (Physical cell HITL vault) | Not tracked | **Implemented (ASP-432)** | Vault-gate in gatekeeper shim; fail-closed on all vault failure paths |
 
 ---
 
@@ -277,6 +282,7 @@
 | H-019 (Dev-only CI gate) | Medium | **Closed (ASP-574)** | CI gate + nightly Section 16 |
 | H-020 (Gatekeeper SPOF) | Medium | **Design only (H-008 residual)** | H-008 Phase 2 complete; redundancy plan separate |
 | H-021 (aspen.sentinel permissions) | Medium | **Closed (ASP-369)** | ACL pivot removed; edge cross-plant denied by default |
+| **H-022 (Physical cell HITL vault)** | **Critical** | **Implemented (ASP-432)** | Vault-gate in gatekeeper shim; 19/19 tests; fail-closed all paths |
 | H-HOST-01 (NATS store access) | Low | Active | Existing systemd hardening |
 | H-HOST-03 (Stale units) | Low | Check gap | Audit systemd flags |
 | H-HOST-04 (Master password env) | Medium | **Open** | Keyring/prompt pattern |
