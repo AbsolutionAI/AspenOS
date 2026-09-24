@@ -75,7 +75,7 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 | --- | --- |
 | `scripts/check-nightly.sh` total | **150 checks across 22 sections** (**149 pass, 1 known failure** = C11 p50 benchmark deviation, hardware-dependent) |
 | Of which: smoke test suite | 61 passed, 1 failed (C11 p50 benchmark), 62 total |
-| Python test suite | 429 passed, 4 skipped (optional deps: aiohttp, mcp.server), 0 failures |
+| Python test suite | 466 passed, 4 skipped (optional deps: aiohttp, mcp.server), 0 failures |
 | nats-server | v2.14.5 |
 | systemd unit files | 18 (9 in `systemd/`, 9 in `dist/pkgroot/lib/systemd/system/`) |
 | Debian metadata | `debian/DEBIAN/`: control (starship-os 2.2.0 amd64), postinst, postrm, prerm |
