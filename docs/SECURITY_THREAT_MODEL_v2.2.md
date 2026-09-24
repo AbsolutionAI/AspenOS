@@ -78,6 +78,7 @@
 | H-020 | **Gatekeeper single point of failure** | Availability | 7.0 (AV:N/AC:H) | Mitigate with local fallback + redundant instances (ADR-0009) | **Design only** — Phase 2 (ASP-564) covers token lifecycle + credential strip; redundancy plan tracked separately |
 | H-021 | **No dual-publish on aspen.sentinel.* subjects yet** | Observability | 5.0 (AV:N/AC:L) | Migration incomplete; `starship.*` still primary | **Closed (ASP-369)** — edge→alpha ACL pivot removed; edge cross-plant fails closed; H-021 addressed via ACL change |
 | H-022 | **Physical cell act requires HITL vault approval** | Actuation / Safety | **8.5** (AV:N/AC:L) | Gatekeeper shim vault-gate: physical cell act subjects require durable HITL vault approval record before authorize grants; dual-human preserved as additional gate layer | **Implemented (ASP-432)** — 19/19 vault-gate tests + 99/99 phase2 pass; fail-closed on every vault failure path |
+| H-023 | **Software estop latch is agent-dependent — no independent hardware watchdog** | Safety | **9.0** (AV:L/AC:H) | Independent `EstopWatchdog` (design/sim): software-path `tick` heartbeat, fail-closed open-loop trip on missed/forced/backend failure, clear only via two distinct authorizers, durable latch via `FilePulseBackend` | **Implemented (ASP-433)** — 18/18 watchdog tests; 466-test suite green; residual: live GPIO/relay wire = Aspen START on this issue |
 
 ### 2.3 Fleet-specific threats (F- series)
 
@@ -262,6 +263,7 @@
 | F-014 (Signed packages) | Not tracked | **Implemented (ASP-378)** | `gpgv` verify gate + CI job; ceremony deferred |
 | F-022 (Edge→alpha pivot) | Not tracked | **Closed (ASP-369)** | ACL entry removed; edge→alpha denied |
 | H-022 (Physical cell HITL vault) | Not tracked | **Implemented (ASP-432)** | Vault-gate in gatekeeper shim; fail-closed on all vault failure paths |
+| H-023 (Independent estop watchdog) | Not tracked | **Implemented (ASP-433)** | `EstopWatchdog` design/sim: fail-closed tick/deadline gate, dual-authorize clear, durable latch; live GPIO/relay wire residual pending Aspen START |
 
 ---
 
@@ -283,6 +285,7 @@
 | H-020 (Gatekeeper SPOF) | Medium | **Design only (H-008 residual)** | H-008 Phase 2 complete; redundancy plan separate |
 | H-021 (aspen.sentinel permissions) | Medium | **Closed (ASP-369)** | ACL pivot removed; edge cross-plant denied by default |
 | **H-022 (Physical cell HITL vault)** | **Critical** | **Implemented (ASP-432)** | Vault-gate in gatekeeper shim; 19/19 tests; fail-closed all paths |
+| **H-023 (Independent estop watchdog)** | **High** | **Implemented (ASP-433)** | `EstopWatchdog` design/sim: fail-closed tick/deadline gate, dual-authorize clear, durable latch; live wire = Aspen START |
 | H-HOST-01 (NATS store access) | Low | Active | Existing systemd hardening |
 | H-HOST-03 (Stale units) | Low | Check gap | Audit systemd flags |
 | H-HOST-04 (Master password env) | Medium | **Open** | Keyring/prompt pattern |
