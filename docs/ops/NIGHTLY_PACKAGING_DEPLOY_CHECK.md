@@ -75,7 +75,7 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 | --- | --- |
 | `scripts/check-nightly.sh` total | **150 checks across 22 sections** (**149 pass, 1 known failure** = C11 p50 benchmark deviation, hardware-dependent) |
 | Of which: smoke test suite | 61 passed, 1 failed (C11 p50 benchmark), 62 total |
-| Python test suite | 466 passed, 4 skipped (optional deps: aiohttp, mcp.server), 0 failures |
+| Python test suite | 470 passed, 4 skipped (optional deps: aiohttp, mcp.server), 0 failures |
 | nats-server | v2.14.5 |
 | systemd unit files | 18 (9 in `systemd/`, 9 in `dist/pkgroot/lib/systemd/system/`) |
 | Debian metadata | `debian/DEBIAN/`: control (starship-os 2.2.0 amd64), postinst, postrm, prerm |
@@ -99,7 +99,8 @@ Update this table when suites gain or lose checks so future nightly runs can rep
 ### C11 sandbox p50 benchmark (`make smoke` check 53 of 61)
 
 The ADR 0001 criterion requires `c11_internal p50 < 2ms`. On this control-plane host,
-the measured p50 is ~3.2–3.5ms (e.g. 3.181 ms on 2026-09-21, 3.428 ms on 2026-09-19).
+the measured p50 is ~3.2–3.7ms (e.g. 3.181 ms on 2026-09-21, 3.428 ms on 2026-09-19,
+3.651 ms on 2026-09-26).
 This is a hardware-dependent
 benchmark: the threshold may be met on dedicated CI runners with newer processors or lower
 latency profiles.
