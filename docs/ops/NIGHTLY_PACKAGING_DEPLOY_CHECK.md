@@ -112,30 +112,11 @@ written to stderr before that summary is ever reached.
 
 - Each check is independent: a single failure does not halt the suite
 - The exit code equals the number of failed checks (0 = all passed)
+- **Exit 75 is reserved** for lock contention (see above) and means no checks ran — retry the run
 - The full run log is visible in GitHub Actions under the nightly workflow
 
-### Concurrency guard
-
-The checks mutate shared state in the working tree: `scripts/build-deb.sh` does
-`rm -rf "$PKG_ROOT"` before staging, and section 3 relinks the C11 binaries under
-`src/c/*/`. Two overlapping runs in the same checkout therefore break each other and
-report the damage as check failures.
-
-`scripts/check-nightly.sh` holds an exclusive `flock(1)` on `/tmp/starship-nightly.lock`
-for the duration of the run. A contending invocation does not queue; it prints the
-contention message to stderr and exits **75** (`EX_TEMPFAIL`). The lock is a kernel
-lock on the open file description, so it is released when the holder exits for any
-reason, `SIGKILL` included — there is no stale lock to reap.
-
-Exit 75 is reserved and is distinct from the "number of failed checks" convention
-above. A scheduler should treat it as retry-later, not as a regression. If you see
-it, another nightly check is already running against this checkout; wait for it
-rather than investigating the exit code as a product failure.
-
-Only the nightly script participates in the lock. A directly invoked `make smoke`
-or `scripts/build-deb.sh` is unguarded, so do not run those in parallel with a
-nightly check.
-
+Only the nightly script participates in the lock. A directly invoked `make smoke` or
+`scripts/build-deb.sh` is unguarded, so do not run those in parallel with a nightly check.
 
 ## Baseline
 
