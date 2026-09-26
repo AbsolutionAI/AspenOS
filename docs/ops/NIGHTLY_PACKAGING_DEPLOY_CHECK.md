@@ -22,11 +22,17 @@
    - Windows packaging artifacts under `packaging/windows/` (`install.bat`, `configure.bat`, `uninstall.bat`, `staragent.exe`, `staragent.yaml`, `README.txt`)
    - Version consistency between `VERSION` file and `debian/DEBIAN/control`
 5. **Build steps**: ISO/deb builds are SKIP by design on this host (Option B, see `ISO_BUILDER.md`); static checks only.
-6. **Reporting**: post a results comment on the run issue with:
-   - verdict line (PASS/FAIL)
-   - pass/fail counts per suite
-   - toolchain notes (nats-server version, etc.)
-   - deviations from this baseline doc
+6. **Reporting**: overwrite `docs/ops/NIGHTLY_LATEST.md` and post a results comment on the run issue. Do not add a new `docs/ops/nightly-results-*.md`. Historical dated files stay; they are not the live record.
+
+   `docs/ops/NIGHTLY_LATEST.md` (overwrite in place):
+   - Timestamp (UTC)
+   - Git SHA
+   - Verdict: PASS or FAIL
+   - check-nightly: `<pass>/<total>`
+   - Deviations
+   - Issue
+
+   The issue comment carries the same verdict, pass/fail counts per suite, toolchain notes (nats-server version, etc.), and deviations from this baseline doc.
 
 On failure: diagnose, fix if well-scoped, otherwise mark the run issue blocked naming the failing check and owner.
 
