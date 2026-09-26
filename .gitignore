@@ -73,3 +73,6 @@ nats/tls/
 !nats/fleet-accounts.conf.tmpl
 .aider*
 .worktrees/
+
+# Paperclip scratch state
+.paperclip/
