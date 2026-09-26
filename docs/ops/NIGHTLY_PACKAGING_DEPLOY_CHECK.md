@@ -32,7 +32,11 @@ On failure: diagnose, fix if well-scoped, otherwise mark the run issue blocked n
 
 ## What gets checked
 
-The nightly check runs in 20 sections:
+Before any check runs, the script acquires an exclusive `flock` on
+`/tmp/starship-nightly.lock`; if another check run holds it, the invocation exits `75` without
+running anything. See [Concurrency guard](#concurrency-guard-asp-659) below.
+
+The nightly check then runs 20 sections:
 
 | Section | Checks |
 |---------|--------|
@@ -63,11 +67,75 @@ The nightly check runs in 20 sections:
 
 The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm-manager`) at pinned commits from `third_party/pins.json` to support the fleet-bus smoke test. Toolchain setup mirrors `ci.yml` (Go 1.22, Python 3.12, Rust stable, libseccomp-dev).
 
+## Concurrency guard (ASP-659)
+
+`scripts/check-nightly.sh` takes an exclusive `flock(1)` on `/tmp/starship-nightly.lock`
+immediately after it changes into the repo root, and holds it on file descriptor 9 for the whole
+run. Exactly one check run executes per checkout at a time.
+
+The guard is required because the checks mutate shared in-tree state rather than a scratch
+directory: `scripts/build-deb.sh` does `rm -rf "$PKG_ROOT"` before re-staging, and section 3
+relinks the C11 binaries under `src/c/*/`. Two overlapping runs therefore break each other and
+report the damage as check failures — on 2026-09-26 two concurrent runs produced two phantom
+"regressions" (`sandbox_native import`, `deb package builds`) that both pass in isolation.
+
+On contention the contending invocation prints, to stderr:
+
+```
+another nightly check already holds /tmp/starship-nightly.lock — refusing to run concurrently
+```
+
+and exits **75** (`EX_TEMPFAIL`) without running a single check.
+
+### Reserved exit code 75
+
+`75` is reserved for lock contention and is **not** a check-failure count. It is distinct from the
+suite's `exit "$FAIL"` convention and tells a scheduler to retry rather than record a phantom
+regression. The only other way to exit 75 is a run in which 75 checks genuinely failed, which
+would already have printed `NIGHTLY CHECK FAILED (75 failures)` — the contention message is
+written to stderr before that summary is ever reached.
+
+### Operator notes
+
+- **Retry, do not re-report.** An exit-75 nightly means no verification happened. Re-run it.
+- **Lock lifetime.** `flock` is a kernel lock on the open file description. It is released when the
+  holding process exits for any reason, `SIGKILL` included, so a killed run cannot leave a stale
+  lock. Children of the check inherit fd 9, so the lock is also held for any build the script
+  spawned; killing only the parent leaves the lock held until those children exit.
+- **Scope.** The lock path is a fixed `/tmp` file, not `TMPDIR`-scoped, because each agent run
+  gets a private `TMPDIR` and a `TMPDIR`-scoped lock would give every run its own lock and guard
+  nothing.
+- Advisory locking only covers callers that cooperate. `check-nightly.sh` now cooperates; invoking
+  `scripts/build-deb.sh` or `make -C src/c/...` directly is not guarded.
+
 ## Failure handling
 
 - Each check is independent: a single failure does not halt the suite
 - The exit code equals the number of failed checks (0 = all passed)
 - The full run log is visible in GitHub Actions under the nightly workflow
+
+### Concurrency guard
+
+The checks mutate shared state in the working tree: `scripts/build-deb.sh` does
+`rm -rf "$PKG_ROOT"` before staging, and section 3 relinks the C11 binaries under
+`src/c/*/`. Two overlapping runs in the same checkout therefore break each other and
+report the damage as check failures.
+
+`scripts/check-nightly.sh` holds an exclusive `flock(1)` on `/tmp/starship-nightly.lock`
+for the duration of the run. A contending invocation does not queue; it prints the
+contention message to stderr and exits **75** (`EX_TEMPFAIL`). The lock is a kernel
+lock on the open file description, so it is released when the holder exits for any
+reason, `SIGKILL` included — there is no stale lock to reap.
+
+Exit 75 is reserved and is distinct from the "number of failed checks" convention
+above. A scheduler should treat it as retry-later, not as a regression. If you see
+it, another nightly check is already running against this checkout; wait for it
+rather than investigating the exit code as a product failure.
+
+Only the nightly script participates in the lock. A directly invoked `make smoke`
+or `scripts/build-deb.sh` is unguarded, so do not run those in parallel with a
+nightly check.
+
 
 ## Baseline
 
