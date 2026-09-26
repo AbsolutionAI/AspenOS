@@ -126,7 +126,8 @@ Only the nightly script participates in the lock. A directly invoked `make smoke
 | Of which: smoke test suite | 61 passed, 1 failed (C11 p50 benchmark), 62 total |
 | Python test suite | 470 passed, 4 skipped (optional deps: aiohttp, mcp.server), 0 failures |
 | nats-server | v2.14.5 |
-| systemd unit files | 18 (9 in `systemd/`, 9 in `dist/pkgroot/lib/systemd/system/`) |
+| systemd unit files | 16 (8 `*.service` in `systemd/`, the same 8 in `dist/pkgroot/lib/systemd/system/`) |
+| systemd cgroup drop-in dirs | 8 `systemd/<unit>.service.d/` dirs in `systemd/`, the same 8 in `dist/pkgroot/lib/systemd/system/` |
 | Debian metadata | `debian/DEBIAN/`: control (starship-os 2.2.0 amd64), postinst, postrm, prerm |
 | `scripts/update.sh` | present, executable |
 | Windows packaging | `packaging/windows/`: install.bat, configure.bat, uninstall.bat, staragent.exe, staragent.yaml, README.txt |
@@ -142,6 +143,26 @@ Only the nightly script participates in the lock. A directly invoked `make smoke
 | Model digest pinning (ASP-377/F-013) | section 22 checks pass (resolver, pinned non-empty digests, offline strict validation, dashboard/installer guards, CI gate, fixture tests) |
 
 Update this table when suites gain or lose checks so future nightly runs can report meaningful deviations.
+
+### Reconciling the unit count with section 6
+
+The `systemd unit files` row counts only `*.service`, `*.timer`, and `*.socket` — the same
+globs the static inventory in Procedure step 4 uses:
+
+```bash
+find systemd -maxdepth 1 -type f \( -name '*.service' -o -name '*.timer' -o -name '*.socket' \)
+```
+
+Section 6 checks **9** files, not 8. The extra one is `systemd/agnetic-mesh.target`, a `.target`
+that orders the units rather than being one, so it is deliberately excluded from the unit count.
+The 8 counted units are `agnetic-agent@`, `agnetic-dashboard`, `agnetic-message-history`,
+`agnetic-nats`, `agnetic-staragent`, `agnetic-status-bridge`, `starship-fleet`, and
+`starship-health-checker`. "9 canonical units" in the section 6 row and "8 units" here are
+therefore consistent, not a deviation.
+
+The drop-in dirs are a separate artifact with a separate count: section 20 checks one
+`systemd/<unit>.service.d/10-cgroup-limits.conf` per unit, so the number of drop-in dirs must track
+the number of units, and is reported on its own row rather than folded into the unit count.
 
 ## Known deviations
 
