@@ -1,10 +1,20 @@
 # Nightly latest
 
-- Timestamp (UTC): 2026-09-26T18:20:00Z
-- Git SHA: 0ab00d9d574c7175cc26e5cb6374630a98448460
+- Timestamp (UTC): 2026-09-27T08:05:02Z
+- Git SHA: e3b1d598024b23abf58bf4ea9d03ddb10c44cdd9
 - Verdict: PASS
 - check-nightly: 149/150
-- Deviations: C11 p50 3.651 ms (known hardware deviation; ADR 0001 threshold is 2 ms). Same single known failure as the prior consecutive nightlies.
-- Issue: ASP-656
+- smoke: 61/62 (1 known failure: C11 p50 3.669 ms)
+- iso-smoke: 32/32
+- Python suite: 466 passed, 4 skipped, 0 failures
+- Deviations:
+  1. C11 p50 3.669 ms vs the ADR 0001 threshold of 2 ms — known hardware deviation, same single
+     known failure as the prior consecutive nightlies, and inside the runbook's documented
+     3.2–3.7 ms observed range.
+  2. Baseline correction (docs, not a check failure): the `Python test suite` row said
+     `470 passed, 4 skipped`. Both the system interpreter and the repo `.venv` report
+     `466 passed, 4 skipped` (470 collected). The 2026-09-26 run (2e6819b) had recorded the
+     collected total as the pass count. Row corrected to `466 passed, 4 skipped (470 collected)`.
+- Issue: ASP-671
 
-Seeded by ASP-663 from `docs/ops/nightly-results-2026-09-26T12-20.md` (12:20 MDT). This wake did not re-run `scripts/check-nightly.sh`. The next nightly overwrites this file in place. Do not add `docs/ops/nightly-results-*.md`.
+The next nightly overwrites this file in place. Do not add `docs/ops/nightly-results-*.md`.
