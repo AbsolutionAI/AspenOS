@@ -149,3 +149,28 @@ def test_nightly_section_20_cgroup_limits_present():
     assert "build-deb stages service.d drop-in dirs" in nightly
     assert "install-systemd installs drop-ins to /etc" in nightly
     assert "test_cgroup_limits.py" in nightly
+
+
+def test_nightly_section_23_package_classification_present():
+    """H-020: nightly asserts ADR-0008 rule 4 (declared tier + SoR agreement)."""
+    nightly = _nightly()
+    assert "Section 23: Package classification gate" in nightly
+    assert "every package declares a classification" in nightly
+    assert "classification gate self-test" in nightly
+    assert "test_package_classification.py" in nightly
+
+
+def test_nightly_section_23_appended_after_22():
+    """H-020 was appended so existing section numbers did not shift."""
+    nightly = _nightly()
+    assert nightly.index("Section 22: Model digest pinning gate") < nightly.index(
+        "Section 23: Package classification gate"
+    )
+
+
+def test_ci_runs_package_classification_gate():
+    """H-020 must block merge, not only the nightly run."""
+    ci = _ci()
+    assert "security-package-classification" in ci
+    assert "check-package-classification.sh" in ci
+    assert "test_package_classification.py" in ci
