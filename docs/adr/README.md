@@ -26,6 +26,7 @@ Aspen OS / AspenGrove architecture decisions. Prefer short, statused markdown in
 | [ADR-0009](./ADR-0009-capability-based-gatekeepers.md) | Capability-based gatekeepers (no broad API keys) | **Accepted (design + P1 + P2)** | BEL-215 — ASP-540 P1; ASP-564 P2; ASP-627 accept; packaging placement residual |
 | [ADR-0010](./0001-c11-agent-runtime.md) | C11 agent runtime (legacy file `0001-…`) | Accepted | Logical **0010**; file keeps historic name |
 | [ADR-0012](./ADR-0012-operator-of-record-binding.md) | Authenticated operator-of-record binding for DualHumanGate | **Proposed** | ASP-534 / ASP-530 — NATS `human_id` SoR; before G9+ non-sim arm; **not** accepted ASP-627 |
+| [ADR-0013](./ADR-0013-execution-workspace-isolation.md) | Per-issue git worktree execution workspaces | **Accepted** | ASP-661 / BEL-316 — Paperclip `isolated_workspace` + `git_worktree`; policy flip is a follow-up |
 
 ### Open candidates (not yet filed)
 
