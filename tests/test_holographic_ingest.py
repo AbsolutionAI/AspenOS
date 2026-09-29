@@ -1,5 +1,6 @@
 """Holographic dual-write from BEL-154 ingest (shared SQLite)."""
 
+import os
 import sys
 from pathlib import Path
 
@@ -36,13 +37,17 @@ def test_explicit_db_env_writes_holographic(tmp_path, monkeypatch):
         ingest_dir=ingest,
     )
     assert path.exists()
-    sys.path.insert(0, "/home/tech/.hermes/hermes-agent")
+    # The store lives in a separate Hermes tree, not in this repo. That tree and
+    # its own transitive deps are optional here, so a missing one is a skip, not
+    # a failure — the in-repo ingest assertions above still run either way.
+    hermes_root = Path(os.environ.get("HERMES_AGENT_ROOT", "/home/tech/.hermes/hermes-agent"))
+    if not hermes_root.is_dir():
+        pytest.skip(f"Hermes agent tree not present at {hermes_root}")
+    sys.path.insert(0, str(hermes_root))
     try:
         from plugins.memory.holographic.store import MemoryStore
-    except ModuleNotFoundError as exc:
-        if "tools.registry" in str(exc) or "holographic" in str(exc):
-            pytest.skip("Hermes holographic plugin not available", allow_module_level=False)
-        raise
+    except ImportError as exc:
+        pytest.skip(f"Hermes holographic store not importable: {exc}")
 
     store = MemoryStore(db_path=str(db))
     hits = store.search_facts("OpenCode holographic")
