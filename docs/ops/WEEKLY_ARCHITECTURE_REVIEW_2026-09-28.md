@@ -166,7 +166,7 @@ Parallel routines (nightly, daily sweep, biweekly threat model, this review) are
 
 ## 8. Follow-up
 
-**ASP child (filed this heartbeat):** add `pyyaml` to the `verify-package-signature` job, same as `security-model-digests`. Prove collection. Do not merge PR 45 from that ticket. Architect lands PR 45 once that job is green. Do not wake a second implementer while Opencode is already running.
+**ASP-682** (todo, Fast Coder, not invoked): add `pyyaml` to the `verify-package-signature` job, same as `security-model-digests`. Prove the suite is reached. Do not merge PR 45 from that ticket. Architect lands PR 45 once that job is green. Do not wake a second implementer while Opencode is already running.
 
 No other new architecture ticket.
 
