@@ -40,7 +40,7 @@ Aspen OS / AspenGrove architecture decisions. Prefer short, statused markdown in
 - Fleet subject inventory: `docs/ops/FLEET_SUBJECT_PUBLISHERS.md`
 - Memory design: `docs/architecture/MEMORY_LAYER.md` (BEL-154)
 - ABS path ownership: `docs/ops/ABS_MIRROR_ROUTING.md`
-- Weekly reviews: `docs/ops/WEEKLY_ARCHITECTURE_REVIEW_*.md` (latest: 2026-09-21 / ASP-627)
+- Weekly reviews: `docs/ops/WEEKLY_ARCHITECTURE_REVIEW_*.md` (latest: 2026-09-28 / ASP-676). ADR-0013 row lands with PR 45, not this review.
 
 ## How to add an ADR
 
