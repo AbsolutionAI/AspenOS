@@ -22,17 +22,27 @@
    - Windows packaging artifacts under `packaging/windows/` (`install.bat`, `configure.bat`, `uninstall.bat`, `staragent.exe`, `staragent.yaml`, `README.txt`)
    - Version consistency between `VERSION` file and `debian/DEBIAN/control`
 5. **Build steps**: ISO/deb builds are SKIP by design on this host (Option B, see `ISO_BUILDER.md`); static checks only.
-6. **Reporting**: post a results comment on the run issue with:
-   - verdict line (PASS/FAIL)
-   - pass/fail counts per suite
-   - toolchain notes (nats-server version, etc.)
-   - deviations from this baseline doc
+6. **Reporting**: overwrite `docs/ops/NIGHTLY_LATEST.md` and post a results comment on the run issue. Do not add a new `docs/ops/nightly-results-*.md`. Historical dated files stay; they are not the live record.
+
+   `docs/ops/NIGHTLY_LATEST.md` (overwrite in place):
+   - Timestamp (UTC)
+   - Git SHA
+   - Verdict: PASS or FAIL
+   - check-nightly: `<pass>/<total>`
+   - Deviations
+   - Issue
+
+   The issue comment carries the same verdict, pass/fail counts per suite, toolchain notes (nats-server version, etc.), and deviations from this baseline doc.
 
 On failure: diagnose, fix if well-scoped, otherwise mark the run issue blocked naming the failing check and owner.
 
 ## What gets checked
 
-The nightly check runs in 20 sections:
+Before any check runs, the script acquires an exclusive `flock` on
+`/tmp/starship-nightly.lock`; if another check run holds it, the invocation exits `75` without
+running anything. See [Concurrency guard](#concurrency-guard-asp-659) below.
+
+The nightly check then runs 20 sections:
 
 | Section | Checks |
 |---------|--------|
@@ -63,11 +73,56 @@ The nightly check runs in 20 sections:
 
 The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm-manager`) at pinned commits from `third_party/pins.json` to support the fleet-bus smoke test. Toolchain setup mirrors `ci.yml` (Go 1.22, Python 3.12, Rust stable, libseccomp-dev).
 
+## Concurrency guard (ASP-659)
+
+`scripts/check-nightly.sh` takes an exclusive `flock(1)` on `/tmp/starship-nightly.lock`
+immediately after it changes into the repo root, and holds it on file descriptor 9 for the whole
+run. Exactly one check run executes per checkout at a time.
+
+The guard is required because the checks mutate shared in-tree state rather than a scratch
+directory: `scripts/build-deb.sh` does `rm -rf "$PKG_ROOT"` before re-staging, and section 3
+relinks the C11 binaries under `src/c/*/`. Two overlapping runs therefore break each other and
+report the damage as check failures — on 2026-09-26 two concurrent runs produced two phantom
+"regressions" (`sandbox_native import`, `deb package builds`) that both pass in isolation.
+
+On contention the contending invocation prints, to stderr:
+
+```
+another nightly check already holds /tmp/starship-nightly.lock — refusing to run concurrently
+```
+
+and exits **75** (`EX_TEMPFAIL`) without running a single check.
+
+### Reserved exit code 75
+
+`75` is reserved for lock contention and is **not** a check-failure count. It is distinct from the
+suite's `exit "$FAIL"` convention and tells a scheduler to retry rather than record a phantom
+regression. The only other way to exit 75 is a run in which 75 checks genuinely failed, which
+would already have printed `NIGHTLY CHECK FAILED (75 failures)` — the contention message is
+written to stderr before that summary is ever reached.
+
+### Operator notes
+
+- **Retry, do not re-report.** An exit-75 nightly means no verification happened. Re-run it.
+- **Lock lifetime.** `flock` is a kernel lock on the open file description. It is released when the
+  holding process exits for any reason, `SIGKILL` included, so a killed run cannot leave a stale
+  lock. Children of the check inherit fd 9, so the lock is also held for any build the script
+  spawned; killing only the parent leaves the lock held until those children exit.
+- **Scope.** The lock path is a fixed `/tmp` file, not `TMPDIR`-scoped, because each agent run
+  gets a private `TMPDIR` and a `TMPDIR`-scoped lock would give every run its own lock and guard
+  nothing.
+- Advisory locking only covers callers that cooperate. `check-nightly.sh` now cooperates; invoking
+  `scripts/build-deb.sh` or `make -C src/c/...` directly is not guarded.
+
 ## Failure handling
 
 - Each check is independent: a single failure does not halt the suite
 - The exit code equals the number of failed checks (0 = all passed)
+- **Exit 75 is reserved** for lock contention (see above) and means no checks ran — retry the run
 - The full run log is visible in GitHub Actions under the nightly workflow
+
+Only the nightly script participates in the lock. A directly invoked `make smoke` or
+`scripts/build-deb.sh` is unguarded, so do not run those in parallel with a nightly check.
 
 ## Baseline
 
@@ -75,9 +130,10 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 | --- | --- |
 | `scripts/check-nightly.sh` total | **150 checks across 22 sections** (**149 pass, 1 known failure** = C11 p50 benchmark deviation, hardware-dependent) |
 | Of which: smoke test suite | 61 passed, 1 failed (C11 p50 benchmark), 62 total |
-| Python test suite | 429 passed, 4 skipped (optional deps: aiohttp, mcp.server), 0 failures |
+| Python test suite | 470 passed, 4 skipped (optional deps: aiohttp, mcp.server), 0 failures |
 | nats-server | v2.14.5 |
-| systemd unit files | 18 (9 in `systemd/`, 9 in `dist/pkgroot/lib/systemd/system/`) |
+| systemd unit files | 16 (8 `*.service` in `systemd/`, the same 8 in `dist/pkgroot/lib/systemd/system/`) |
+| systemd cgroup drop-in dirs | 8 `systemd/<unit>.service.d/` dirs in `systemd/`, the same 8 in `dist/pkgroot/lib/systemd/system/` |
 | Debian metadata | `debian/DEBIAN/`: control (starship-os 2.2.0 amd64), postinst, postrm, prerm |
 | `scripts/update.sh` | present, executable |
 | Windows packaging | `packaging/windows/`: install.bat, configure.bat, uninstall.bat, staragent.exe, staragent.yaml, README.txt |
@@ -94,12 +150,33 @@ The nightly workflow clones sibling repositories (`aspen-edge-rrm`, `aspen-swarm
 
 Update this table when suites gain or lose checks so future nightly runs can report meaningful deviations.
 
+### Reconciling the unit count with section 6
+
+The `systemd unit files` row counts only `*.service`, `*.timer`, and `*.socket` — the same
+globs the static inventory in Procedure step 4 uses:
+
+```bash
+find systemd -maxdepth 1 -type f \( -name '*.service' -o -name '*.timer' -o -name '*.socket' \)
+```
+
+Section 6 checks **9** files, not 8. The extra one is `systemd/agnetic-mesh.target`, a `.target`
+that orders the units rather than being one, so it is deliberately excluded from the unit count.
+The 8 counted units are `agnetic-agent@`, `agnetic-dashboard`, `agnetic-message-history`,
+`agnetic-nats`, `agnetic-staragent`, `agnetic-status-bridge`, `starship-fleet`, and
+`starship-health-checker`. "9 canonical units" in the section 6 row and "8 units" here are
+therefore consistent, not a deviation.
+
+The drop-in dirs are a separate artifact with a separate count: section 20 checks one
+`systemd/<unit>.service.d/10-cgroup-limits.conf` per unit, so the number of drop-in dirs must track
+the number of units, and is reported on its own row rather than folded into the unit count.
+
 ## Known deviations
 
 ### C11 sandbox p50 benchmark (`make smoke` check 53 of 61)
 
 The ADR 0001 criterion requires `c11_internal p50 < 2ms`. On this control-plane host,
-the measured p50 is ~3.2–3.5ms (e.g. 3.181 ms on 2026-09-21, 3.428 ms on 2026-09-19).
+the measured p50 is ~3.2–3.7ms (e.g. 3.181 ms on 2026-09-21, 3.428 ms on 2026-09-19,
+3.651 ms on 2026-09-26).
 This is a hardware-dependent
 benchmark: the threshold may be met on dedicated CI runners with newer processors or lower
 latency profiles.
