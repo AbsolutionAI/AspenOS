@@ -129,9 +129,9 @@ Only the nightly script participates in the lock. A directly invoked `make smoke
 
 | Check | Baseline |
 | --- | --- |
-| `scripts/check-nightly.sh` total | **159 checks across 23 sections** (**158 pass, 1 known failure** = C11 p50 benchmark deviation, hardware-dependent) |
+| `scripts/check-nightly.sh` total | **159 checks across 23 sections** (150 before section 23, +8 new checks, +1 new script entering the section 7 `bash -n` loop). Expected **158 pass, 1 known failure** (= C11 p50 benchmark deviation, hardware-dependent). Count is **derived, not observed** — section 23 was run verbatim (8/8) but a full `check-nightly.sh` pass has not been recorded since the bump; confirm on the next nightly |
 | Of which: smoke test suite | 61 passed, 1 failed (C11 p50 benchmark), 62 total |
-| Python test suite | 495 passed, 3 skipped (optional deps: aiohttp, mcp.server), 1 known failure (`test_holographic_ingest.py::test_explicit_db_env_writes_holographic` — external `/home/tech/.hermes/hermes-agent` tree needs `ruamel.yaml`; see Known deviations) |
+| Python test suite | 495 passed, 4 skipped, **0 failed**. All 4 skips are absent optional dependencies, not defects: `aiohttp` (`test_server.py`), `mcp.server` (`test_memory_mcp.py`), `nats-py` (`test_sentinel_consumer.py`), and the external Hermes holographic plugin (`test_holographic_ingest.py`). See Known deviations |
 | nats-server | v2.14.5 |
 | systemd unit files | 16 (8 `*.service` in `systemd/`, the same 8 in `dist/pkgroot/lib/systemd/system/`) |
 | systemd cgroup drop-in dirs | 8 `systemd/<unit>.service.d/` dirs in `systemd/`, the same 8 in `dist/pkgroot/lib/systemd/system/` |
@@ -186,21 +186,30 @@ latency profiles.
 **Not actionable** unless the sandbox is moved to a different host or optimized. The
 nightly check records this as a single known failure (1 of 62 smoke tests).
 
-### `test_holographic_ingest.py` / missing `ruamel` (environment, not repo)
+### `test_holographic_ingest.py` / missing `ruamel` — RESOLVED, no longer a deviation
 
-`scripts/holographic_ingest.py` defaults `HERMES_AGENT_ROOT` to
+**This is no longer a known deviation. Fixed in `3ec55f1`; the suite is 495 passed, 4 skipped,
+0 failed.** Recorded here only so a future run does not re-diagnose it as a regression.
+
+The history is worth keeping. `scripts/holographic_ingest.py` defaults `HERMES_AGENT_ROOT` to
 `/home/tech/.hermes/hermes-agent`, an **external** tool tree outside this repository. That
 tree's `hermes_yaml.py` imports `ruamel.yaml`, which is not a declared or undeclared
-dependency of this repo. When the external tree is absent or incomplete, the one test that
-exercises an explicit `HERMES_DB` env path fails with `ModuleNotFoundError: No module named
-'ruamel'`.
+dependency of this repo. The test that exercises an explicit `HERMES_DB` env path therefore
+hit `ModuleNotFoundError: No module named 'ruamel'`.
 
-Confirmed pre-existing and unrelated to any in-repo change: it reproduces on
-`origin/master` and was independently recorded on ASP-699/ASP-700 (ASP-700 Auditor:
-`466 passed, 4 skipped` with this same single failure). **Not actionable in this repo** —
-fixing it means either vendoring the external tree or making `holographic_ingest.py` degrade
-when `HERMES_AGENT_ROOT` is unset, which is a separate ticket. Recorded here so a future run
-does not read it as a regression.
+That is correct behaviour for an absent optional dependency, and the test already had a
+`try/except ImportError` guard — but the guard only skipped on two hardcoded module names and
+re-raised everything else. So one missing optional module became a hard suite failure. The
+guard was a name allowlist standing in for a capability check; `3ec55f1` replaced it with the
+capability check (any `ModuleNotFoundError` from the optional tree means "not installed
+here"). The assertion guarding this repo's own behaviour runs before the import and is
+unaffected, so coverage was not traded away.
+
+Worth noting how long this sat unfixed: it was recorded as pre-existing and out-of-scope on
+ASP-699, ASP-700, ASP-696 and ASP-702 across several sweeps before anyone treated it as
+actionable. A pre-existing failure that is re-explained on every sweep is a queue item, not
+a documentation item. See `docs/solutions/asp-684-nats-tls-by-default.md` for the compound
+writeup.
 
 ## What is NOT checked
 
