@@ -122,6 +122,47 @@ phantom.
 **Grep:** when testing logic that lives in another language, never reimplement it in the
 test language — extract and execute the original.
 
+## A skip guard that was not a capability check
+
+Worth recording because the shape is easy to re-introduce, and because it masqueraded as
+"pre-existing environmental noise" for long enough to block a QA gate.
+
+`tests/test_holographic_ingest.py::test_explicit_db_env_writes_holographic` verifies the
+holographic dual-write by importing `MemoryStore` from the Hermes agent tree at
+`/home/tech/.hermes/hermes-agent` — an out-of-repo optional dependency. The test guarded
+that import like this:
+
+```python
+except ModuleNotFoundError as exc:
+    if "tools.registry" in str(exc) or "holographic" in str(exc):
+        pytest.skip("Hermes holographic plugin not available")
+    raise
+```
+
+The intent is clearly "skip if the optional plugin isn't here." The implementation is a
+**name allowlist**. The moment the missing module was anything other than those two names —
+here `ruamel.yaml`, pulled in by the plugin's own YAML backend — the guard stopped matching
+and re-raised, turning an ordinary missing-optional-dependency into a hard suite failure.
+
+The rule: an import guard around an *optional* dependency should test the capability
+(`except ImportError`), never the identity of the missing symbol. If the module is genuinely
+required, import it unguarded and let it fail loudly; if it is optional, any resolution
+failure means the same thing.
+
+Two things worth being precise about:
+
+- **The fix did not weaken the test.** `path.exists()` runs before the import, so the
+  repo's own dual-write behaviour is still asserted on every host. Only the half that
+  cannot be evaluated without an external tree skips. Mutation-checked: breaking the
+  dual-write still fails the test rather than skipping it.
+- **A green suite is a property of a test, not of the change.** Calling this "pre-existing,
+  not mine, do not CE-GATE on it" was locally true and operationally useless — the QA
+  harness gates on exit code, which cannot see change attribution. The correct move for a
+  red suite that blocks other work is to fix it in the same pass, not to annotate it.
+
+The `nats-server` `skipif` guards in `tests/test_nats_tls_default.py` get this right: they
+gate on capability (`shutil.which("nats-server") is None`) and skip. Match that pattern.
+
 ## Residual / follow-up
 
 - **Rotation cadence** is not introduced here. Generated material is valid 825 days and
@@ -129,9 +170,11 @@ test language — extract and execute the original.
   model §8 item 11) owns NATS credential rotation.
 - **`server`/dev profile stays plaintext** on loopback agent-bus by design. If dev ever
   needs to exercise mTLS, that is a profile-level change, not a firstboot default change.
-- **`ruamel` test failure** is pre-existing and environmental (external
-  `/home/tech/.hermes/hermes-agent` tree). Reproduced on a clean `origin/master` checkout and
-  recorded in the ops Known deviations so it is not re-diagnosed as a regression.
+- **The `ruamel` suite failure is fixed**, not deferred. It was pre-existing and environmental
+  (external `/home/tech/.hermes/hermes-agent` tree), but a non-zero suite exit is not
+  attributable by tooling, so it kept blocking automated QA on this work. The cause was a
+  defect in the test's own skip guard — see "A skip guard that was not a capability check"
+  below. It now skips cleanly and the suite exits 0.
 
 ## Verification
 
@@ -142,7 +185,7 @@ test language — extract and execute the original.
 | `check-nats-tls-default.sh --self-test` | PASS — positive control + all 5 mutations detected |
 | `tests/test_nats_tls_default.py` | 29 passed (incl. 3 real `nats-server -t` parses) |
 | nightly Section 23 (8 checks, run verbatim) | all PASS |
-| `pytest tests/` | 495 passed, 3 skipped, 1 pre-existing `ruamel` failure |
+| `pytest tests/` | 495 passed, 4 skipped, exit 0 (no failures) |
 | `tests/test_ci_assertions.py` + `test_nats_secret_modes.py` | 43 passed |
 | `.github/workflows/ci.yml` parses | 9 jobs incl. `security-nats-tls` |
 | `openssl verify` on generated chain | pass |
