@@ -130,7 +130,7 @@ Only the nightly script participates in the lock. A directly invoked `make smoke
 | --- | --- |
 | `scripts/check-nightly.sh` total | **150 checks across 22 sections** (**149 pass, 1 known failure** = C11 p50 benchmark deviation, hardware-dependent) |
 | Of which: smoke test suite | 61 passed, 1 failed (C11 p50 benchmark), 62 total |
-| Python test suite | 470 passed, 4 skipped (optional deps: aiohttp, mcp.server), 0 failures |
+| Python test suite | 466 passed, 4 skipped (optional deps: aiohttp, mcp.server, nats-py dashboard import, ruamel.yaml for the Hermes holographic plugin), 0 failures |
 | nats-server | v2.14.5 |
 | systemd unit files | 16 (8 `*.service` in `systemd/`, the same 8 in `dist/pkgroot/lib/systemd/system/`) |
 | systemd cgroup drop-in dirs | 8 `systemd/<unit>.service.d/` dirs in `systemd/`, the same 8 in `dist/pkgroot/lib/systemd/system/` |
@@ -149,6 +149,19 @@ Only the nightly script participates in the lock. A directly invoked `make smoke
 | Model digest pinning (ASP-377/F-013) | section 22 checks pass (resolver, pinned non-empty digests, offline strict validation, dashboard/installer guards, CI gate, fixture tests) |
 
 Update this table when suites gain or lose checks so future nightly runs can report meaningful deviations.
+
+### Coverage gap: holographic dual-write assertion
+
+`tests/test_holographic_ingest.py::test_explicit_db_env_writes_holographic` is the only test that
+proves the BEL-154 dual-write lands in the Hermes `MemoryStore`. It imports the plugin from
+`/home/tech/.hermes/hermes-agent`, so it skips whenever that checkout or its third-party deps are
+absent — and `ruamel.yaml` is not installed on the control-plane host or in `.github/workflows/nightly.yml`.
+The nightly therefore reports `0 failures` without that assertion having run.
+
+Treat that row as a coverage gap, not as a green signal. If the dual-write regresses, the nightly will
+not notice until `ruamel.yaml` is installed (`pip install ruamel.yaml`, alongside the
+`pyyaml nats-py pytest pytest-asyncio aiohttp httpx mcp` list in `nightly.yml`) or the assertion is
+reworked to run against a repo-owned store.
 
 ### Reconciling the unit count with section 6
 
@@ -176,7 +189,7 @@ the number of units, and is reported on its own row rather than folded into the 
 
 The ADR 0001 criterion requires `c11_internal p50 < 2ms`. On this control-plane host,
 the measured p50 is ~3.2–3.7ms (e.g. 3.181 ms on 2026-09-21, 3.428 ms on 2026-09-19,
-3.651 ms on 2026-09-26).
+3.651 ms on 2026-09-26, 3.555 ms on 2026-09-30).
 This is a hardware-dependent
 benchmark: the threshold may be met on dedicated CI runners with newer processors or lower
 latency profiles.

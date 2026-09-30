@@ -40,9 +40,14 @@ def test_explicit_db_env_writes_holographic(tmp_path, monkeypatch):
     try:
         from plugins.memory.holographic.store import MemoryStore
     except ModuleNotFoundError as exc:
-        if "tools.registry" in str(exc) or "holographic" in str(exc):
-            pytest.skip("Hermes holographic plugin not available", allow_module_level=False)
-        raise
+        # The Hermes holographic plugin and its deps (ruamel.yaml, ...) are optional.
+        # Skip only when the missing top-level package is not one of ours, so a
+        # regression in the plugin or in Aspen's own plugins/ package still fails.
+        missing = exc.name or ""
+        ours = ("plugins", "hermes_cli", "hermes_yaml", "holographic")
+        if missing.split(".")[0] in ours:
+            raise
+        pytest.skip(f"Hermes holographic plugin deps unavailable: {exc}")
 
     store = MemoryStore(db_path=str(db))
     hits = store.search_facts("OpenCode holographic")
