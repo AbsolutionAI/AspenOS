@@ -109,6 +109,13 @@ it not, the baseline would have been wrong for an unrelated reason and I would h
 the error forward. This is the ASP-672 failure mode (a stale count surviving because nobody
 re-derived it) avoided by spending two minutes on arithmetic.
 
+Confirmed empirically against the 2026-09-26 nightly record
+(`docs/ops/nightly-results-2026-09-26T12-20.md`), which reports **149 passed, 1 failed
+(150 total)** on `origin/master` — matching the derivation above. After this change:
+`113` column-0 calls + `1` deb + `45` Section 7 iterations = **159**. Note the two indented
+deb checks are an `if`/`else`, so exactly one executes; counting both is the easy way to
+land on 158 and think the baseline was off by one.
+
 ### 6. Assert the resolver, not a reimplementation of it
 
 The TLS-mode matrix has 8 combinations. Tempting to reimplement `_resolve_tls_mode` in
