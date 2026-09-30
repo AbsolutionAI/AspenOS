@@ -13,7 +13,7 @@
 2. **Toolchain**: ensure `nats-server` is on PATH:
    `export PATH="$HOME/go/bin:$HOME/.local/bin:$PATH"`.
 3. **Smoke suites** (record pass/fail counts):
-   - `bash scripts/check-nightly.sh` (149 checks across 22 sections — C11 p50 is a known hardware-dependent failure)
+   - `bash scripts/check-nightly.sh` (159 checks across 23 sections — C11 p50 is a known hardware-dependent failure)
    - `make iso-smoke` (32 checks, embedded in section 4 as the iso-firstboot smoke)
 4. **Static inventory**:
    - systemd unit count (`*.service`/`*.timer`/`*.socket` across `systemd/`, `dist/pkgroot/lib/systemd/system/`, `deploy/`, `config/`)
@@ -42,7 +42,7 @@ Before any check runs, the script acquires an exclusive `flock` on
 `/tmp/starship-nightly.lock`; if another check run holds it, the invocation exits `75` without
 running anything. See [Concurrency guard](#concurrency-guard-asp-659) below.
 
-The nightly check then runs 20 sections:
+The nightly check then runs 23 sections:
 
 | Section | Checks |
 |---------|--------|
@@ -68,6 +68,7 @@ The nightly check then runs 20 sections:
 | 20. cgroup per-agent resource limits (ASP-376/F-012) | `systemd/<unit>.service.d/10-cgroup-limits.conf` drop-ins exist for all 8 units with CPU/Memory/Tasks keys, `build-deb.sh` stages `.service.d` dirs, `install-systemd.sh` installs them to `/etc`, fixture tests pass |
 | 21. Package signature gate (ASP-378/F-014) | `verify-deb-signature.sh`/`sign-deb.sh` exist, committed trust anchor `security/packages/starship-release.gpg`, ceremony vs verify documented, `update.sh --verify-signature`, CI runs gate, fixture tests pass |
 | 22. Model digest pinning (ASP-377/F-013) | `resolve-model-digests.py` exists, `config/models-digests.yaml` pinned/non-empty, offline strict validation passes, every `models.yaml` upstream pinned, Modelfile documents pinned digest, install-models/health-checker/dashboard guard pulls, CI runs gate, fixture tests pass |
+| 23. NATS TLS by default (H-024) | `scripts/check-nats-tls-default.sh` passes and its `--self-test` proves all 5 predicates load-bearing, firstboot resolves ops/edge to TLS on and applies it after bus selection via `active.conf`, firstboot fails closed on missing TLS material, `gen-nats-tls.sh --mutual` emits `verify: true`, no hardcoded `verify: false` in `nats/*.conf`, fixture tests pass |
 
 ## CI infrastructure
 
@@ -128,9 +129,9 @@ Only the nightly script participates in the lock. A directly invoked `make smoke
 
 | Check | Baseline |
 | --- | --- |
-| `scripts/check-nightly.sh` total | **150 checks across 22 sections** (**149 pass, 1 known failure** = C11 p50 benchmark deviation, hardware-dependent) |
+| `scripts/check-nightly.sh` total | **159 checks across 23 sections** (**158 pass, 1 known failure** = C11 p50 benchmark deviation, hardware-dependent) |
 | Of which: smoke test suite | 61 passed, 1 failed (C11 p50 benchmark), 62 total |
-| Python test suite | 466 passed, 4 skipped, 0 failures. All 4 skips are absent optional dependencies, not defects: `aiohttp` (`test_server.py`), `mcp.server` (`test_memory_mcp.py`), `nats-py` (`test_sentinel_consumer.py`), and the external Hermes holographic plugin, which cannot import `ruamel` (`test_holographic_ingest.py`) |
+| Python test suite | 495 passed, 4 skipped, 0 failures. All 4 skips are absent optional dependencies, not defects: `aiohttp` (`test_server.py`), `mcp.server` (`test_memory_mcp.py`), `nats-py` (`test_sentinel_consumer.py`), and the external Hermes holographic plugin, which cannot import `ruamel` (`test_holographic_ingest.py`) |
 | nats-server | v2.14.5 |
 | systemd unit files | 16 (8 `*.service` in `systemd/`, the same 8 in `dist/pkgroot/lib/systemd/system/`) |
 | systemd cgroup drop-in dirs | 8 `systemd/<unit>.service.d/` dirs in `systemd/`, the same 8 in `dist/pkgroot/lib/systemd/system/` |
@@ -141,12 +142,13 @@ Only the nightly script participates in the lock. A directly invoked `make smoke
 | Gatekeeper module | `src/python/gatekeeper/minimal_shim.py` present, valid Python syntax |
 | ISO build structure | 3 autoinstall profiles (edge/server/ops YAMLs), chroot hooks present, package lists present |
 | Dashboard static assets | 8 files present (style.css, ui.js, dashboard.js, agents.js, chat.js, panels.js, incidents.js, boot.js) |
-| Shell syntax coverage | 44 scripts (43 in `scripts/`, 1 in `packaging/`), all pass `bash -n` |
+| Shell syntax coverage | 45 scripts (44 in `scripts/`, 1 in `packaging/`), all pass `bash -n` |
 | NATS secret paths (ASP-373/F-009) | section 18 checks pass (600 modes via `fix-nats-secret-modes.sh`, no 640/644, staragent.yaml 600, 3 fixture tests) |
 | NATS rate limits & connection caps (ASP-375/F-011) | section 19 checks pass (hardening keys in agent/fleet configs, auth timeout 2.0, per-account limits, 5 fixture tests) |
 | cgroup per-agent resource limits (ASP-376/F-012) | section 20 checks pass (drop-ins exist for 8 units with CPU/Memory/Tasks keys, build-deb stages `.service.d`, install-systemd installs to `/etc`, 5 fixture tests) |
 | Package signature gate (ASP-378/F-014) | section 21 checks pass (verify/sign scripts, committed keyring, `--verify-signature` in update.sh, CI gate, fixture tests) |
 | Model digest pinning (ASP-377/F-013) | section 22 checks pass (resolver, pinned non-empty digests, offline strict validation, dashboard/installer guards, CI gate, fixture tests) |
+| NATS TLS by default (H-024) | section 23 checks pass (gate + self-test, ops/edge default on, post-selection wiring, fail-closed guard, mutual TLS support, no hardcoded `verify: false`, 29 fixture tests incl. real `nats-server -t` config parse) |
 
 Update this table when suites gain or lose checks so future nightly runs can report meaningful deviations.
 

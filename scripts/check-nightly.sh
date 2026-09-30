@@ -262,6 +262,17 @@ check "install-starship does not swallow digest failures" bash -c 'grep -q "inst
 check "CI runs digest gate" bash -c 'grep -q "security-model-digests" .github/workflows/ci.yml && grep -q "test_model_digests.py" .github/workflows/ci.yml'
 check "model digest fixture tests" bash -c "'$PY' -m pytest tests/test_model_digests.py -q --tb=short 2>&1 | grep -E '[0-9]+ passed'"
 
+# ─── Section 23: NATS TLS by default (H-024) ──────────────────────
+echo -e "\n${YELLOW}── Section 23: NATS TLS by default (H-024) ──${NC}"
+check "TLS-by-default gate passes" bash -c 'bash scripts/check-nats-tls-default.sh'
+check "TLS-by-default gate self-test" bash -c 'bash scripts/check-nats-tls-default.sh --self-test'
+check "firstboot defaults ops/edge to TLS on" bash -c 'grep -q "_resolve_tls_mode" scripts/starship-firstboot.sh && grep -qE "ops\|edge\)[[:space:]]*echo on" scripts/starship-firstboot.sh'
+check "TLS applied after bus selection via active.conf" bash -c 'grep -q "readlink -f /etc/starship/nats/active.conf" scripts/starship-firstboot.sh'
+check "firstboot fails closed on missing TLS" bash -c 'grep -q "STARSHIP_NATS_TLS_BEST_EFFORT" scripts/starship-firstboot.sh'
+check "gen-nats-tls supports mutual TLS" bash -c 'grep -q -- "--mutual" scripts/gen-nats-tls.sh && grep -q "verify: true" scripts/gen-nats-tls.sh'
+check "no hardcoded verify:false in nats confs" bash -c '! grep -rnE "^[[:space:]]*verify:[[:space:]]*false" nats/'
+check "TLS-by-default fixture tests" bash -c "'$PY' -m pytest tests/test_nats_tls_default.py -q --tb=short 2>&1 | grep -E '[0-9]+ passed'"
+
 # ─── Summary ─────────────────────────────────────────────────
 TIMING_END=$(date +%s%N)
 ELAPSED_MS=$(( (TIMING_END - TIMING_BEGIN) / 1000000 ))

@@ -206,7 +206,7 @@
 ### 4.3 Medium-term (v2.3 planning)
 
 - [x] **ADR-0009 implementation (Phase 2):** Full token lifecycle (consumption/refresh), Hermes/Paperclip credential strip, immutable proxy enforcement. — Phase 1 (proposal interception + dual-human + audit) landed in ASP-540; Phase 2 landed in ASP-564 (`GatekeeperProxy`/`NATSAgentProxy` credential strip, `SafetySubjectEnforcer`, token lifecycle).
-- [ ] **TLS by default:** Enable `STARSHIP_NATS_TLS=1` in firstboot templates. Document WAN deployment.
+- [x] **TLS by default:** Enable `STARSHIP_NATS_TLS=1` in firstboot templates. Document WAN deployment. — Landed in ASP-684: TLS mode resolved by `_resolve_tls_mode` (ops/edge default on, `server` stays plaintext), applied post-bus-selection via `active.conf` so all three bus modes are reachable, mutual TLS via `gen-nats-tls.sh --mutual`, fail-closed with `STARSHIP_NATS_TLS_BEST_EFFORT=1` commissioning override. CI job `security-nats-tls` + nightly Section 23. WAN deployment: `docs/security/H-024-wan-mtls-deployment.md`.
 - [ ] **NATS nkey migration (continued):** ASP-536 added nkey-only gen mode; residual work: enforce nkey-only in CI (fail `--password-only` in production builds), migrate SYS account, automate `nk` binary availability. Replace password-based auth across all accounts (partial ASP-536).
 - [ ] **Automated ACL drift detection:** Cron job compares live ACL with `fleet.yaml` baseline.
 - [ ] **Security scan CI gate:** Integrate `bandit` / `semgrep` into `make check` or CI pipeline.
@@ -374,7 +374,7 @@
 
 15. **[x] ADR-0009 Phase 2:** Full token lifecycle (consumption/refresh), Hermes/Paperclip credential strip, immutable proxy enforcement. — Phase 1 landed in ASP-540; Phase 2 landed in ASP-564. H-020 (SPOF) redundancy plan tracked separately.
 
-16. **[ ] TLS by default:** Enable `STARSHIP_NATS_TLS=1` in firstboot templates. Document WAN deployment with mutual TLS.
+16. **[x] TLS by default:** Enable `STARSHIP_NATS_TLS=1` in firstboot templates. Document WAN deployment with mutual TLS. — **Implemented (ASP-684).** Before: `gen-nats-tls.sh` existed but nothing called it, and the TLS block sat *inside* `_enable_accounts_bus`, so `STARSHIP_NATS_TLS=1` on an `edge` cell was silently ignored — a knob that lied. Now: mode resolved up front (ops/edge default on; `server` dev stays plaintext on loopback), TLS applied after bus selection by resolving `active.conf` so accounts/fleet/agent modes all reach it, and required-but-unavailable TLS **fails closed** rather than degrading to plaintext. `gen-nats-tls.sh --mutual` emits `verify: true` for WAN; upgrading an existing cell re-issues the snippet without rotating certs. `scripts/check-nats-tls-default.sh` (5 load-bearing predicates, proven by `--self-test`) is CI job `security-nats-tls` + nightly Section 23. Deployment guide: `docs/security/H-024-wan-mtls-deployment.md`. Rotation cadence remains open under H-017 (§8 item 11).
 
 17. **[ ] NATS nkey migration (continued):** ASP-536 added nkey-only gen mode; residual work: enforce nkey-only in CI (fail `--password-only` in production builds), migrate SYS account, automate `nk` binary availability. Replace password-based auth across all accounts (partial ASP-536).
 
