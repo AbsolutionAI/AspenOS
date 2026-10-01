@@ -39,10 +39,15 @@ def test_explicit_db_env_writes_holographic(tmp_path, monkeypatch):
     sys.path.insert(0, "/home/tech/.hermes/hermes-agent")
     try:
         from plugins.memory.holographic.store import MemoryStore
-    except ModuleNotFoundError as exc:
-        if "tools.registry" in str(exc) or "holographic" in str(exc):
-            pytest.skip("Hermes holographic plugin not available", allow_module_level=False)
-        raise
+    except ImportError as exc:
+        # The Hermes tree at HERMES_AGENT_ROOT is an out-of-repo optional dependency,
+        # so *any* unresolved import inside it means "not usable on this host" -- not
+        # that dual-write regressed. Skipping on the exception type rather than on a
+        # module-name allowlist: the old guard matched only "tools.registry" and
+        # "holographic", so a missing transitive dep (ruamel) or an absent tree
+        # entirely ("No module named 'plugins'") re-raised and failed the suite.
+        # The dual-write assertion above runs before this import and is unaffected.
+        pytest.skip(f"Hermes holographic plugin not importable: {exc}")
 
     store = MemoryStore(db_path=str(db))
     hits = store.search_facts("OpenCode holographic")

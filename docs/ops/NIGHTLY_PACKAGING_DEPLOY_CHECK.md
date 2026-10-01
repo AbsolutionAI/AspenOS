@@ -130,7 +130,7 @@ Only the nightly script participates in the lock. A directly invoked `make smoke
 | --- | --- |
 | `scripts/check-nightly.sh` total | **150 checks across 22 sections** (**149 pass, 1 known failure** = C11 p50 benchmark deviation, hardware-dependent) |
 | Of which: smoke test suite | 61 passed, 1 failed (C11 p50 benchmark), 62 total |
-| Python test suite | 470 passed, 4 skipped (optional deps: aiohttp, mcp.server), 0 failures |
+| Python test suite | 466 passed, 4 skipped, 0 failures. All 4 skips are absent optional dependencies, not defects: `aiohttp` (`test_server.py`), `mcp.server` (`test_memory_mcp.py`), `nats-py` (`test_sentinel_consumer.py`), and the external Hermes holographic plugin, which cannot import `ruamel` (`test_holographic_ingest.py`) |
 | nats-server | v2.14.5 |
 | systemd unit files | 16 (8 `*.service` in `systemd/`, the same 8 in `dist/pkgroot/lib/systemd/system/`) |
 | systemd cgroup drop-in dirs | 8 `systemd/<unit>.service.d/` dirs in `systemd/`, the same 8 in `dist/pkgroot/lib/systemd/system/` |
@@ -183,6 +183,35 @@ latency profiles.
 
 **Not actionable** unless the sandbox is moved to a different host or optimized. The
 nightly check records this as a single known failure (1 of 62 smoke tests).
+
+### CI does not run the full Python suite — `origin/master` was red without CI noticing
+
+Fixed in ASP-706. Recorded so a future run does not re-diagnose it, and because the
+underlying gap is still open.
+
+`tests/test_holographic_ingest.py` imports the out-of-repo Hermes plugin
+(`/home/tech/.hermes/hermes-agent`, overridable via `HERMES_AGENT_ROOT`) to read back what
+dual-write produced. Its skip guard matched only two hardcoded module names
+(`tools.registry`, `holographic`) and re-raised every other import failure. That tree's
+`hermes_cli/config.py` imports `ruamel.yaml`, so on any host without `ruamel` the test
+failed the suite instead of skipping:
+
+```
+FAILED tests/test_holographic_ingest.py::test_explicit_db_env_writes_holographic
+ModuleNotFoundError: No module named 'ruamel'
+1 failed, 466 passed, 3 skipped
+```
+
+The guard also failed on a host with no Hermes tree at all (`No module named 'plugins'`),
+so it was wrong in both directions. The fix skips on `ImportError` instead of matching
+names. `assert path.exists()` stays above the import, so a broken dual-write still fails
+the test rather than skipping.
+
+**The gap that let this survive:** `.github/workflows/ci.yml` runs three *named* test files
+(`test_package_signatures.py`, `test_model_digests.py`) plus `scripts/smoke-test.sh`.
+None runs `tests/` wholesale, so a red full suite is invisible to CI and surfaces only in
+§13 and in Aider's preflight — where a non-zero exit has repeatedly been misread as a
+regression in the change under review. Running the full suite in CI is still open.
 
 ## What is NOT checked
 
