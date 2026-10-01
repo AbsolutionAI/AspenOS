@@ -202,3 +202,37 @@ gate on capability (`shutil.which("nats-server") is None`) and skip. Match that 
 The gate's 5 predicates were each broken individually against a copied tree and the gate
 turned red every time — the control is load-bearing in both directions, not merely
 present.
+## Compound — `git checkout --ours` is not a doc-conflict resolution
+
+Found while this commit sat held for security review: master absorbed a competing fix
+(PR 53) after the branch was cut, leaving one conflicted doc file. The obvious resolution
+silently deleted this change's entire documentation footprint.
+
+**The trap.** `docs/ops/NIGHTLY_PACKAGING_DEPLOY_CHECK.md` is a hand-maintained table
+whose rows are cross-referenced from `check-nightly.sh` sections. Taking the whole file
+from one side resolves the conflict and leaves **no marker that anything was lost**:
+
+- both `NATS TLS by default (H-024)` rows gone — section 23 was live in the script, but
+  the runbook claimed 20 sections / 150 checks
+- the "known deviation" prose reverted to a claim that the suite was red, undoing a fix
+  that had already landed on master
+
+Nothing fails. `check-nats-tls-default.sh` greps the script and the conf templates; it
+never reads the runbook. The gate passing is not evidence the doc survived — which is
+exactly why this is easy to merge and hard to notice.
+
+**The rule.** When a conflict is confined to a table/prose file that a *different* file
+asserts the contents of, resolve line by line and keep both sides. `git checkout --ours`
+/ `--theirs` is only safe when the file is self-contained. Before committing a resolution,
+prove the surviving side still contains the rows the other side added:
+
+```sh
+git show HEAD:<conflicted-file> | grep -c "<marker unique to the other side>"
+```
+
+A count of 0 on a marker you expect to be present is the whole bug.
+
+**Corollary, general.** Gates that check *behaviour* do not check that behaviour is
+*documented*. Any change that bumps a count, adds a section, or renames a thing has a
+second, unguarded surface in the runbook — and a doc conflict is the cheapest place to
+lose it. Verified recipe: `docs/plans/ASP-684.md` § Merge recipe.
