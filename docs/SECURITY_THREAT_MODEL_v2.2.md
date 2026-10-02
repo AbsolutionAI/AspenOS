@@ -84,7 +84,7 @@
 
 | ID | Threat | Asset | Risk (CVSS) | Mitigation | Status |
 |----|--------|-------|-------------|------------|--------|
-| F-015 | **Red-team lateral from range to ops** | Plant isolation | 8.0 (AV:A/AC:L) | `check_cross_plant()` rule 3/4: isolation deny; RANGE no import from OPS; tool-anomaly detector (ASP-379) adds behavioral detection of lateral moves | **Active** — anomaly detector implemented (ASP-379), fail-open observation only; blocking path deferred |
+| F-015 | **Red-team lateral from range to ops** | Plant isolation | 8.0 (AV:A/AC:L) | `check_cross_plant()` rule 3/4: isolation deny; RANGE no import from OPS; tool-anomaly detector (ASP-379) adds behavioral detection of lateral moves | **Active** — anomaly detector implemented (ASP-379); **live-wired (ASP-687)**: `AnomalyConsumer` subscribes `aspen.sentinel.audit.event` and publishes findings to `aspen.sentinel.tools.anomaly` (R1 high = page). Fail-open, log-only; blocking path deferred |
 | F-016 | **Plant ACL misconfiguration opens cross-plant** | ACL | 6.5 (AV:N/AC:L) | Default `same_plant_only` fail-closed; explicit allow list; F-022 removed edge→alpha pivot | **Active** — F-022 closed (ASP-369) |
 | F-017 | **Fleet heartbeat spoofing (register fake node)** | Identity | 7.5 (AV:N/AC:L) | NATS accounts + token; no PKI/fingerprint yet | **Open** |
 | F-018 | **Exercise state race — start/stop collision** | Exercise | 5.0 (AV:N/AC:H) | Atomic file write; poll-based check in fleet_policy.py | **Open** |
@@ -223,6 +223,7 @@
 | **H-014 AppArmor in deb postinst (ASP-374/575)** | Profiles staged + loaded via `debian/DEBIAN/postinst` (`apparmor_parser -r`); nightly Section 17 verifies 4 checks | (H-014 → satisfied) | **Satisfied** — profile presence, build-deb staging, postinst wiring, no-enforce all verified |
 | **H-007 estop integration test (ASP-573)** | Dedicated negative-case test in `smoke-fleet-bus.py`; bare clear + single auth clear refused; dual distinct clear works | None (H-007 → covered) | **Covered** |
 | **H-015 audit consumer (ASP-537)** | Dashboard endpoints for Sentinel audit events; offline JSONL journal + JetStream durable trail; gatekeeper events covered | (H-015 → closed) | **CLOSED** — publisher + consumer both wired; gateway-agnostic design |
+| **F-015 anomaly consumer (ASP-687)** | `AnomalyConsumer` subscribes `aspen.sentinel.audit.event`, runs `ToolAnomalyDetector`, journals findings to JSONL (fsync) and publishes `aspen.sentinel.tools.anomaly` with `Nats-Msg-Id` dedup | F-015 detection path | **Implemented** — live fail-open detection; residual: at-most-once delivery (no durable pull consumer), no paging consumer wired yet, blocking path still deferred |
 | **H-008 Phase 2 token lifecycle (ASP-564)** | Credential-strip proxy (`GatekeeperProxy`/`NATSAgentProxy`), `SafetySubjectEnforcer`, token issue/consume/refresh/expire lifecycle | None (H-008 mitigation extended) | **Implemented** — Phase 1 + Phase 2 both landed |
 | **ADR-0012 filed** | Operator-of-record binding ADR (Proposed, not implemented) | None (design-only) | Filed as Proposed |
 | **Agent Zero removal** | Removed from host; reduces attack surface (legacy service gone) | None | Clean |
@@ -242,6 +243,7 @@
 |------|--------|-----------------|
 | H-019 (Dev-only CI gate) | CI gate `check-no-devonly-in-prod.sh` committed; wired in CI (`security-devonly-isolation` + nightly Section 16) | ASP-574: `scripts/check-no-devonly-in-prod.sh` committed, `.github/workflows/ci.yml` job, `scripts/check-nightly.sh` Section 16; self-test script verifies fail-on-planted |
 | H-015 (Audit trail) | Publisher wired + JetStream durable stream + dashboard consumer endpoints | ASP-537: `scripts/sentinel-audit.py`, `dashboard/server.py` Sentinel endpoints, JSONL journal + JetStream mirror; gatekeeper events covered |
+| F-015 (Anomaly detection) | Detector live-wired to the audit feed; findings paged via a dedicated subject | ASP-687: `src/python/sentinel/anomaly_consumer.py` + `scripts/sentinel-tool-anomaly.py`; `aspen.sentinel.tools.anomaly` registered in `nats/subjects.yaml`; no ACL change needed (`aspen.sentinel.>` covers it) |
 | H-014 (AppArmor deployment) | Profiles staged + loaded in deb postinst; nightly Section 17 verifies wiring | ASP-374: `debian/DEBIAN/postinst` includes `apparmor_parser -r`; ASP-575: verification report confirming 4-nightly-check criteria met |
 | F-022 (Edge→alpha pivot) | ACL entry `plant-edge: [plant-alpha]` removed; 11 fixture tests verify edge→alpha denied | ASP-369: commit `201933f`, 6 files, 272 insertions, 11/11 fixture tests |
 | H-021 (aspen.sentinel permissions) | Resolved as aspect of ASP-369 ACL change | Edge cross-plant fails closed; no pivot path |
@@ -289,7 +291,7 @@
 | H-HOST-01 (NATS store access) | Low | Active | Existing systemd hardening |
 | H-HOST-03 (Stale units) | Low | Check gap | Audit systemd flags |
 | H-HOST-04 (Master password env) | Medium | **Open** | Keyring/prompt pattern |
-| F-015 (Red lateral) | **High** | Active + Anomaly detector | Existing isolation + ASP-379 (fail-open observation) |
+| F-015 (Red lateral) | **High** | Active + Anomaly detector live | Existing isolation + ASP-379; ASP-687 wires the detector to the audit feed and publishes to `aspen.sentinel.tools.anomaly` (still fail-open observation) |
 | F-016 (ACL misconfig) | Medium | Active + F-022 closed | Fail-closed default; edge→alpha removed |
 | F-017 (Spoofed heartbeat) | Medium | Open | PKI fingerprint |
 | F-013 (Unpinned model digests) | Low | Implemented (ASP-377) | Verify-after-pull fail-hard; reject unpinned in production |

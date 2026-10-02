@@ -4,7 +4,7 @@
 **Mode:** IMPLEMENTATION
 **Source:** Sentinel Threat Model / H-015 / F-015 — LOW
 **Plan:** `docs/plans/ASP-379.md`
-**Updated:** 2026-09-20
+**Updated:** 2026-10-02 (live wiring follow-up closed by ASP-687)
 
 ## Summary
 
@@ -44,8 +44,12 @@ blocks `propose_act` (or any call path).
       fixtures for benign vs anomalous sequences, fail-open contract,
       detection-library plus CLI. Cheap enough to run on every audit event;
       deliberately NOT wired to any deny path yet (follow-up task, see below).
-- [ ] Live consumption hook-up (JetStream consumer → detector → findings
-      journal/table) — deferred; a follow-up issue tracks the wiring.
+- [x] Live consumption hook-up — **closed by ASP-687**:
+      `AnomalyConsumer` subscribes `aspen.sentinel.audit.event`, feeds each
+      event through `ToolAnomalyDetector.feed()`, and publishes findings to
+      `aspen.sentinel.tools.anomaly` (`src/python/sentinel/anomaly_consumer.py`
+      + `scripts/sentinel-tool-anomaly.py`). See
+      `docs/solutions/asp-687-sentinel-anomaly-consumer.md`.
 
 ## Changes
 
@@ -66,11 +70,19 @@ blocks `propose_act` (or any call path).
 
 - Dual-human `authorize_clear` (ASP-364 / ASP-538)
 - ASP-370 (aa-enforce) / production deny-by-default
-- Live consumer wiring into a JetStream subject `sentinel.tools.anomaly`
+- ~~Live consumer wiring into a JetStream subject~~ — delivered by ASP-687
 
 ## Follow-up
 
-Live wiring: subscribe a consumer to the tool-audit subject (ADR-0007), feed
+~~Live wiring: subscribe a consumer to the tool-audit subject (ADR-0007), feed
 each event through `ToolAnomalyDetector.feed()`, and publish any findings to a
 `sentinel.tools.anomaly` subject / audit table so ops can page on R1 (high)
-and template on R2–R4.
+and template on R2–R4.~~ **Done (ASP-687)** — shipped as
+`aspen.sentinel.tools.anomaly`.
+
+Remaining from this note, all tracked by ASP-687 or later:
+
+- A **durable JetStream pull consumer** replacing the at-most-once core-NATS
+  subscription, so a restart does not lose the window it was down for.
+- An **ops paging consumer** for `aspen.sentinel.tools.anomaly` (R1 = high).
+- Any **blocking path** — still deliberately deferred.

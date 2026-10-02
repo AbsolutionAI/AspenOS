@@ -225,6 +225,8 @@ class ToolAnomalyDetector:
         self._window_events_cap = int(window_events_cap)
         # actor -> list[(ts_epoch, event)]
         self._history: dict[str, list[tuple]] = {}
+        # actor -> {correlation_key: ts_epoch} for findings already emitted
+        self._emitted: dict[str, dict[tuple, float]] = {}
 
     # -- ingestion ----------------------------------------------------------
 
@@ -236,12 +238,19 @@ class ToolAnomalyDetector:
         ts = _ts_epoch(event.get("ts") or event.get("ts_epoch"))
         if ts != float("inf"):
             history = self._history.setdefault(actor, [])
-            history.append((ts, event))
-            cutoff = ts - self.window_s
-            history[:] = [(t, e) for t, e in history if t >= cutoff]
-            if len(history) > self._window_events_cap:
-                self._history[actor] = history[-self._window_events_cap:]
-        return self._check_actor(actor)
+            # A JetStream consumer is at-least-once, so the same audit event can
+            # arrive twice. Counting it twice inflates the R2/R3/R4 counts and
+            # manufactures a burst out of a single real tool call.
+            event_id = event.get("event_id")
+            if event_id and any(e.get("event_id") == event_id for _, e in history):
+                ts = float("inf")
+            else:
+                history.append((ts, event))
+                cutoff = ts - self.window_s
+                history[:] = [(t, e) for t, e in history if t >= cutoff]
+                if len(history) > self._window_events_cap:
+                    self._history[actor] = history[-self._window_events_cap:]
+        return self._check_actor(actor, event)
 
     def scan(self, events: Iterable[dict]) -> list[Finding]:
         """Batch ingest: run a sliding detector over the given events.
@@ -266,42 +275,106 @@ class ToolAnomalyDetector:
 
     # -- rule evaluation ----------------------------------------------------
 
-    def _check_actor(self, actor: str) -> list[Finding]:
+    def _dedupe(self, actor: str, findings: list[Finding], ts: float) -> list[Finding]:
+        """Drop findings already emitted for the same correlation key.
+
+        ``Finding`` carries no correlation key of its own, so ``rule`` +
+        ``window_s`` + the member ``event_id``s identify the incident. R2/R3/R4
+        already fire once per burst at exact threshold crossing; R1 is a
+        set-state predicate over the whole window, so without this one
+        exfiltration incident emits a finding for every later event the actor
+        produces. See ``docs/plans/ASP-687.md``.
+        """
+        emitted = self._emitted.setdefault(actor, {})
+        self._prune_emitted(actor, ts)
+        fresh: list[Finding] = []
+        for finding in findings:
+            key = (
+                finding.rule,
+                finding.window_s,
+                tuple(str(e.get("event_id") or "") for e in finding.events),
+            )
+            if key in emitted:
+                continue
+            emitted[key] = ts
+            fresh.append(finding)
+        return fresh
+
+    def _check_actor(self, actor: str, arriving: dict | None = None) -> list[Finding]:
+        """Evaluate the rules for ``actor`` against the event just ingested.
+
+        ``arriving`` is the event passed to :meth:`feed`; when ``None`` (no new
+        event landed, e.g. a redelivery or an unusable timestamp) only the
+        non-R1 rules run, because they key off window counts rather than off
+        arrival identity.
+        """
         history = self._history.get(actor) or []
         if not history:
             return []
+        ts = float(history[-1][0])
+        # Prune unconditionally: a quiet actor must still release correlation
+        # state, or `_emitted` grows for as long as the process lives.
+        self._prune_emitted(actor, ts)
         findings: list[Finding] = []
-        rule_r1 = self._rule_sensitive_read_then_egress(actor, history)
+        rule_r1 = self._rule_sensitive_read_then_egress(actor, history, arriving)
         if rule_r1:
             findings.append(rule_r1)
         findings.extend(self._rule_bursts(actor, history))
-        return findings
+        return self._dedupe(actor, findings, ts)
 
-    def _rule_sensitive_read_then_egress(self, actor: str, history: list) -> Finding | None:
-        """R1 — sensitive read followed by egress within the R1 window."""
+    def _prune_emitted(self, actor: str, ts: float) -> None:
+        """Drop correlation keys older than the window (bounded memory)."""
+        emitted = self._emitted.get(actor)
+        if not emitted:
+            return
+        cutoff = ts - self.window_s
+        for key in [k for k, at in emitted.items() if at < cutoff]:
+            del emitted[key]
+
+    def _rule_sensitive_read_then_egress(
+        self, actor: str, history: list, arriving: dict | None
+    ) -> Finding | None:
+        """R1 — an egress closes on a sensitive read that preceded it.
+
+        Only the egress half of the pair can *create* this finding, so the rule
+        is keyed on the arriving event being an egress. The previous form asked
+        "does the window contain a matching pair", which is a set-state
+        predicate: it stayed true for every subsequent event the actor produced
+        and re-emitted the identical finding each time. One incident, one
+        finding — see ``docs/plans/ASP-687.md``.
+        """
+        if arriving is None or not _is_egress(
+            arriving.get("action"), arriving.get("target")
+        ):
+            return None
         latency = self.sensitive_read_egress_window_s
-        events = sorted([e for _, e in history], key=lambda e: _ts_epoch(e.get("ts")))
-        for i, event in enumerate(events):
-            if not _is_sensitive_read(event.get("action"), event.get("target")):
+        ts_egress = _ts_epoch(arriving.get("ts") or arriving.get("ts_epoch"))
+        # Earlier events only; the arriving event is excluded above.
+        for _, earlier in sorted(
+            history, key=lambda item: _ts_epoch(item[1].get("ts"))
+        ):
+            if earlier is arriving:
                 continue
-            ts_i = _ts_epoch(event.get("ts"))
-            for other in events[i + 1:]:
-                ts_j = _ts_epoch(other.get("ts"))
-                if ts_j - ts_i > latency:
-                    break  # window closed for this read
-                if _is_egress(other.get("action"), other.get("target")):
-                    return Finding(
-                        rule="sensitive_read_then_egress",
-                        severity="high",
-                        actor=actor,
-                        message=(
-                            f"sensitive read '{event.get('action')}' on "
-                            f"'{event.get('target')}' followed by egress "
-                            f"'{other.get('action')}' within {latency:g}s"
-                        ),
-                        window_s=latency,
-                        events=[event, other],
-                    )
+            ts_read = _ts_epoch(earlier.get("ts"))
+            if ts_egress - ts_read > latency:
+                break  # window closed for this egress
+            if _is_egress(earlier.get("action"), earlier.get("target")):
+                # An earlier egress already consumed the reads before it and
+                # was reported when it arrived.
+                break
+            if _is_sensitive_read(earlier.get("action"), earlier.get("target")):
+                return Finding(
+                    rule="sensitive_read_then_egress",
+                    severity="high",
+                    actor=actor,
+                    message=(
+                        f"sensitive read '{earlier.get('action')}' on "
+                        f"'{earlier.get('target')}' followed by egress "
+                        f"'{arriving.get('action')}' within {latency:g}s"
+                    ),
+                    window_s=latency,
+                    events=[earlier, arriving],
+                )
         return None
 
     def _rule_bursts(self, actor: str, history: list) -> list[Finding]:

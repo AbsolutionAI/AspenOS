@@ -235,3 +235,193 @@ def test_cli_scan_reports_and_never_errors(tmp_path):
             assert "sensitive_read_then_egress" in outcome
         else:
             assert "no anomalies" in outcome
+
+# ---------------------------------------------------------------------------
+# Emit-once semantics (ASP-687)
+#
+# Every rule here is re-evaluated on each arrival, and the consumer feeds events
+# one at a time. Without a correlation guard the detector re-emits the *same*
+# incident once per subsequent event: 12 events containing one read+egress pair
+# produced 11 identical R1 findings. These tests pin one incident -> one finding.
+# ---------------------------------------------------------------------------
+
+
+def test_r1_emits_once_not_once_per_later_event():
+    """The R1 regression: 12 events, one exfil pair, exactly one finding."""
+    events = [
+        _event("proxy", "tool.read_file", target="/etc/shadow", ts=BASE_TS),
+        _event("proxy", "tool.http_post", target="https://c2.invalid/x",
+               ts=BASE_TS + 3),
+    ] + [
+        _event("proxy", "tool.search_files", target="docs/readme.md",
+               ts=BASE_TS + 10 * (i + 1))
+        for i in range(10)
+    ]
+
+    findings = ToolAnomalyDetector().scan(events)
+
+    r1 = [f for f in findings if f.rule == "sensitive_read_then_egress"]
+    assert len(r1) == 1, [f.message for f in r1]
+    assert len(findings) == 1, [f.rule for f in findings]
+
+
+def test_r1_emits_once_when_fed_one_event_at_a_time():
+    """Streaming is the live path, and it was the worse case: 11 findings."""
+    events = [
+        _event("proxy", "tool.read_file", target="/etc/shadow", ts=BASE_TS),
+        _event("proxy", "tool.http_post", target="https://c2.invalid/x",
+               ts=BASE_TS + 3),
+    ] + [
+        _event("proxy", "tool.search_files", target="docs/readme.md",
+               ts=BASE_TS + 10 * (i + 1))
+        for i in range(10)
+    ]
+
+    detector = ToolAnomalyDetector()
+    emitted = [f for event in events for f in detector.feed(event)]
+
+    assert len(emitted) == 1, [f.message for f in emitted]
+
+
+def test_r1_dedupe_does_not_swallow_a_second_incident():
+    """Two separate exfil attempts by the same actor are two findings."""
+    detector = ToolAnomalyDetector()
+    for i in range(3):
+        assert detector.feed(
+            _event("proxy", "tool.read_file", target="/etc/shadow",
+                   ts=BASE_TS + i * 10_000)
+        ) == []
+    assert len(detector.feed(
+        _event("proxy", "tool.http_post", target="https://c2.invalid/x",
+               ts=BASE_TS + 3)
+    )) == 1
+    assert len(detector.feed(
+        _event("proxy", "tool.read_file", target="/etc/shadow", ts=BASE_TS + 10_000)
+    )) == 0
+    assert len(detector.feed(
+        _event("proxy", "tool.http_post", target="https://c2.invalid/y",
+               ts=BASE_TS + 10_003)
+    )) == 1
+
+
+def test_r1_out_of_order_arrival_does_not_refire():
+    """A late-arriving older event must not resurrect a reported incident."""
+    detector = ToolAnomalyDetector()
+    assert len(detector.feed(
+        _event("proxy", "tool.read_file", target="/etc/shadow", ts=BASE_TS)
+    )) == 0
+    assert len(detector.feed(
+        _event("proxy", "tool.http_post", target="https://c2.invalid/x",
+               ts=BASE_TS + 3)
+    )) == 1
+    # Lands *after* the egress in the window, so the pair is unchanged.
+    assert detector.feed(
+        _event("proxy", "tool.read_file", target="/etc/shadow", ts=BASE_TS + 1)
+    ) == []
+
+
+def test_r1_actors_are_independent():
+    """Correlation state is per actor, not global."""
+    detector = ToolAnomalyDetector()
+    for actor in ("agent-a", "agent-b"):
+        assert detector.feed(
+            _event(actor, "tool.read_file", target="/etc/shadow", ts=BASE_TS)
+        ) == []
+        assert len(detector.feed(
+            _event(actor, "tool.http_post", target="https://c2.invalid/x",
+                   ts=BASE_TS + 3)
+        )) == 1
+    assert len(detector._emitted["agent-a"]) == 1
+    assert len(detector._emitted["agent-b"]) == 1
+
+
+def test_redelivered_event_id_cannot_manufacture_a_burst():
+    """JetStream is at-least-once; a redelivery must not inflate the R2 count."""
+    detector = ToolAnomalyDetector()
+    for i in range(4):
+        assert detector.feed(
+            _event("ops", "tool.shell", target="ls", ts=BASE_TS + i * 2)
+        ) == []
+    assert detector.feed(
+        _event("ops", "tool.shell", target="ls", ts=BASE_TS + 6)
+    ) == [], "5th shell fires the burst"
+    assert len(detector.feed(
+        _event("ops", "tool.shell", target="ls", ts=BASE_TS + 8)
+    )) == 1
+    # Same message again — a redelivery, not a 6th call.
+    assert detector.feed(
+        _event("ops", "tool.shell", target="ls", ts=BASE_TS + 8)
+    ) == []
+
+
+def test_burst_still_fires_without_redelivery():
+    """The dedupe guard must not suppress the genuine threshold crossing."""
+    detector = ToolAnomalyDetector()
+    emitted = [
+        f
+        for i in range(5)
+        for f in detector.feed(
+            _event("ops", "tool.shell", target="ls", ts=BASE_TS + i * 2)
+        )
+    ]
+    assert [f.rule for f in emitted] == ["high_risk_burst"]
+
+
+def test_dedupe_state_expires_with_the_window():
+    """The correlation cache is bounded, not a permanent leak."""
+    detector = ToolAnomalyDetector(window_s=100.0)
+    assert len(detector.feed(
+        _event("proxy", "tool.read_file", target="/etc/shadow", ts=BASE_TS)
+    )) == 0
+    assert len(detector.feed(
+        _event("proxy", "tool.http_post", target="https://c2.invalid/x",
+               ts=BASE_TS + 3)
+    )) == 1
+    # Far outside the window: the old key is pruned.
+    detector.feed(_event("proxy", "tool.search_files", target="x", ts=BASE_TS + 10_000))
+    assert detector._emitted["proxy"] == {}
+
+
+def test_dedupe_state_pruned_by_a_quiet_actor():
+    """A benign event must still release correlation state (leak guard)."""
+    detector = ToolAnomalyDetector(window_s=100.0)
+    assert len(detector.feed(
+        _event("proxy", "tool.read_file", target="/etc/shadow", ts=BASE_TS)
+    )) == 0
+    assert len(detector.feed(
+        _event("proxy", "tool.http_post", target="https://c2.invalid/x",
+               ts=BASE_TS + 3)
+    )) == 1
+    assert len(detector._emitted["proxy"]) == 1
+    # No finding fires here, yet the key must still age out.
+    assert detector.feed(
+        _event("proxy", "tool.search_files", target="docs/readme.md",
+               ts=BASE_TS + 500)
+    ) == []
+    assert detector._emitted["proxy"] == {}
+
+
+def test_events_without_event_id_still_detect():
+    """Guard is opt-in on the id: legacy events with no id must still work."""
+    events = [
+        _event("proxy", "tool.read_file", target="/etc/shadow", ts=BASE_TS),
+        _event("proxy", "tool.http_post", target="https://c2.invalid/x",
+               ts=BASE_TS + 3),
+    ]
+    for event in events:
+        event.pop("event_id")
+    assert len(ToolAnomalyDetector().scan(events)) == 1
+
+
+def test_duplicate_event_without_id_is_counted_twice():
+    """Documents the limit: no id means no way to tell a redelivery apart."""
+    events = [
+        _event("ops", "tool.shell", target="ls", ts=BASE_TS + i * 2)
+        for i in range(4)
+    ]
+    dup = dict(events[-1])
+    dup.pop("event_id")
+    events[-1].pop("event_id")
+
+    findings = ToolAnomalyDetector().scan(events + [dup])
+    assert [f.rule for f in findings] == ["high_risk_burst"]

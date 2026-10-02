@@ -84,6 +84,7 @@ aspen:
     fleet_overview: "aspen.sentinel.fleet.overview"
     osint_ingest: "aspen.sentinel.osint.ingest"
     incident_channel: "aspen.sentinel.incident.channel"
+    tools_anomaly: "aspen.sentinel.tools.anomaly"
   authz:
     gate_request: "aspen.authz.gate.request"
     gate_decision: "aspen.authz.gate.decision"

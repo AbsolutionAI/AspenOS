@@ -22,6 +22,7 @@ Aspen Sentinel requires dedicated subjects for authorization gates, audit feeds,
 |--------------------------------------|-------------------------------------------------------|--------------------------------------|----------------------------|
 | `aspen.sentinel.fleet.overview`     | aggregate plants/nodes/status, degraded[]            | fan-in from fleet.heartbeat         | Sentinel dashboard        |
 | `aspen.sentinel.audit.event`        | {event_id, actor, action, target, result, ts}        | durable JetStream                   | Sentinel audit, compliance|
+| `aspen.sentinel.tools.anomaly`      | finding {finding_id, rule, severity, actor, message, window_s, events[], event_id, ts} | JetStream, `Nats-Msg-Id: finding_id` (best-effort, idempotent) | ops paging (R1 high), Sentinel dashboard |
 | `aspen.sentinel.osint.ingest`       | source, raw/ref, confidence, tags[]                  | optional replay                     | Sentinel OSINT pane       |
 | `aspen.authz.gate.request`          | capability, resource, context, proposer_agent_id     | propose_act path                    | Gatekeeper (BEL-215)      |
 | `aspen.authz.gate.decision`         | request_id, decision (grant/deny), humans[], note?   | dual-human required for RED/BLACK   | Agents, audit             |
@@ -73,11 +74,29 @@ Aspen Sentinel requires dedicated subjects for authorization gates, audit feeds,
   collects two distinct human approvals on `aspen.authz.gate.decision`
   (`{request_id, human_id}`), refuses bare/single-human forwards, and gates
   every decision into the ADR-0007 audit envelope.
+- `aspen.sentinel.tools.anomaly` — consumer live:
+  `src/python/sentinel/anomaly_consumer.py` (`AnomalyConsumer`) +
+  `scripts/sentinel-tool-anomaly.py` CLI. Subscribes to
+  `aspen.sentinel.audit.event`, feeds every event through
+  `ToolAnomalyDetector` (ASP-379), and publishes findings to
+  `aspen.sentinel.tools.anomaly`. Findings are journaled to
+  `/var/lib/aspen/sentinel/anomaly.jsonl` (append + fsync, always) and mirrored
+  to JetStream best-effort with `Nats-Msg-Id: finding_id`, where `finding_id` is
+  a content hash of the incident so a replay collapses onto one message instead
+  of paging twice. Rules: R1 `sensitive_read_then_egress` (high — page), R2
+  `high_risk_burst`, R3 `denial_probe`, R4 `error_storm`. **Fail-open and
+  log-only**: nothing here can block a tool call or alter a verdict.
+  Delivery is at-most-once (`nc.subscribe`, not a durable pull consumer) — see
+  the trade-off note in `docs/plans/ASP-687.md`.
 - NATS ACLs for `aspen.sentinel.*` / `aspen.authz.*` / `aspen.fleet.*` /
   `aspen.safety.*` per role — `nats/fleet-accounts.conf.tmpl` (ASP-536).
+  `aspen.sentinel.tools.anomaly` needs no ACL change: it falls under the existing
+  `aspen.sentinel.>` grant (verified against the template).
 
 **Next**: Sentinel dashboard consumer for `aspen.sentinel.fleet.overview` /
-`aspen.sentinel.audit.event`; update Master Spec §3.1.
+`aspen.sentinel.audit.event`; a durable JetStream pull consumer for
+`aspen.sentinel.audit.event` (to replace ASP-687's at-most-once subscription);
+ops paging consumer for `aspen.sentinel.tools.anomaly`; update Master Spec §3.1.
 
 ## Acceptance Criteria
 - Contracts published in aspen-contracts repo
