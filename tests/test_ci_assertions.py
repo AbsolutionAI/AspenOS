@@ -64,6 +64,13 @@ def test_ci_c11_help_is_not_coupled_to_builtin_string():
     assert "sandbox_run --help" in ci
 
 
+def test_ci_nats_install_is_guarded():
+    """ASP-721: the smoke job must fail hard, not warn, on a bad NATS install."""
+    ci = _ci()
+    assert "set -euo pipefail" in ci
+    assert "command -v nats-server" in ci
+
+
 def test_nightly_section_13_python_test_suite_present():
     nightly = _nightly()
     assert "Section 13: Python test suite" in nightly
