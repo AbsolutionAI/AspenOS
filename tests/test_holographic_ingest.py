@@ -1,5 +1,6 @@
 """Holographic dual-write from BEL-154 ingest (shared SQLite)."""
 
+import os
 import sys
 from pathlib import Path
 
@@ -36,13 +37,15 @@ def test_explicit_db_env_writes_holographic(tmp_path, monkeypatch):
         ingest_dir=ingest,
     )
     assert path.exists()
-    sys.path.insert(0, "/home/tech/.hermes/hermes-agent")
+    sys.path.insert(0, os.environ.get("HERMES_AGENT_ROOT", "/home/tech/.hermes/hermes-agent"))
     try:
         from plugins.memory.holographic.store import MemoryStore
-    except ModuleNotFoundError as exc:
-        if "tools.registry" in str(exc) or "holographic" in str(exc):
-            pytest.skip("Hermes holographic plugin not available", allow_module_level=False)
-        raise
+    except ImportError as exc:
+        # holographic_ingest.add_fact isolates *every* import failure, so the test
+        # must not be stricter than the code it covers: an unavailable Hermes
+        # checkout (plugin absent, or a transitive dep such as ruamel missing)
+        # skips rather than fails.
+        pytest.skip(f"Hermes holographic plugin not importable: {exc}")
 
     store = MemoryStore(db_path=str(db))
     hits = store.search_facts("OpenCode holographic")
