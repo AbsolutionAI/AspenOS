@@ -54,6 +54,22 @@ jobs:
       - name: F-013 digest gate fixtures (tamper/mismatch must fail)
         run: python -m pytest tests/test_model_digests.py -q
 
+  security-nats-tls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pytest
+        run: pip install pytest pyyaml
+      - name: H-024 gate self-test (predicates must be load-bearing)
+        run: bash scripts/check-nats-tls-default.sh --self-test
+      - name: H-024 gate on the real tree
+        run: bash scripts/check-nats-tls-default.sh
+      - name: H-024 TLS-by-default fixtures
+        run: python -m pytest tests/test_nats_tls_default.py -q
+
   smoke:
     runs-on: ubuntu-latest
     steps:
