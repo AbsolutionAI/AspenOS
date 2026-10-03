@@ -64,11 +64,39 @@ def test_ci_c11_help_is_not_coupled_to_builtin_string():
     assert "sandbox_run --help" in ci
 
 
+def _nats_install_jobs() -> set:
+    """Job names whose body installs nats-server (download or `sudo cp`)."""
+    jobs = _ci_jobs()
+    return {
+        name for name, lines in jobs.items()
+        if any("nats-server-v2." in ln or "nats-server /usr/local/bin" in ln for ln in lines)
+    }
+
+
+def _line_of(lines: list, prefix: str, start: int = 0) -> int:
+    return next(i for i, ln in enumerate(lines) if i >= start and ln.startswith(prefix))
+
+
 def test_ci_nats_install_is_guarded():
-    """ASP-721: the smoke job must fail hard, not warn, on a bad NATS install."""
-    ci = _ci()
-    assert "set -euo pipefail" in ci
-    assert "command -v nats-server" in ci
+    """ASP-721: the smoke job must fail hard, not warn, on a bad NATS install.
+
+    The DoD is locality as well as presence: the guard belongs to the smoke
+    job and nowhere else, and it must *wrap* the download + `sudo cp` rather
+    than sit beside them.
+    """
+    lines = [ln.strip() for ln in _ci_jobs()["smoke"]]
+
+    assert any(ln.startswith("set -euo pipefail") for ln in lines)
+    opens_at = _line_of(lines, "if ! command -v nats-server")
+    installs_at = _line_of(lines, "sudo cp nats-server-v2.")
+    # trailing `command -v` inside the block, so a silent install shows in the log
+    traces_at = _line_of(lines, "command -v nats-server", start=installs_at)
+    closes_at = _line_of(lines, "fi", start=traces_at)
+    assert opens_at < installs_at < traces_at < closes_at, lines
+
+    # the pin does not regress to the stale branch's v2.14.3
+    assert not any("v2.14.3" in ln for ln in lines), lines
+    assert _nats_install_jobs() == {"smoke"}, _nats_install_jobs()
 
 
 def test_nightly_section_13_python_test_suite_present():
