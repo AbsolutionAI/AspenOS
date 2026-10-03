@@ -262,6 +262,14 @@ check "install-starship does not swallow digest failures" bash -c 'grep -q "inst
 check "CI runs digest gate" bash -c 'grep -q "security-model-digests" .github/workflows/ci.yml && grep -q "test_model_digests.py" .github/workflows/ci.yml'
 check "model digest fixture tests" bash -c "'$PY' -m pytest tests/test_model_digests.py -q --tb=short 2>&1 | grep -E '[0-9]+ passed'"
 
+# ─── Section 23: Package classification gate (H-020) ──────────────────
+echo -e "\n${YELLOW}── Section 23: Package classification gate (H-020) ──${NC}"
+check "classification gate is executable" test -x scripts/check-package-classification.sh
+check "every package declares a classification" bash scripts/check-package-classification.sh
+check "classification gate self-test" bash scripts/check-package-classification.sh --self-test
+check "CI runs classification gate" bash -c 'grep -q "security-package-classification" .github/workflows/ci.yml && grep -q "check-package-classification.sh" .github/workflows/ci.yml && grep -q "test_package_classification.py" .github/workflows/ci.yml'
+check "package classification fixture tests" bash -c "'$PY' -m pytest tests/test_package_classification.py -q --tb=short 2>&1 | grep -E '[0-9]+ passed'"
+
 # ─── Summary ─────────────────────────────────────────────────
 TIMING_END=$(date +%s%N)
 ELAPSED_MS=$(( (TIMING_END - TIMING_BEGIN) / 1000000 ))

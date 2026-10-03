@@ -25,6 +25,22 @@ jobs:
       - name: Check Dev-only package isolation (H-019)
         run: bash scripts/check-no-devonly-in-prod.sh
 
+  security-package-classification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pytest (gate parses manifests with stdlib tomllib)
+        run: pip install pytest
+      - name: H-020 package classification gate (undeclared / invalid / SoR drift must fail)
+        run: bash scripts/check-package-classification.sh
+      - name: Gate self-test
+        run: bash scripts/check-package-classification.sh --self-test
+      - name: Package classification fixture tests
+        run: python -m pytest tests/test_package_classification.py -q
+
   verify-package-signature:
     runs-on: ubuntu-latest
     steps:
