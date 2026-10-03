@@ -62,7 +62,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install pytest
-        run: pip install pytest
+        run: pip install pytest pyyaml
       - name: H-024 gate self-test (predicates must be load-bearing)
         run: bash scripts/check-nats-tls-default.sh --self-test
       - name: H-024 gate on the real tree
