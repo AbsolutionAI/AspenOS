@@ -132,18 +132,19 @@ class TestPaperclipMemoryCLI:
         """Regression guard: passing ingest_dir=None must not crash the CLI
         (the ASP-61 ingest_dir=None bug).
 
-        The module default is this repo's host convention
-        (``/home/tech/.aspen/memory/ingest``), which a CI runner cannot write --
-        it fails with ``[Errno 13] Permission denied: '/home/tech'`` -- and which a
-        unit test has no business writing to anyway. Redirect the module default at
-        ``tmp_path`` instead. The path actually under test is unchanged: the CLI
-        passes nothing and ``ingest_paperclip_record`` substitutes the module
-        default, which it imports at call time.
+        ASP-733: this used to assert only when the default directory already
+        existed, so on CI it was a no-op that passed because the author's
+        hardcoded home path was absent. It now pins the default to tmp_path
+        via the env override and asserts unconditionally, and writes nowhere
+        outside tmp_path.
         """
-        import scripts.memory_ingest as mi
+        ingest = tmp_path / "default-ingest"
+        monkeypatch.setenv("AGNETIC_MEMORY_INGEST_DIR", str(ingest))
+        import importlib
 
-        default_dir = tmp_path / "default-ingest"
-        monkeypatch.setattr(mi, "DEFAULT_INGEST_DIR", default_dir)
+        import scripts.memory_ingest as mi
+        mi = importlib.reload(mi)
+        assert mi.DEFAULT_INGEST_DIR == ingest
 
         real_ingest = mi.ingest_record
         written = {}
@@ -155,5 +156,6 @@ class TestPaperclipMemoryCLI:
         monkeypatch.setattr(mi, "ingest_record", fake_ingest)
         rc = pm.main(["--source-id", "ASP-77", "--content", "x"])
         assert rc == 0
-        assert written["ingest_dir"] == default_dir
-        assert default_dir.exists()
+        assert written["ingest_dir"] is not None
+        assert Path(written["ingest_dir"]) == ingest
+        assert list((ingest / "paperclip").glob("*.jsonl"))

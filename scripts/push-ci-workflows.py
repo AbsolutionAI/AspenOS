@@ -4,10 +4,40 @@
 import base64
 import json
 import os
+import subprocess
 import sys
 import urllib.request
 
-TOKEN = os.popen("cd /home/tech/agnetic-os && git remote get-url origin | sed 's|.*://[^:]*:\\([^@]*\\)@.*|\\1|'").read().strip()
+
+def resolve_token() -> str:
+    """Return a GitHub token from the environment, falling back to `gh auth`.
+
+    Previously this scraped the token out of a `git remote get-url` run inside
+    a hardcoded checkout path on the author's machine. That silently produced
+    an empty token everywhere else, and every API call then failed with a 401
+    that looked like a permissions problem. An explicit, named source fails
+    loudly instead.
+    """
+    for name in ("GH_TOKEN", "GITHUB_TOKEN"):
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value
+    try:
+        value = subprocess.run(
+            ["gh", "auth", "token"],
+            capture_output=True, text=True, timeout=15, check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        value = ""
+    if value:
+        return value
+    sys.exit(
+        "push-ci-workflows: no GitHub token. Set GH_TOKEN or GITHUB_TOKEN, "
+        "or run `gh auth login`."
+    )
+
+
+TOKEN = resolve_token()
 
 HEADERS = {
     "Authorization": f"token {TOKEN}",
