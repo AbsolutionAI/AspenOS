@@ -184,34 +184,37 @@ latency profiles.
 **Not actionable** unless the sandbox is moved to a different host or optimized. The
 nightly check records this as a single known failure (1 of 62 smoke tests).
 
-### CI does not run the full Python suite — `origin/master` was red without CI noticing
+### CI now runs the full Python suite (ASP-730) — the gap that let ASP-706 through is closed
 
-Fixed in ASP-706. Recorded so a future run does not re-diagnose it, and because the
-underlying gap is still open.
+Recorded as a resolved deviation so a future run does not re-diagnose it, and because the
+*next* layer of the same bug is worth remembering.
 
-`tests/test_holographic_ingest.py` imports the out-of-repo Hermes plugin
-(`/home/tech/.hermes/hermes-agent`, overridable via `HERMES_AGENT_ROOT`) to read back what
-dual-write produced. Its skip guard matched only two hardcoded module names
-(`tools.registry`, `holographic`) and re-raised every other import failure. That tree's
-`hermes_cli/config.py` imports `ruamel.yaml`, so on any host without `ruamel` the test
-failed the suite instead of skipping:
+The ASP-706 failure itself was fixed by making the skip guard catch `ImportError` instead
+of matching module names. `assert path.exists()` stays above the import in
+`tests/test_holographic_ingest.py`, so a broken dual-write still fails the test rather than
+skipping — that part is unchanged and still correct.
 
-```
-FAILED tests/test_holographic_ingest.py::test_explicit_db_env_writes_holographic
-ModuleNotFoundError: No module named 'ruamel'
-1 failed, 466 passed, 3 skipped
-```
+**Why it survived:** `.github/workflows/ci.yml` ran only *named* test files
+(`test_package_signatures.py`, `test_model_digests.py`) plus `scripts/smoke-test.sh`. None
+ran `tests/` wholesale, so a red full suite was invisible to CI and surfaced only in §13 and
+in Aider's preflight — where a non-zero exit has repeatedly been misread as a regression in
+the change under review. ASP-730 adds a required `python-test-suite` job running
+`python -m pytest tests/ -v --tb=short -rs` on the same interpreter §13 uses here
+(CPython 3.12), with `pytest pytest-asyncio pyyaml` and nothing else, so the four
+optional-dependency skips (`aiohttp`, `mcp.server`, `nats-py`, Hermes `ruamel`) stay skips
+and the CI baseline matches preflight.
 
-The guard also failed on a host with no Hermes tree at all (`No module named 'plugins'`),
-so it was wrong in both directions. The fix skips on `ImportError` instead of matching
-names. `assert path.exists()` stays above the import, so a broken dual-write still fails
-the test rather than skipping.
-
-**The gap that let this survive:** `.github/workflows/ci.yml` runs three *named* test files
-(`test_package_signatures.py`, `test_model_digests.py`) plus `scripts/smoke-test.sh`.
-None runs `tests/` wholesale, so a red full suite is invisible to CI and surfaces only in
-§13 and in Aider's preflight — where a non-zero exit has repeatedly been misread as a
-regression in the change under review. Running the full suite in CI is still open.
+**The second-order finding, worth keeping.** Turning the gate on immediately went red — 12
+failures, all one root cause. `services/hitl.py` guards its optional import with
+`try: from aiohttp import web / except ImportError: web = None`, then annotates
+module-level defs `-> web.Response`. Without `from __future__ import annotations` that
+annotation is evaluated at def time, so the file was unimportable without `aiohttp` on any
+Python < 3.14 (PEP 649 defers annotations by default only in 3.14). §13 never saw it
+because `nightly.yml` installs `aiohttp`; the local host never saw it because it runs 3.14;
+CI never saw it because CI did not run the suite. Six sibling modules
+(`audit`, `webhooks`, `planner`, `evaluator`, `kill_switch`, `handoff`) carried the identical
+landmine and now carry `from __future__ import annotations` too.
+`tests/test_ci_assertions.py` pins both contracts so neither can regress silently.
 
 ## What is NOT checked
 
