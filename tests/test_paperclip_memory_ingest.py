@@ -157,3 +157,7 @@ class TestPaperclipMemoryCLI:
         assert rc == 0
         assert written["ingest_dir"] == default_dir
         assert default_dir.exists()
+
+    def test_asp730_deliberate_red_probe(self, tmp_path):
+        """TEMPORARY ASP-730 acceptance probe - reverted in the next commit."""
+        assert tmp_path.exists() is False, "ASP-730 deliberate-red probe"
