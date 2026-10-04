@@ -4,7 +4,8 @@
 Failure isolation: never raise to the caller. Tests using a temp ``ingest_dir``
 do not touch production unless ``ASPEN_HOLOGRAPHIC_DB`` is set.
 
-DB default: /home/tech/.aspen/memory/holographic.db
+DB default: ``<data_home>/memory/holographic.db``, i.e. ``~/.aspen`` unless
+``ASPEN_DATA_HOME`` or ``XDG_DATA_HOME`` says otherwise. See ``scripts/paths.py``.
 """
 from __future__ import annotations
 
@@ -12,10 +13,15 @@ import os
 import sys
 from pathlib import Path
 
-DEFAULT_HOLOGRAPHIC_DB = Path("/home/tech/.aspen/memory/holographic.db")
-_HERMES_AGENT = Path(
-    os.environ.get("HERMES_AGENT_ROOT", "/home/tech/.hermes/hermes-agent")
-)
+try:
+    from paths import hermes_agent_root as _hermes_agent_root
+    from paths import holographic_db as _default_holographic_db
+except ImportError:
+    from scripts.paths import hermes_agent_root as _hermes_agent_root
+    from scripts.paths import holographic_db as _default_holographic_db
+
+DEFAULT_HOLOGRAPHIC_DB = _default_holographic_db()
+HERMES_AGENT_ROOT = _hermes_agent_root()
 _MAX_FACT_CHARS = 2000
 _MIN_FACT_CHARS = 8
 
@@ -105,12 +111,11 @@ def write_holographic(
         )
         tags = _tags(source, agent or source, project, linear_refs, paperclip_refs)
         category = _category(body)
-        db = Path(db_path) if db_path else Path(
-            os.environ.get("ASPEN_HOLOGRAPHIC_DB", str(DEFAULT_HOLOGRAPHIC_DB))
-        )
+        db = Path(db_path) if db_path else _default_holographic_db()
 
-        if str(_HERMES_AGENT) not in sys.path:
-            sys.path.insert(0, str(_HERMES_AGENT))
+        hermes_agent = _hermes_agent_root()
+        if str(hermes_agent) not in sys.path:
+            sys.path.insert(0, str(hermes_agent))
         from plugins.memory.holographic.store import MemoryStore  # type: ignore
 
         store = MemoryStore(db_path=str(db))

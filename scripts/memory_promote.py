@@ -47,9 +47,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "services"))
 
 from memory import MemoryManager, MemoryType  # noqa: E402
 
-DEFAULT_INGEST_DIR = Path("/home/tech/.aspen/memory/ingest")
-DEFAULT_FACTS_DIR = Path("/home/tech/.aspen/memory/facts")
-DEFAULT_FACTS_LOG = DEFAULT_FACTS_DIR / "facts.jsonl"
+try:
+    from paths import memory_facts_log as _default_facts_log
+    from paths import memory_ingest_dir as _default_ingest_dir
+except ImportError:
+    from scripts.paths import memory_facts_log as _default_facts_log
+    from scripts.paths import memory_ingest_dir as _default_ingest_dir
+
+DEFAULT_INGEST_DIR = _default_ingest_dir()
+DEFAULT_FACTS_LOG = _default_facts_log()
 
 _THRESHOLD = 0.7
 _RECENT_WINDOW_DAYS = 30
@@ -288,8 +294,8 @@ def main(argv: list[str] | None = None) -> int:
         prog="memory-promote",
         description="BEL-154 memory promotion pipeline",
     )
-    parser.add_argument("--ingest-dir", type=Path, default=DEFAULT_INGEST_DIR)
-    parser.add_argument("--facts-log", type=Path, default=DEFAULT_FACTS_LOG)
+    parser.add_argument("--ingest-dir", type=Path, default=_default_ingest_dir())
+    parser.add_argument("--facts-log", type=Path, default=_default_facts_log())
     parser.add_argument("--db", default=os.environ.get(
         "AGNETIC_MEMORY_DB", "/tmp/agnetic-data/memory.db"))
     parser.add_argument("--min-confidence", type=float, default=_THRESHOLD)
