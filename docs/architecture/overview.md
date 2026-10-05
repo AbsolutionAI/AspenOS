@@ -2,7 +2,7 @@
 
 **Canonical product SoR:** [`docs/sor/MASTER_SPEC.md`](../sor/MASTER_SPEC.md) (AspenGrove v4.0 — Three Organs).  
 **ADRs:** [`docs/adr/README.md`](../adr/README.md)  
-**Last architecture review:** [`docs/ops/WEEKLY_ARCHITECTURE_REVIEW_2026-09-21.md`](../ops/WEEKLY_ARCHITECTURE_REVIEW_2026-09-21.md) (ASP-627)
+**Last architecture review:** [`docs/ops/WEEKLY_ARCHITECTURE_REVIEW_2026-10-05.md`](../ops/WEEKLY_ARCHITECTURE_REVIEW_2026-10-05.md) (ASP-739)
 
 This monorepo is the **AspenOS / Starship Alpha** implementation tree. Product boundaries:
 
@@ -39,6 +39,7 @@ OS:           Ubuntu 24.04 · systemd · AppArmor · cgroups · optional C11 san
 - Cross-plant ACL: **plant-edge → plant-alpha denied** (H-021 / ASP-369); ops-initiated alpha→edge retained.
 - Tool anomaly (H-015): fail-open detector over audit events (`src/python/sentinel/tool_anomaly.py`) — investigation lead, not a deny path.
 - Fleet bus: monorepo publishes **`aspen.fleet.*` alongside** legacy `starship.*`/`agnetic.*` dual (ASP-596); ADR-0011 sunset **not** filed.
+- Execution isolation (ADR-0013): Paperclip `isolated_workspace` + `git_worktree` is live. A QA PASS is void when the pinned workspace `sourceIssueId` is a different issue (ASP-736 / ASP-733).
 
 ## Runtime paths (target)
 
