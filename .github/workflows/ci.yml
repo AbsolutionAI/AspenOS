@@ -80,6 +80,22 @@ jobs:
       - name: Full Python suite (tests/)
         run: python -m pytest tests/ -v --tb=short -rs
 
+  security-nats-tls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pytest
+        run: pip install pytest pyyaml
+      - name: H-024 gate self-test (predicates must be load-bearing)
+        run: bash scripts/check-nats-tls-default.sh --self-test
+      - name: H-024 gate on the real tree
+        run: bash scripts/check-nats-tls-default.sh
+      - name: H-024 TLS-by-default fixtures
+        run: python -m pytest tests/test_nats_tls_default.py -q
+
   smoke:
     runs-on: ubuntu-latest
     steps:
@@ -111,10 +127,14 @@ jobs:
         env:
           PATH: /usr/local/go/bin:/home/runner/go/bin:/usr/local/bin:/usr/bin:/bin
         run: |
+          set -euo pipefail
           export PATH="$(go env GOPATH)/bin:$(pwd)/starshipctl:$PATH"
-          # install nats-server for accounts conf -t
-          curl -sL https://github.com/nats-io/nats-server/releases/download/v2.14.5/nats-server-v2.14.5-linux-amd64.tar.gz | tar xz
-          sudo cp nats-server-v2.14.5-linux-amd64/nats-server /usr/local/bin/
+          # install nats-server for accounts conf -t (must land on PATH)
+          if ! command -v nats-server >/dev/null 2>&1; then
+            curl -sL https://github.com/nats-io/nats-server/releases/download/v2.14.5/nats-server-v2.14.5-linux-amd64.tar.gz | tar xz
+            sudo cp nats-server-v2.14.5-linux-amd64/nats-server /usr/local/bin/
+            command -v nats-server
+          fi
           # optional nkeys
           go install github.com/nats-io/nkeys/nk@latest || true
           export PATH="$(go env GOPATH)/bin:$PATH"

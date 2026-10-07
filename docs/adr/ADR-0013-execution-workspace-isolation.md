@@ -4,7 +4,9 @@
 **Paperclip:** ASP-661 (parent ASP-657)  
 **Linear:** [BEL-316](https://linear.app/bellahtech/issue/BEL-316/adr-0013-per-issue-git-worktree-execution-workspaces-asp-661)  
 **Review:** Architect decision on ASP-661. This record is the review. Live policy flip is a follow-up, not this ADR's commit.  
-**Related:** ASP-659 flock (`3d88b1a`, local master, not yet on `origin/master`) · ASP-658 `.paperclip/` gitignore · ASP-660 runbook baseline
+**Related:** ASP-659 flock (`3d88b1a`, local master, not yet on `origin/master`) · ASP-658 `.paperclip/` gitignore · ASP-660 runbook baseline  
+
+**Errata (ASP-739, 2026-10-05):** The sentences below that say the flock is not on `origin/master`, that git identity is `Your Name`, and that the policy flip is still pending were true on 2026-09-26. They are not open preconditions. `3d88b1a` is an ancestor of `origin/master`. Repo-local identity is `packndeploy`. Project policy matches Decision §1. Do not re-accept this ADR. Open realization gap, not a reversal: a later issue can be pinned to another issue's workspace (ASP-733 workspace `54dc4532` is the ASP-728 tree). QA must fail closed on `sourceIssueId` mismatch. Tracked on ASP-736.
 
 ---
 

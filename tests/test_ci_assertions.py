@@ -45,6 +45,22 @@ def test_ci_c11_help_is_not_coupled_to_builtin_string():
     assert "sandbox_run --help" in ci
 
 
+def _smoke_job() -> str:
+    m = re.search(r"^  smoke:.*?(?=^  [a-z0-9-]+:)", _ci(), re.S | re.M)
+    assert m, "missing smoke job in ci.yml"
+    return m.group(0)
+
+
+def test_ci_nats_install_is_guarded():
+    """ASP-721: the smoke job's nats-server install fails closed on a broken download."""
+    smoke = _smoke_job()
+    assert "set -euo pipefail" in smoke
+    assert "if ! command -v nats-server >/dev/null 2>&1; then" in smoke
+    assert smoke.index("set -euo pipefail") < smoke.index("nats-server")
+    assert "v2.14.5" in smoke
+    assert "v2.14.3" not in smoke
+
+
 def test_nightly_section_13_python_test_suite_present():
     nightly = _nightly()
     assert "Section 13: Python test suite" in nightly
