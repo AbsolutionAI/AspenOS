@@ -218,6 +218,36 @@ CI never saw it because CI did not run the suite. Six sibling modules
 landmine and now carry `from __future__ import annotations` too.
 `tests/test_ci_assertions.py` pins both contracts so neither can regress silently.
 
+### CI checks were advisory — `master` is now protected (ASP-732)
+
+Recorded as a resolved deviation so a future run does not re-diagnose the "all green, still
+mergeable" posture. Until 2026-10-07 `origin/master` had no branch protection and no rulesets
+(`GET /branches/master/protection` → 404, `GET /rulesets` → `[]`), so every check in
+`Starship OS CI` was advisory: a PR with all checks red could still be merged, an admin push
+bypassed everything, and nothing forced the `python-test-suite` job from ASP-730 to pass
+before a merge landed. Running the suite in CI was necessary but not sufficient — a signal
+nobody is forced to read is the same as no signal.
+
+`master` now carries classic branch protection:
+
+- **Required status checks, `strict: true`** — all ten `Starship OS CI` jobs must be green
+  *and* the head must be up to date with `master` before a merge is accepted, so a green run
+  on an older head cannot satisfy the gate:
+  `lint`, `security-devonly-isolation`, `verify-package-signature`, `security-model-digests`,
+  `python-test-suite`, `security-nats-tls`, `smoke`, `build-go`, `build-rust`, `build-c11`.
+- **`enforce_admins: true`** — there is no admin bypass; the only way past the gate is a
+  deliberate settings change, which is auditable rather than an invisible push.
+- **Force pushes and branch deletions blocked**, required conversations resolved.
+- `required_linear_history` is deliberately **not** enabled: this repo lands PRs with merge
+  commits ("Merge pull request #NN"), and switching merge strategy is an architectural
+  decision, not a side effect of this ticket.
+
+Proven on the day it was applied: PR #70 carried one deliberately failing `tests/` test,
+`python-test-suite` went red, and an admin merge attempt was refused with
+`405 — 2 of 10 required status checks have not succeeded: 1 failing`. The probe was closed
+unmerged. If `python-test-suite` is ever removed or made non-required in
+`.github/workflows/ci.yml`, this whole deviation reopens.
+
 ## What is NOT checked
 
 - ISO build from source (requires root / nested virt, not feasible in CI; directory structure is statically checked in Section 14)
