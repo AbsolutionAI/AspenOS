@@ -9,7 +9,9 @@
 set -e
 
 # === Configuration ===
-PROJECT_ROOT="/home/tech/agnetic-os"
+# Derived from this script's own location so a checkout works wherever it lands.
+# AGNETIC_ROOT overrides it for a deployment that keeps the tree elsewhere.
+PROJECT_ROOT="${AGNETIC_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 SHARED_STORE="${PROJECT_ROOT}/shared/memories/agents/default"
 Hermes_SkiLlPath="${HERMES_SKILLS_PATH:-$HOME/.hermes/skills}"  # Auto-load from ~/.hermes/ if set
 

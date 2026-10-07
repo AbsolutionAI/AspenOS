@@ -128,14 +128,23 @@ class TestPaperclipMemoryCLI:
                       "--ingest-dir", str(tmp_path)])
         assert rc == 2
 
-    def test_cli_no_ingest_dir_uses_default(self, monkeypatch):
+    def test_cli_no_ingest_dir_uses_default(self, monkeypatch, tmp_path):
         """Regression guard: passing ingest_dir=None must not crash the CLI
-        (the ASP-61 ingest_dir=None bug)."""
-        from scripts.memory_ingest import DEFAULT_INGEST_DIR
-        default = DEFAULT_INGEST_DIR / "paperclip"
-        if default.exists():
-            monkeypatch.delenv("AGNETIC_MEMORY_INGEST_DIR", raising=False)
+        (the ASP-61 ingest_dir=None bug).
+
+        ASP-733: this used to assert only when the default directory already
+        existed, so on CI it was a no-op that passed because the author's
+        hardcoded home path was absent. It now pins the default to tmp_path
+        via the env override and asserts unconditionally, and writes nowhere
+        outside tmp_path.
+        """
+        ingest = tmp_path / "default-ingest"
+        monkeypatch.setenv("AGNETIC_MEMORY_INGEST_DIR", str(ingest))
+        import importlib
+
         import scripts.memory_ingest as mi
+        mi = importlib.reload(mi)
+        assert mi.DEFAULT_INGEST_DIR == ingest
 
         real_ingest = mi.ingest_record
         written = {}
@@ -148,3 +157,5 @@ class TestPaperclipMemoryCLI:
         rc = pm.main(["--source-id", "ASP-77", "--content", "x"])
         assert rc == 0
         assert written["ingest_dir"] is not None
+        assert Path(written["ingest_dir"]) == ingest
+        assert list((ingest / "paperclip").glob("*.jsonl"))
