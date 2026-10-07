@@ -54,6 +54,32 @@ jobs:
       - name: F-013 digest gate fixtures (tamper/mismatch must fail)
         run: python -m pytest tests/test_model_digests.py -q
 
+  # Required check (ASP-730). Runs tests/ wholesale so a red full Python suite
+  # is visible on the PR instead of only in nightly section 13 and QA preflight,
+  # where a non-zero exit gets misread as a regression in the change under review.
+  # Deliberately no continue-on-error / always(): the only way past this gate is a
+  # deliberate settings change, not an ignore-click.
+  python-test-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install suite deps
+        # Only what the suite requires. The optional deps (aiohttp, mcp.server,
+        # nats-py, the out-of-repo Hermes holographic plugin) stay uninstalled so
+        # their documented skips keep skipping and this gate's baseline matches
+        # what QA preflight sees.
+        run: pip install pytest pytest-asyncio pyyaml
+      - name: Record interpreter
+        run: python -VV
+      # -rs so the four optional-dependency skips print their reasons in the log
+      # instead of being an unexplained "s" in the progress output.
+      - name: Full Python suite (tests/)
+        run: python -m pytest tests/ -v --tb=short -rs
+
   security-nats-tls:
     runs-on: ubuntu-latest
     steps:

@@ -128,14 +128,22 @@ class TestPaperclipMemoryCLI:
                       "--ingest-dir", str(tmp_path)])
         assert rc == 2
 
-    def test_cli_no_ingest_dir_uses_default(self, monkeypatch):
+    def test_cli_no_ingest_dir_uses_default(self, monkeypatch, tmp_path):
         """Regression guard: passing ingest_dir=None must not crash the CLI
-        (the ASP-61 ingest_dir=None bug)."""
-        from scripts.memory_ingest import DEFAULT_INGEST_DIR
-        default = DEFAULT_INGEST_DIR / "paperclip"
-        if default.exists():
-            monkeypatch.delenv("AGNETIC_MEMORY_INGEST_DIR", raising=False)
+        (the ASP-61 ingest_dir=None bug).
+
+        The module default is this repo's host convention
+        (``/home/tech/.aspen/memory/ingest``), which a CI runner cannot write --
+        it fails with ``[Errno 13] Permission denied: '/home/tech'`` -- and which a
+        unit test has no business writing to anyway. Redirect the module default at
+        ``tmp_path`` instead. The path actually under test is unchanged: the CLI
+        passes nothing and ``ingest_paperclip_record`` substitutes the module
+        default, which it imports at call time.
+        """
         import scripts.memory_ingest as mi
+
+        default_dir = tmp_path / "default-ingest"
+        monkeypatch.setattr(mi, "DEFAULT_INGEST_DIR", default_dir)
 
         real_ingest = mi.ingest_record
         written = {}
@@ -147,4 +155,5 @@ class TestPaperclipMemoryCLI:
         monkeypatch.setattr(mi, "ingest_record", fake_ingest)
         rc = pm.main(["--source-id", "ASP-77", "--content", "x"])
         assert rc == 0
-        assert written["ingest_dir"] is not None
+        assert written["ingest_dir"] == default_dir
+        assert default_dir.exists()

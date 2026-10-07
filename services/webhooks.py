@@ -13,6 +13,8 @@ Usage:
     python3 webhooks.py test --source github --event push  # send test webhook
 """
 
+from __future__ import annotations
+
 import sys
 import os
 import json

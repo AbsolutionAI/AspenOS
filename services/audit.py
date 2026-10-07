@@ -14,6 +14,8 @@ Usage:
     python3 audit.py serve                         # start dashboard API
 """
 
+from __future__ import annotations
+
 import sys
 import os
 import re
@@ -98,7 +100,7 @@ class RiskLevel(Enum):
     CRITICAL = "critical"
 
     @staticmethod
-    def from_str(val: str) -> "RiskLevel":
+    def from_str(val: str) -> RiskLevel:
         try:
             return RiskLevel(val.lower())
         except ValueError:

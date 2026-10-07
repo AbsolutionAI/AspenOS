@@ -165,3 +165,81 @@ def test_nightly_section_20_cgroup_limits_present():
     assert "build-deb stages service.d drop-in dirs" in nightly
     assert "install-systemd installs drop-ins to /etc" in nightly
     assert "test_cgroup_limits.py" in nightly
+
+
+def _ci_job(name: str) -> str:
+    """Return the raw YAML body of one job in ci.yml.
+
+    Job bodies are two-space indented; a line that is indented exactly two spaces
+    and then non-space starts the next job, so that is where this one ends.
+    """
+    ci = _ci()
+    start = ci.index(f"\n  {name}:\n") + 1
+    rest = ci[start:]
+    nxt = re.search(r"^  \S", rest[1:], re.MULTILINE)
+    return rest if nxt is None else rest[: nxt.start() + 1]
+
+
+def test_ci_runs_full_python_suite():
+    """ASP-730: CI must run tests/ wholesale, not named files only.
+
+    The named-file-only gate let origin/master go red (ASP-706) with every required
+    check green, so the failure only surfaced in nightly section 13 and QA preflight.
+    """
+    ci = _ci()
+    assert "python -m pytest tests/" in ci, "ci.yml must run the full tests/ suite"
+    assert "python-test-suite:" in ci, "ci.yml must define the python-test-suite job"
+
+
+def test_ci_full_suite_job_is_not_a_soft_gate():
+    """ASP-730: the full-suite check is required, not continue-on-error.
+
+    A silently-optional job recreates the blind spot it was added to close.
+    """
+    job = _ci_job("python-test-suite")
+    assert "continue-on-error" not in job, "python-test-suite must not be continue-on-error"
+    assert "always()" not in job, "python-test-suite must not be gated by always()"
+
+
+def test_ci_full_suite_job_matches_nightly_interpreter():
+    """ASP-730: the CI gate runs the same Python as the nightly host.
+
+    The suite had never been executed on the CI interpreter, which is how a real bug
+    (services/hitl.py unimportable without aiohttp on Python < 3.14) stayed green
+    here and red in nightly section 13.
+    """
+    job = _ci_job("python-test-suite")
+    assert "python-version: '3.12'" in job, "python-test-suite must use the nightly Python"
+    installs = [ln for ln in job.splitlines() if "pip install" in ln]
+    assert installs, "python-test-suite must install the suite deps"
+    joined = " ".join(installs)
+    for dep in ("pytest", "pytest-asyncio", "pyyaml"):
+        assert dep in joined, f"python-test-suite must install {dep}"
+    # Optional deps stay out so their documented skips keep skipping.
+    for optional in ("aiohttp", "nats-py", "mcp", "httpx"):
+        assert optional not in joined, (
+            f"{optional} must stay optional: installing it deletes a documented skip "
+            f"and changes the gate's baseline"
+        )
+
+
+def test_guarded_optional_imports_defer_annotations():
+    """ASP-730: `web = None` must be survivable at import time.
+
+    These modules guard `from aiohttp import web` with `except ImportError`, then
+    annotate module-level defs `-> web.Response`. Without PEP 563 that annotation is
+    evaluated at def time, so the module cannot be imported at all when aiohttp is
+    absent -- defeating the guard and failing the suite on any Python < 3.14.
+    """
+    guarded = sorted(
+        p for p in (ROOT / "services").glob("*.py")
+        if "from aiohttp import web" in p.read_text()
+    )
+    assert len(guarded) >= 7, f"expected the guarded service modules, found {guarded}"
+    for path in guarded:
+        text = path.read_text()
+        assert "from __future__ import annotations" in text, (
+            f"{path.name} guards its aiohttp import but still evaluates web.Response "
+            f"annotations at import time"
+        )
+        assert "web = None" in text, f"{path.name} must keep the optional-import guard"
