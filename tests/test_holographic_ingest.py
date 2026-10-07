@@ -36,7 +36,7 @@ def test_explicit_db_env_writes_holographic(tmp_path, monkeypatch):
         ingest_dir=ingest,
     )
     assert path.exists()
-    sys.path.insert(0, "/home/tech/.hermes/hermes-agent")
+    sys.path.insert(0, str(hi._HERMES_AGENT))
     try:
         from plugins.memory.holographic.store import MemoryStore
     except ImportError as exc:
@@ -49,9 +49,11 @@ def test_explicit_db_env_writes_holographic(tmp_path, monkeypatch):
         # The dual-write assertion above runs before this import and is unaffected.
         pytest.skip(f"Hermes holographic plugin not importable: {exc}")
 
-    store = MemoryStore(db_path=str(db))
-    hits = store.search_facts("OpenCode holographic")
-    assert hits, hits
+    with MemoryStore(db_path=str(db)) as store:
+        facts = store.list_facts()
+    hits = [f for f in facts if "ASP-HOLO-1" in (f["content"] or "")]
+    assert hits, facts
+    assert hits[0]["category"] == "decision", hits[0]
 
 
 def test_grokbuild_source_accepted(tmp_path):
