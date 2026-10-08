@@ -131,7 +131,7 @@ Only the nightly script participates in the lock. A directly invoked `make smoke
 | --- | --- |
 | `scripts/check-nightly.sh` total | **159 checks across 23 sections** (**158 pass, 1 known failure** = C11 p50 benchmark deviation, hardware-dependent) |
 | Of which: smoke test suite | 61 passed, 1 failed (C11 p50 benchmark), 62 total |
-| Python test suite | 495 passed, 4 skipped, 0 failures. All 4 skips are absent optional dependencies, not defects: `aiohttp` (`test_server.py`), `mcp.server` (`test_memory_mcp.py`), `nats-py` (`test_sentinel_consumer.py`), and the external Hermes holographic plugin, which cannot import `ruamel` (`test_holographic_ingest.py`) |
+| Python test suite | 500 passed, 4 skipped, 0 failures. All 4 skips are absent optional dependencies, not defects: `aiohttp` (`test_server.py`), `mcp.server` (`test_memory_mcp.py`), `nats-py` (`test_sentinel_consumer.py`), and the external Hermes holographic plugin, which cannot import `ruamel` (`test_holographic_ingest.py`) |
 | nats-server | v2.14.5 |
 | systemd unit files | 16 (8 `*.service` in `systemd/`, the same 8 in `dist/pkgroot/lib/systemd/system/`) |
 | systemd cgroup drop-in dirs | 8 `systemd/<unit>.service.d/` dirs in `systemd/`, the same 8 in `dist/pkgroot/lib/systemd/system/` |
