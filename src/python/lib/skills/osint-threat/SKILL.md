@@ -6,7 +6,7 @@ OSINT sensor and threat actor intelligence for security operations.
 - Monitor open sources for threat actors targeting infrastructure
 - Correlate indicators (IPs, domains, TTPs) with internal telemetry
 - Generate threat reports and triage alerts
-- Integrate with hybrid_intel and osint_sensor services
+- Publish raw/ref findings to `aspen.sentinel.osint.ingest` (publish-only diode, ADR-0007)
 - Store findings as DECISION / SEMANTIC memories
 
 ## Usage
@@ -16,5 +16,5 @@ OSINT sensor and threat actor intelligence for security operations.
 
 ## Dependencies
 - web_search / http tools
-- osint_sensor service
+- NATS publisher for `aspen.sentinel.osint.ingest` (publish-only; no subscribe)
 - LanceDB for intel storage
