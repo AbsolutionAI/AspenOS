@@ -10,12 +10,19 @@ Sources, in priority order for ``scan``:
     2. ``--from-audit-db``    legacy services.audit SQLite trail
     3. default                $ASPEN_AUDIT_LOG / /var/lib/aspen/sentinel/audit.jsonl
 
+Subcommands:
+    scan   run the detector over a journal/stdin and print findings
+    watch  subscribe to ``aspen.sentinel.audit.event`` and publish findings to
+           ``aspen.sentinel.tools.anomaly`` (ASP-687); ``--once`` replays the
+           audit journal offline instead of subscribing
+
 Exit codes: 0 ok (findings are informational), 2 usage.
 """
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import sys
@@ -73,6 +80,42 @@ def cmd_scan(args: argparse.Namespace) -> int:
     return 0
 
 
+async def _run_watch(args: argparse.Namespace) -> int:
+    from sentinel.tool_anomaly_consumer import ToolAnomalyConsumer
+
+    consumer = ToolAnomalyConsumer(
+        nats_url=args.nats_url,
+        audit_log=args.journal,
+        anomaly_log=args.anomaly_log,
+        window_s=args.window,
+    )
+    if args.once:
+        findings = await consumer.ingest_journal()
+        print(f"Replayed {consumer.audit_log_path}: {len(findings)} finding(s).")
+        for f in findings:
+            page = "PAGE" if f.get("notify") else "    "
+            print(f"{page} {f['severity'].upper():<7} {f['rule']:<32} "
+                  f"actor={f['actor']}")
+        return 0
+
+    online = await consumer.start()
+    print(
+        f"Watching {consumer.audit_log_path} → {consumer.subject} "
+        f"({'live NATS' if online else 'offline, journal-only'}). Ctrl-C to stop."
+    )
+    try:
+        await asyncio.Event().wait()
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        pass
+    finally:
+        await consumer.close()
+    return 0
+
+
+def cmd_watch(args: argparse.Namespace) -> int:
+    return asyncio.run(_run_watch(args))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="tool-anomaly",
@@ -89,11 +132,25 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--window", type=float, default=120.0,
                       help="sliding window seconds (default 120)")
     scan.add_argument("--json", action="store_true", help="raw JSON findings output")
+
+    watch = sub.add_parser(
+        "watch",
+        help="consume the live audit stream and emit findings (ASP-687)",
+    )
+    watch.add_argument("--nats-url", help="broker URL (default $ASPEN_NATS_URL)")
+    watch.add_argument("--journal", help="audit JSONL source for --once replay (overrides $ASPEN_AUDIT_LOG)")
+    watch.add_argument("--anomaly-log", help="findings JSONL journal (overrides $ASPEN_ANOMALY_LOG)")
+    watch.add_argument("--window", type=float, default=120.0,
+                       help="sliding window seconds (default 120)")
+    watch.add_argument("--once", action="store_true",
+                       help="replay the audit journal offline and exit")
     return parser
 
 
 def main() -> int:
     args = build_parser().parse_args()
+    if args.command == "watch":
+        return cmd_watch(args)
     return cmd_scan(args)
 
 
