@@ -30,15 +30,19 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-DEFAULT_INGEST_DIR = Path(os.environ.get(
-    "AGNETIC_MEMORY_INGEST_DIR",
-    "/home/tech/.aspen/memory/ingest",
-))
+try:
+    from paths import memory_ingest_dir as _default_ingest_dir
+except ImportError:
+    from scripts.paths import memory_ingest_dir as _default_ingest_dir
+
+# Import-time snapshot, kept for the agents/*.py callers that do
+# ``ingest_dir or DEFAULT_INGEST_DIR``. Resolve _default_ingest_dir() at call
+# time anywhere the value actually matters, so it tracks the live environment.
+DEFAULT_INGEST_DIR = _default_ingest_dir()
 
 VALID_SOURCES = {"hermes", "paperclip", "opencode", "aider", "appflowy", "grokbuild"}
 
@@ -65,12 +69,14 @@ def ingest_record(
     linear_refs: list[str] | None = None,
     paperclip_refs: list[str] | None = None,
     timestamp: str | None = None,
-    ingest_dir: Path = DEFAULT_INGEST_DIR,
+    ingest_dir: Path | None = None,
 ) -> Path:
     """Validate and append a BEL-154 raw ingest record. Returns the file path.
 
     Raises ``ValueError`` for an unknown ``source``.
     """
+    if ingest_dir is None:
+        ingest_dir = _default_ingest_dir()
     if source not in VALID_SOURCES:
         raise ValueError(
             f"invalid source {source!r}; valid sources: {', '.join(sorted(VALID_SOURCES))}"
@@ -120,7 +126,7 @@ def ingest_record(
             linear_refs=linear_refs,
             paperclip_refs=paperclip_refs,
             ingest_dir=ingest_dir,
-            default_ingest_dir=DEFAULT_INGEST_DIR,
+            default_ingest_dir=_default_ingest_dir(),
         )
     except Exception:
         pass
@@ -154,7 +160,7 @@ def main(argv: list[str] | None = None) -> int:
                         help="comma-separated Paperclip issue ids (ABS-9)")
     parser.add_argument("--timestamp", default=None,
                         help="ISO timestamp (default: now UTC)")
-    parser.add_argument("--ingest-dir", type=Path, default=DEFAULT_INGEST_DIR)
+    parser.add_argument("--ingest-dir", type=Path, default=_default_ingest_dir())
     args = parser.parse_args(argv)
 
     def _split(value: str | None) -> list[str] | None:
