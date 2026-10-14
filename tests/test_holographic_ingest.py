@@ -88,3 +88,38 @@ def test_all_four_writers_jsonl(tmp_path):
     gm.ingest_grokbuild_record("Grok Build writer smoke.", source_id="G1", ingest_dir=tmp_path)
     for src in ("paperclip", "opencode", "aider", "grokbuild"):
         assert list((tmp_path / src).glob("*.jsonl"))
+
+
+def _broken_catalog(tmp_path):
+    d = tmp_path / "plugins" / "holographic"
+    d.mkdir(parents=True)
+    (d / "holographic.py").write_text("import hermes_state_wal_does_not_exist  # broken\n")
+    (d / "text.py").write_text("")
+    (d / "store.py").write_text("class MemoryStore:\n    pass\n")
+    return d
+
+
+def test_broken_catalog_plugin_hard_fails_on_repeat(tmp_path, monkeypatch):
+    """ASP-782 / PR #79: present-but-broken plugin must fail every call, never skip."""
+    d = _broken_catalog(tmp_path)
+    monkeypatch.setenv("ASPEN_HOLOGRAPHIC_PLUGIN", str(d))
+    monkeypatch.setenv("ASPEN_HOLOGRAPHIC_DB", str(tmp_path / "holo.db"))
+    monkeypatch.setattr(hi, "_MODULE_CACHE", {})
+    # Ingest write swallows the failure first (isolation) ...
+    assert hi.write_holographic(
+        "Decision: broken plugin path.", source="opencode", source_id="X1"
+    ) is None
+    # ... but later loader calls must still raise, not return None.
+    for _ in range(2):
+        with pytest.raises(ModuleNotFoundError):
+            hi.load_memory_store()
+
+
+def test_absent_catalog_plugin_returns_none(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("ASPEN_HOLOGRAPHIC_PLUGIN", raising=False)
+    monkeypatch.delenv("HERMES_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(hi, "_MODULE_CACHE", {})
+    assert hi.load_memory_store() is None
+    assert hi.load_memory_store() is None
+    assert "holographic read-back NOT verified" in capsys.readouterr().err
