@@ -82,7 +82,10 @@ def _category(content: str) -> str:
     return "ingest"
 
 
-_MODULE_CACHE: dict[str, types.ModuleType | None] = {}
+# Successful loads cache the module; failed loads cache the exception and
+# re-raise it on every later call. A present-but-broken plugin must hard-fail
+# every time (ASP-781 plan); only an absent plugin returns None.
+_MODULE_CACHE: dict[str, types.ModuleType | BaseException] = {}
 
 
 def catalog_plugin_dir() -> Path | None:
@@ -131,8 +134,8 @@ def load_memory_store() -> object | None:
     cache_key = str(catalog_dir)
     if cache_key in _MODULE_CACHE:
         cached = _MODULE_CACHE[cache_key]
-        if cached is None:
-            return None
+        if isinstance(cached, BaseException):
+            raise cached
         return cached.MemoryStore
     try:
         if str(_HERMES_AGENT) not in sys.path:
@@ -165,8 +168,8 @@ def load_memory_store() -> object | None:
         store_module = _load_submodule("store")
         _MODULE_CACHE[cache_key] = store_module
         return store_module.MemoryStore
-    except Exception:
-        _MODULE_CACHE[cache_key] = None
+    except Exception as exc:
+        _MODULE_CACHE[cache_key] = exc
         raise
 
 def write_holographic(
