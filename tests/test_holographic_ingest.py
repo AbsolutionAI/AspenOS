@@ -36,23 +36,9 @@ def test_explicit_db_env_writes_holographic(tmp_path, monkeypatch):
         ingest_dir=ingest,
     )
     assert path.exists()
-    sys.path.insert(0, "/home/tech/.hermes/hermes-agent")
-    try:
-        from plugins.memory.holographic.store import MemoryStore
-    except ImportError as exc:
-        # The Hermes tree at HERMES_AGENT_ROOT is an out-of-repo optional dependency,
-        # so *any* unresolved import inside it means "not usable on this host" -- not
-        # that dual-write regressed. Skipping on the exception type rather than on a
-        # module-name allowlist: the old guard matched only "tools.registry" and
-        # "holographic", so a missing transitive dep (ruamel) or an absent tree
-        # entirely ("No module named 'plugins'") re-raised and failed the suite.
-        #
-        # This skip drops the read-back assertion below, so it is NOT evidence the
-        # dual-write was verified -- only that the JSONL leg landed (asserted above).
-        pytest.skip(
-            f"Hermes holographic plugin not importable, holographic read-back NOT "
-            f"verified: {exc}"
-        )
+    MemoryStore = hi.load_memory_store()
+    if MemoryStore is None:
+        pytest.skip("holographic read-back NOT verified")
 
     # Read back through the store's real API. MemoryStore has no search_facts(); the
     # available read path is list_facts(). Match on the source_id, which _compose_fact
