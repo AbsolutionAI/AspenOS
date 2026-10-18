@@ -1,0 +1,85 @@
+# ASP-796 — Phase D D1 cell profile, SIM ONLY (software path for ASP-418)
+#
+# Forward-port of the plant-range D1 profile drafted under ASP-416 / ASP-381
+# (PR #29, config/cells/plant-range-d1.yaml) as a simulation-only profile,
+# chosen by the owner on 2026-09-26 ("Software sim_only ticket only").
+#
+# HARD CONSTRAINTS (enforced by tests/test_plant_range_d1_sim_profile.py):
+#   * sim_only: true and aspen_sim: true. Never install on a physical cell.
+#   * motion_allowed: false. No joints, setpoints, MOTION_DAY or actuator writes.
+#   * No hardware I/O blocks (estop GPIO, USB-serial, CAN, fieldbus, drivers).
+#   * No plant/OT network changes. ASP-435 stays a parked human gate.
+#   * No purchase orders. No install path. BT-ASP-SRV is NOT a plant cell.
+#
+# ASP-418 (physical bring-up) stays parked. This file does not unblock or
+# authorize physical D1.
+
+version: "1.0"
+cell:
+  id: plant-range-d1-sim
+  name: "Phase D D1 cell (range) — simulation only"
+  plant: plant-range
+  isolation: true
+  phase: D1
+  sim_only: true
+  aspen_sim: true            # simulation backend; the physical profile is out of scope
+  motion_allowed: false      # never flipped in this profile
+  physical_profile: null     # physical D1 is ASP-418 (parked); no file is referenced
+
+# Sim node identity (roles must be allowed for plant-range in config/fleet.yaml)
+node:
+  plant: plant-range
+  roles: [ops]
+  team: ops
+  profile: ops
+
+# Mission / arm gate — exercised in simulation only
+arm:
+  hold_to_enable: true
+  require_human_operator: true
+  forbid_operator_values: [""]   # sim operators are fine here; empty is not
+  auto_arm: false
+  enable_window_seconds: 600
+
+# Act path (safety-adjacent). The sim must reproduce the same refusals the
+# physical profile would enforce.
+act:
+  path: propose_act_only
+  dual_human_required: true
+  result_on_approve: executed_sim   # never "executed" (live)
+  refuse:
+    - insufficient_principals
+    - duplicate_principal
+    - self_approval
+    - expired
+
+# Cross-plant ACL expectation (must match config/fleet.yaml acl.allow)
+acl:
+  outbound_allow: []
+  refuse_schedule_to:
+    - plant-alpha
+    - plant-edge
+
+# Safety (bus subjects only — no hardware estop wiring in a sim profile)
+safety:
+  estop_subject: aspen.safety.estop
+  clear_subject: aspen.safety.clear
+  latch: true
+  dual_human_clear: true            # H-007: two distinct humans to unlatch
+  audit:
+    path_env: ASPEN_AUDIT_PATH
+    default_path: /var/lib/aspen/audit/plant-range-d1-sim.jsonl
+    require_hash_chain: true
+
+# Explicit non-goals for this profile
+forbidden:
+  - physical_cell_install
+  - aspen_sim_0
+  - motion_day
+  - joint_setpoint_stream_from_hermes
+  - micro_agent_actuator_write
+  - hardware_io_estop_gpio_serial_can
+  - plant_or_ot_network_change
+  - cross_plant_schedule_out
+  - unattended_dark_shift
+  - hardware_po
