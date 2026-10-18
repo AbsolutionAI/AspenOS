@@ -122,7 +122,7 @@ scripts/check-no-devonly-in-prod.sh` and its `--self-test` both still pass.
 
 ### 4.4 Nightly + CI wiring
 
-- `scripts/check-nightly.sh`: new **Section 23: Package classification gate (H-020)**, appended
+- `scripts/check-nightly.sh`: new **Section 24: Package classification gate (H-020)** (renumbered from 23 when merged after H-024 took 23), appended
   after §22 so existing section numbers — which `tests/test_ci_assertions.py` asserts on — do not
   shift. Three checks: gate script executable, gate passes, fixture tests pass.
 - `.github/workflows/ci.yml`: new `package-classification` job next to

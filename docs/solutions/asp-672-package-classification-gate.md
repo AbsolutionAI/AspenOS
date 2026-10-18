@@ -42,7 +42,7 @@ sibling `check-no-devonly-in-prod.sh` (marker build → scan → report → `--s
    - *agreement*: every **markdown table row whose tier cell is a valid tier** asserts a tier
      for the names in the cells after it; the declared tier must be in that set.
 5. **Wired as a merge gate and a nightly gate** — CI job `security-package-classification`
-   (push + PR) and `scripts/check-nightly.sh` Section 23.
+   (push + PR) and `scripts/check-nightly.sh` Section 24 (was 23 before H-024 landed).
 
 ## Key findings / gotchas
 
@@ -72,7 +72,7 @@ sibling `check-no-devonly-in-prod.sh` (marker build → scan → report → `--s
   package names. Without an explicit stop-list these get registered as packages with tiers.
 - Append nightly sections at the end. `tests/test_ci_assertions.py` asserts on section *numbers*,
   so inserting §23 before §24 would renumber later sections and fail the contract for no reason.
-  `test_nightly_section_23_appended_after_22` pins the ordering.
+  `test_nightly_section_24_appended_after_23` pins the ordering.
 
 ## Test evidence
 
@@ -101,7 +101,7 @@ fails 6 of 12 fixture tests; a reject-everything gate fails 9.
 | `plugins/hello-world/plugin.json` | Declares `classification = "dev-only"` (was missing) |
 | `docs/PACKAGES.md` | Dev-only matrix row now asserts `hello-world` |
 | `.github/workflows/ci.yml` | New `security-package-classification` job |
-| `scripts/check-nightly.sh` | New Section 23 (appended, no renumbering) |
+| `scripts/check-nightly.sh` | New Section 24 (appended after H-024 Section 23, no renumbering) |
 | `tests/test_package_classification.py` | 12 fixture tests over `PACKAGE_ROOTS` / `PACKAGES_MD` overrides |
 | `tests/test_ci_assertions.py` | 4 tests: §23 present, §23 after §22, CI job wired |
 | `docs/plans/ASP-672-package-classification-gate.md` | Plan (CE plan-first) |

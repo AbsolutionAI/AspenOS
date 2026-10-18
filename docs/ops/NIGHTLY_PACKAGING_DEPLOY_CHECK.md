@@ -13,7 +13,7 @@
 2. **Toolchain**: ensure `nats-server` is on PATH:
    `export PATH="$HOME/go/bin:$HOME/.local/bin:$PATH"`.
 3. **Smoke suites** (record pass/fail counts):
-   - `bash scripts/check-nightly.sh` (149 checks across 22 sections — C11 p50 is a known hardware-dependent failure)
+   - `bash scripts/check-nightly.sh` (159 checks across 23 sections — C11 p50 is a known hardware-dependent failure)
    - `make iso-smoke` (32 checks, embedded in section 4 as the iso-firstboot smoke)
 4. **Static inventory**:
    - systemd unit count (`*.service`/`*.timer`/`*.socket` across `systemd/`, `dist/pkgroot/lib/systemd/system/`, `deploy/`, `config/`)
@@ -42,7 +42,7 @@ Before any check runs, the script acquires an exclusive `flock` on
 `/tmp/starship-nightly.lock`; if another check run holds it, the invocation exits `75` without
 running anything. See [Concurrency guard](#concurrency-guard-asp-659) below.
 
-The nightly check then runs 20 sections:
+The nightly check then runs 23 sections:
 
 | Section | Checks |
 |---------|--------|
@@ -68,6 +68,7 @@ The nightly check then runs 20 sections:
 | 20. cgroup per-agent resource limits (ASP-376/F-012) | `systemd/<unit>.service.d/10-cgroup-limits.conf` drop-ins exist for all 8 units with CPU/Memory/Tasks keys, `build-deb.sh` stages `.service.d` dirs, `install-systemd.sh` installs them to `/etc`, fixture tests pass |
 | 21. Package signature gate (ASP-378/F-014) | `verify-deb-signature.sh`/`sign-deb.sh` exist, committed trust anchor `security/packages/starship-release.gpg`, ceremony vs verify documented, `update.sh --verify-signature`, CI runs gate, fixture tests pass |
 | 22. Model digest pinning (ASP-377/F-013) | `resolve-model-digests.py` exists, `config/models-digests.yaml` pinned/non-empty, offline strict validation passes, every `models.yaml` upstream pinned, Modelfile documents pinned digest, install-models/health-checker/dashboard guard pulls, CI runs gate, fixture tests pass |
+| 23. NATS TLS by default (H-024) | `scripts/check-nats-tls-default.sh` passes and its `--self-test` proves all 5 predicates load-bearing, firstboot resolves ops/edge to TLS on and applies it after bus selection via `active.conf`, firstboot fails closed on missing TLS material, `gen-nats-tls.sh --mutual` emits `verify: true`, no hardcoded `verify: false` in `nats/*.conf`, fixture tests pass |
 
 ## CI infrastructure
 
@@ -128,9 +129,9 @@ Only the nightly script participates in the lock. A directly invoked `make smoke
 
 | Check | Baseline |
 | --- | --- |
-| `scripts/check-nightly.sh` total | **150 checks across 22 sections** (**149 pass, 1 known failure** = C11 p50 benchmark deviation, hardware-dependent) |
+| `scripts/check-nightly.sh` total | **159 checks across 23 sections** (**158 pass, 1 known failure** = C11 p50 benchmark deviation, hardware-dependent) |
 | Of which: smoke test suite | 61 passed, 1 failed (C11 p50 benchmark), 62 total |
-| Python test suite | 470 passed, 4 skipped (optional deps: aiohttp, mcp.server), 0 failures |
+| Python test suite | 500 passed, 4 skipped, 0 failures. All 4 skips are absent optional dependencies, not defects: `aiohttp` (`test_server.py`), `mcp.server` (`test_memory_mcp.py`), `nats-py` (`test_sentinel_consumer.py`), and the external Hermes holographic plugin, which cannot import `ruamel` (`test_holographic_ingest.py`) |
 | nats-server | v2.14.5 |
 | systemd unit files | 16 (8 `*.service` in `systemd/`, the same 8 in `dist/pkgroot/lib/systemd/system/`) |
 | systemd cgroup drop-in dirs | 8 `systemd/<unit>.service.d/` dirs in `systemd/`, the same 8 in `dist/pkgroot/lib/systemd/system/` |
@@ -141,12 +142,13 @@ Only the nightly script participates in the lock. A directly invoked `make smoke
 | Gatekeeper module | `src/python/gatekeeper/minimal_shim.py` present, valid Python syntax |
 | ISO build structure | 3 autoinstall profiles (edge/server/ops YAMLs), chroot hooks present, package lists present |
 | Dashboard static assets | 8 files present (style.css, ui.js, dashboard.js, agents.js, chat.js, panels.js, incidents.js, boot.js) |
-| Shell syntax coverage | 44 scripts (43 in `scripts/`, 1 in `packaging/`), all pass `bash -n` |
+| Shell syntax coverage | 45 scripts (44 in `scripts/`, 1 in `packaging/`), all pass `bash -n` |
 | NATS secret paths (ASP-373/F-009) | section 18 checks pass (600 modes via `fix-nats-secret-modes.sh`, no 640/644, staragent.yaml 600, 3 fixture tests) |
 | NATS rate limits & connection caps (ASP-375/F-011) | section 19 checks pass (hardening keys in agent/fleet configs, auth timeout 2.0, per-account limits, 5 fixture tests) |
 | cgroup per-agent resource limits (ASP-376/F-012) | section 20 checks pass (drop-ins exist for 8 units with CPU/Memory/Tasks keys, build-deb stages `.service.d`, install-systemd installs to `/etc`, 5 fixture tests) |
 | Package signature gate (ASP-378/F-014) | section 21 checks pass (verify/sign scripts, committed keyring, `--verify-signature` in update.sh, CI gate, fixture tests) |
 | Model digest pinning (ASP-377/F-013) | section 22 checks pass (resolver, pinned non-empty digests, offline strict validation, dashboard/installer guards, CI gate, fixture tests) |
+| NATS TLS by default (H-024) | section 23 checks pass (gate + self-test, ops/edge default on, post-selection wiring, fail-closed guard, mutual TLS support, no hardcoded `verify: false`, 29 fixture tests incl. real `nats-server -t` config parse) |
 
 Update this table when suites gain or lose checks so future nightly runs can report meaningful deviations.
 
@@ -183,6 +185,68 @@ latency profiles.
 
 **Not actionable** unless the sandbox is moved to a different host or optimized. The
 nightly check records this as a single known failure (1 of 62 smoke tests).
+
+### CI now runs the full Python suite (ASP-730) — the gap that let ASP-706 through is closed
+
+Recorded as a resolved deviation so a future run does not re-diagnose it, and because the
+*next* layer of the same bug is worth remembering.
+
+The ASP-706 failure itself was fixed by making the skip guard catch `ImportError` instead
+of matching module names. `assert path.exists()` stays above the import in
+`tests/test_holographic_ingest.py`, so a broken dual-write still fails the test rather than
+skipping — that part is unchanged and still correct.
+
+**Why it survived:** `.github/workflows/ci.yml` ran only *named* test files
+(`test_package_signatures.py`, `test_model_digests.py`) plus `scripts/smoke-test.sh`. None
+ran `tests/` wholesale, so a red full suite was invisible to CI and surfaced only in §13 and
+in Aider's preflight — where a non-zero exit has repeatedly been misread as a regression in
+the change under review. ASP-730 adds a required `python-test-suite` job running
+`python -m pytest tests/ -v --tb=short -rs` on the same interpreter §13 uses here
+(CPython 3.12), with `pytest pytest-asyncio pyyaml` and nothing else, so the four
+optional-dependency skips (`aiohttp`, `mcp.server`, `nats-py`, Hermes `ruamel`) stay skips
+and the CI baseline matches preflight.
+
+**The second-order finding, worth keeping.** Turning the gate on immediately went red — 12
+failures, all one root cause. `services/hitl.py` guards its optional import with
+`try: from aiohttp import web / except ImportError: web = None`, then annotates
+module-level defs `-> web.Response`. Without `from __future__ import annotations` that
+annotation is evaluated at def time, so the file was unimportable without `aiohttp` on any
+Python < 3.14 (PEP 649 defers annotations by default only in 3.14). §13 never saw it
+because `nightly.yml` installs `aiohttp`; the local host never saw it because it runs 3.14;
+CI never saw it because CI did not run the suite. Six sibling modules
+(`audit`, `webhooks`, `planner`, `evaluator`, `kill_switch`, `handoff`) carried the identical
+landmine and now carry `from __future__ import annotations` too.
+`tests/test_ci_assertions.py` pins both contracts so neither can regress silently.
+
+### CI checks were advisory — `master` is now protected (ASP-732)
+
+Recorded as a resolved deviation so a future run does not re-diagnose the "all green, still
+mergeable" posture. Until 2026-10-07 `origin/master` had no branch protection and no rulesets
+(`GET /branches/master/protection` → 404, `GET /rulesets` → `[]`), so every check in
+`Starship OS CI` was advisory: a PR with all checks red could still be merged, an admin push
+bypassed everything, and nothing forced the `python-test-suite` job from ASP-730 to pass
+before a merge landed. Running the suite in CI was necessary but not sufficient — a signal
+nobody is forced to read is the same as no signal.
+
+`master` now carries classic branch protection:
+
+- **Required status checks, `strict: true`** — all ten `Starship OS CI` jobs must be green
+  *and* the head must be up to date with `master` before a merge is accepted, so a green run
+  on an older head cannot satisfy the gate:
+  `lint`, `security-devonly-isolation`, `verify-package-signature`, `security-model-digests`,
+  `python-test-suite`, `security-nats-tls`, `smoke`, `build-go`, `build-rust`, `build-c11`.
+- **`enforce_admins: true`** — there is no admin bypass; the only way past the gate is a
+  deliberate settings change, which is auditable rather than an invisible push.
+- **Force pushes and branch deletions blocked**, required conversations resolved.
+- `required_linear_history` is deliberately **not** enabled: this repo lands PRs with merge
+  commits ("Merge pull request #NN"), and switching merge strategy is an architectural
+  decision, not a side effect of this ticket.
+
+Proven on the day it was applied: PR #70 carried one deliberately failing `tests/` test,
+`python-test-suite` went red, and an admin merge attempt was refused with
+`405 — 2 of 10 required status checks have not succeeded: 1 failing`. The probe was closed
+unmerged. If `python-test-suite` is ever removed or made non-required in
+`.github/workflows/ci.yml`, this whole deviation reopens.
 
 ## What is NOT checked
 

@@ -16,6 +16,8 @@ Usage:
     python3 handoff.py format <id>       # format for receiving agent
 """
 
+from __future__ import annotations
+
 import sys
 import os
 import json
@@ -243,7 +245,7 @@ class HandoffDocument:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict) -> "HandoffDocument":
+    def from_dict(cls, data: dict) -> HandoffDocument:
         known = {f.name for f in cls.__dataclass_fields__.values()}
         return cls(**{k: v for k, v in data.items() if k in known})
 
@@ -296,7 +298,7 @@ class HandoffRecord:
         }
 
     @classmethod
-    def from_row(cls, row: sqlite3.Row) -> "HandoffRecord":
+    def from_row(cls, row: sqlite3.Row) -> HandoffRecord:
         return cls(
             id=row["id"],
             from_agent=row["from_agent"],
