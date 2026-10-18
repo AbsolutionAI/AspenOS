@@ -10,7 +10,7 @@
 |---------------|----------------------------------------------------------------------------|--------------------|------------------|-----------------------------------------------|----------------------|
 | **Core**     | Must ship with every AspenOS / Sentinel install. Minimal runtime surface. | aspen-dev (shared) | MIT (core)      | aspen-os-runtime, nats-client, event-envelope, safety-estop driver, aspen-nats | Always present in base images |
 | **Plugin**   | Optional, loadable at runtime. Extend capability without forking core.   | aspen-dev + community | MIT or dual     | langgraph-execution (ADR-0005), pgvector-memory, ros2-bridge, opc-ua-adapter, memory-tiering, **aspen-gatekeeper** (ADR-0009 / ASP-628) | Paperclip catalog or `aspen package install` |
-| **Dev-only** | Internal tooling, CI, packaging, test harnesses. Never in production images. | aspen-dev         | MIT + commercial| package-mesh scripts, compound-engineering tools, grok-build sandbox | aspen-dev only |
+| **Dev-only** | Internal tooling, CI, packaging, test harnesses. Never in production images. | aspen-dev         | MIT + commercial| package-mesh scripts, compound-engineering tools, grok-build sandbox, hello-world (example plugin) | aspen-dev only |
 
 ## Rules
 1. **Core** packages live in `aspen-os/` and `aspen-sentinel/` top-level. Minimal dependencies only.

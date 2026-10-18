@@ -273,6 +273,14 @@ check "gen-nats-tls supports mutual TLS" bash -c 'grep -q -- "--mutual" scripts/
 check "no hardcoded verify:false in nats confs" bash -c '! grep -rnE "^[[:space:]]*verify:[[:space:]]*false" nats/'
 check "TLS-by-default fixture tests" bash -c "'$PY' -m pytest tests/test_nats_tls_default.py -q --tb=short 2>&1 | grep -E '[0-9]+ passed'"
 
+# ─── Section 24: Package classification gate (H-020) ──────────────────
+echo -e "\n${YELLOW}── Section 24: Package classification gate (H-020) ──${NC}"
+check "classification gate is executable" test -x scripts/check-package-classification.sh
+check "every package declares a classification" bash scripts/check-package-classification.sh
+check "classification gate self-test" bash scripts/check-package-classification.sh --self-test
+check "CI runs classification gate" bash -c 'grep -q "security-package-classification" .github/workflows/ci.yml && grep -q "check-package-classification.sh" .github/workflows/ci.yml && grep -q "test_package_classification.py" .github/workflows/ci.yml'
+check "package classification fixture tests" bash -c "'$PY' -m pytest tests/test_package_classification.py -q --tb=short 2>&1 | grep -E '[0-9]+ passed'"
+
 # ─── Summary ─────────────────────────────────────────────────
 TIMING_END=$(date +%s%N)
 ELAPSED_MS=$(( (TIMING_END - TIMING_BEGIN) / 1000000 ))

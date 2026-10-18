@@ -243,3 +243,28 @@ def test_guarded_optional_imports_defer_annotations():
             f"annotations at import time"
         )
         assert "web = None" in text, f"{path.name} must keep the optional-import guard"
+
+
+def test_nightly_section_24_package_classification_present():
+    """H-020: nightly asserts ADR-0008 rule 4 (declared tier + SoR agreement)."""
+    nightly = _nightly()
+    assert "Section 24: Package classification gate" in nightly
+    assert "every package declares a classification" in nightly
+    assert "classification gate self-test" in nightly
+    assert "test_package_classification.py" in nightly
+
+
+def test_nightly_section_24_appended_after_23():
+    """H-020 was appended after H-024 (section 23) so existing numbers did not shift."""
+    nightly = _nightly()
+    assert nightly.index("Section 23: NATS TLS by default (H-024)") < nightly.index(
+        "Section 24: Package classification gate"
+    )
+
+
+def test_ci_runs_package_classification_gate():
+    """H-020 must block merge, not only the nightly run."""
+    ci = _ci()
+    assert "security-package-classification" in ci
+    assert "check-package-classification.sh" in ci
+    assert "test_package_classification.py" in ci
