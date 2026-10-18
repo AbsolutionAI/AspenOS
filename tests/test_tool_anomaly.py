@@ -235,3 +235,40 @@ def test_cli_scan_reports_and_never_errors(tmp_path):
             assert "sensitive_read_then_egress" in outcome
         else:
             assert "no anomalies" in outcome
+
+
+# ---------------------------------------------------------------------------
+# ASP-780: bounded actor map
+# ---------------------------------------------------------------------------
+
+
+def test_actor_map_hard_cap():
+    det = ToolAnomalyDetector(max_actors=50, evict_every=10_000)
+    for i in range(500):
+        det.feed({"actor": f"forged-{i}", "action": "tool.read_file",
+                  "target": "/tmp/x", "ts": 1789948800.0 + i * 0.01})
+    assert det.actor_count == 50
+
+
+def test_idle_actors_evicted():
+    det = ToolAnomalyDetector(window_s=60, evict_every=1)
+    base = 1789948800.0
+    for i in range(20):
+        det.feed({"actor": f"old-{i}", "action": "tool.read_file",
+                  "target": "/tmp/x", "ts": base})
+    assert det.actor_count == 20
+    det.feed({"actor": "fresh", "action": "tool.read_file",
+              "target": "/tmp/x", "ts": base + 3600})
+    assert det.actor_count == 1
+
+
+def test_active_actor_survives_cap():
+    det = ToolAnomalyDetector(max_actors=3, evict_every=10_000)
+    base = 1789948800.0
+    for i in range(10):
+        det.feed({"actor": "busy", "action": "tool.shell", "target": "ls",
+                  "ts": base + i})
+        det.feed({"actor": f"x-{i}", "action": "tool.shell", "target": "ls",
+                  "ts": base + i})
+    assert "busy" in det._history
+    assert det.actor_count == 3
