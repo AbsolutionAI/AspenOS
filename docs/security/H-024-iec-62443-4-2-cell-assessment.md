@@ -261,11 +261,36 @@ Prioritized for **next** hardening slices — do not implement under ASP-434.
 
 ---
 
+## 8a. Addendum: repo drift since the 2026-09-22 baseline (ASP-774)
+
+Recorded 2026-10-18 when landing this file onto `origin/master`, per ASP-774 ("re-read
+PR 44 against `docs/security/H-024-wan-mtls-deployment.md`; if stale, write the delta in a
+new commit"). **This addendum does not re-score anything.** The statuses in §3–§7 are
+as-of 2026-09-22. The rows below list factual repo changes so the next biweekly
+threat-model refresh (ASP-431 lineage) can re-score them.
+
+| Change on `origin/master` | Evidence | Rows to re-assess here |
+|---|---|---|
+| NATS TLS **by default** on `ops`/`edge` firstboot, applied after bus selection via `active.conf`, fail-closed, optional mutual TLS (`gen-nats-tls.sh --mutual`). CI gate `check-nats-tls-default.sh` + nightly Section 23. | PR #58 / ASP-684 (`5059fa8`, merged 2026-10-07); `docs/security/H-024-wan-mtls-deployment.md` | §2 SL-C intent ("until TLS-by-default lands"); CR 3.1 residual; CR 4.1 confidentiality residual; §5 matrix 3.1 TLS; NIST Protect ("TLS default off"); §7 P0 "TLS default on cell firstboot templates" (templates landed; live hosts not rotated) |
+| H-022 HITL vault approval gate in the gatekeeper | `0da87ee` / ASP-432 (2026-09-23) | CR 2.3 evidence list |
+| H-023 estop watchdog: plan + tests only, no live wire | `f24a1e3` / ASP-433 (2026-09-23) | CR 2.3 / safety residuals (design only) |
+| Sentinel tool-anomaly detector wired to the live audit stream (log-only, fail-open). Hardening before service enablement is in review. | `f6ef0d7` / ASP-687 (PR #76); follow-up ASP-780 (PR #81) | NIST Detect; CR 4.2/4.3 monitoring evidence (consumer not yet enabled as a service) |
+
+**Unchanged since the baseline (still open; verdict in §6 still stands):**
+
+- ID-1 / ADR-0012 operator-of-record binding: ADR still **Proposed** (reconfirmed by
+  ASP-739 and ASP-773). Implementation is tracked as ASP-777. The TLS templates do **not**
+  bind `human_id`.
+- ID-2 / F-017 node fingerprint (ASP-686): not on master.
+- Package signing ceremony and native binary signing (ASP-378 residual): not done.
+- Host firewall / AppArmor enforce: still commissioning-gated (no live apply).
+
 ## 9. Change log
 
 | Date | Change |
 |------|--------|
 | 2026-09-22 | Initial H-024 baseline assessment (ASP-434). Docs only. |
+| 2026-10-18 | §8a drift addendum (ASP-774) while landing onto `origin/master`. No status re-scoring. |
 
 ---
 
