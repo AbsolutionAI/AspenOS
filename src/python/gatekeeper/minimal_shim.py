@@ -37,6 +37,10 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
+# Durable vault approval gate (H-022 / ASP-432) — lazily imports the root
+# services/hitl*.py modules, so this module keeps no hard external dependency.
+from . import vault_gate
+
 logger = logging.getLogger("gatekeeper.shim")
 
 # ---------------------------------------------------------------------------
@@ -175,8 +179,20 @@ def set_nats_client(client: Any) -> None:
 # ---------------------------------------------------------------------------
 SAFETY_SUBJECTS = [
     "aspen.safety.*",
+    "aspen.edge.*.act",
     "aspen.edge.*.command",
     "aspen.fleet.mission.start",
+]
+
+# Physical cell act subjects (H-022 / ASP-432, ADR-0003 propose_act). A
+# capability here must clear the durable vault approval gate in addition to the
+# dual-human proposal. Distinct from SAFETY_SUBJECTS on purpose: a capability
+# may be safety-adjacent (estop, mission start) without being a physical cell
+# act — those keep the plain dual-human path so estop stays fast.
+PHYSICAL_ACT_SUBJECTS = [
+    "aspen.edge.*.act",
+    "aspen.safety.*.act",
+    "aspen.edge.*.command",
 ]
 
 
@@ -223,6 +239,20 @@ def is_safety_capability(capability: str, patterns=None) -> bool:
     """
     subject = capability.split(":", 1)[0]
     return any(_subject_match(p, subject) for p in (patterns or SAFETY_SUBJECTS))
+
+
+def is_physical_cell_act(capability: str, profile: str, patterns=None) -> bool:
+    """True when a capability designates a physical cell act.
+
+    Distinct from :func:`is_safety_capability`: a safety-adjacent capability
+    such as estop keeps the plain dual-human proposal path, while a physical
+    cell act additionally requires a durable vault approval record. Light-cell
+    (sim/plain) profiles never take the physical path (ADR-0012 scoping).
+    """
+    if profile == "light-cell":
+        return False
+    subject = capability.split(":", 1)[0]
+    return any(_subject_match(p, subject) for p in (patterns or PHYSICAL_ACT_SUBJECTS))
 
 
 def _utc_now() -> str:
@@ -290,7 +320,7 @@ def _refusal_dict(proposal: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _grant_dict(proposal: Dict[str, Any]) -> Dict[str, Any]:
-    return {
+    result: Dict[str, Any] = {
         "decision": "grant",
         "request_id": proposal["request_id"],
         "token": proposal["token"],
@@ -298,6 +328,11 @@ def _grant_dict(proposal: Dict[str, Any]) -> Dict[str, Any]:
         "humans": list(proposal["humans"]),
         "requires": "dual_human",
     }
+    # H-022: physical-act grants also cite the vault approval record.
+    vault = proposal.get("vault")
+    if vault:
+        result["vault_approval_id"] = vault.get("hitl_request_id")
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -627,6 +662,37 @@ def _grant_proposal(proposal: Dict[str, Any]) -> Dict[str, Any]:
     return _grant_dict(proposal)
 
 
+def _vault_gate(proposal: Dict[str, Any]) -> Dict[str, Any]:
+    """Vault check at the dual-human threshold (H-022 / ASP-432).
+
+    A physical cell act is granted only when the durable vault approval record
+    exists and its status is ``approved``. Anything else — missing mapping,
+    DB row gone, pending/denied status, missing note, or a vault-layer error —
+    refuses with ``vault_approval_required`` (fail closed).
+    """
+    vault = proposal.get("vault") or {}
+    hitl_request_id = vault.get("hitl_request_id")
+    note_id = vault.get("note_id")
+
+    if not hitl_request_id or not vault_gate.check_vault_approval(hitl_request_id, note_id):
+        _mark_refused(proposal, "vault_approval_required")
+        log_audit({
+            "type": "gate.vault_refuse",
+            "request_id": proposal["request_id"],
+            "agent_id": proposal["agent_id"],
+            "capability": proposal["capability"],
+            "resource": proposal["resource"],
+            "hitl_request_id": hitl_request_id,
+            "decision": "refuse",
+            "reason": "vault_approval_required",
+            "humans": list(proposal["humans"]),
+            "humans_required": DUAL_HUMAN_REQUIRED,
+        })
+        return _refusal_dict(proposal)
+
+    return _grant_proposal(proposal)
+
+
 def authorize_gate_request(
     request_id: str,
     human_id: str,
@@ -699,6 +765,8 @@ def authorize_gate_request(
     })
 
     if len(proposal["humans"]) >= DUAL_HUMAN_REQUIRED:
+        if is_physical_cell_act(proposal["capability"], proposal["profile"]):
+            return _vault_gate(proposal)
         return _grant_proposal(proposal)
     return _awaiting_dict(proposal)
 
@@ -808,17 +876,7 @@ def request_capability(
     # 2. Safety-adjacent check — register a pending proposal, never forward.
     if is_safety_capability(capability):
         proposal = _register_proposal(agent_id, capability, resource, profile, request_id)
-        log_audit({
-            "type": "propose_act.pending",
-            "request_id": request_id,
-            "agent_id": agent_id,
-            "capability": capability,
-            "resource": resource,
-            "decision": "pending",
-            "humans_required": DUAL_HUMAN_REQUIRED,
-            "note": "awaiting dual-human authorization",
-        })
-        return {
+        result: Dict[str, Any] = {
             "decision": "propose_act",
             "request_id": request_id,
             "requires": "dual_human",
@@ -831,6 +889,55 @@ def request_capability(
                 "expires_at": proposal["expires_at"],
             },
         }
+
+        # H-022 / ASP-432: physical cell acts need a durable vault approval
+        # record alongside the dual-human proposal. Fail closed on any vault
+        # layer error — never a silent grant.
+        if is_physical_cell_act(capability, profile):
+            try:
+                vault = vault_gate.ensure_vault_approval(
+                    request_id, capability, resource, profile, agent_id
+                )
+            except Exception as exc:
+                _mark_refused(proposal, "vault_unavailable")
+                log_audit({
+                    "type": "gate.vault_unavailable",
+                    "request_id": request_id,
+                    "agent_id": agent_id,
+                    "capability": capability,
+                    "resource": resource,
+                    "decision": "deny",
+                    "reason": "vault_unavailable",
+                    "error": str(exc),
+                })
+                return {
+                    "decision": "deny",
+                    "reason": "vault_unavailable",
+                    "request_id": request_id,
+                }
+            proposal["vault"] = vault
+            result["vault_approval_id"] = vault["hitl_request_id"]
+            log_audit({
+                "type": "gate.vault_created",
+                "request_id": request_id,
+                "hitl_request_id": vault["hitl_request_id"],
+                "agent_id": agent_id,
+                "capability": capability,
+                "profile": profile,
+                "note_id": vault["note_id"],
+            })
+
+        log_audit({
+            "type": "propose_act.pending",
+            "request_id": request_id,
+            "agent_id": agent_id,
+            "capability": capability,
+            "resource": resource,
+            "decision": "pending",
+            "humans_required": DUAL_HUMAN_REQUIRED,
+            "note": "awaiting dual-human authorization",
+        })
+        return result
 
     # 3. Grant short-lived token (registered in TOKEN_REGISTRY for lifecycle)
     token = _register_token(

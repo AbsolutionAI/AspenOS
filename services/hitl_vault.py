@@ -87,7 +87,7 @@ class HITLVault:
                 self._write_approval_note(fpath, row)
                 synced += 1
             except Exception as e:
-                log.warning("sync error for %s: %s", row.get("id", "?"), e)
+                log.warning("sync error for %s: %s", row["id"], e)
                 errors += 1
 
         conn.close()
@@ -119,9 +119,9 @@ class HITLVault:
             "status": row["status"],
             "created_at": row["created_at"],
             "expires_at": row["expires_at"],
-            "decided_by": row.get("decided_by", ""),
-            "decided_at": row.get("decided_at", ""),
-            "reason": row.get("reason", ""),
+            "decided_by": row["decided_by"] or "",
+            "decided_at": row["decided_at"] or "",
+            "reason": row["reason"] or "",
         })
 
         lines = [frontmatter, ""]
@@ -139,7 +139,7 @@ class HITLVault:
             for r in risk_reasons:
                 lines.append(f"- {r}")
             lines.append("")
-        if row.get("risk_suggestion"):
+        if row["risk_suggestion"]:
             lines.append(f"> **Suggestion:** {row['risk_suggestion']}")
             lines.append("")
 

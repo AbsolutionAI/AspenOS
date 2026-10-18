@@ -15,6 +15,8 @@ Usage:
     python3 kill_switch.py daemon              # run as HTTP API daemon
 """
 
+from __future__ import annotations
+
 import sys
 import os
 import json

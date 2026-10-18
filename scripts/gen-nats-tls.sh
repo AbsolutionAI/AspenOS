@@ -1,25 +1,37 @@
 #!/usr/bin/env bash
-# Starship OS — generate self-signed TLS material for NATS fleet (optional)
-# Usage: bash scripts/gen-nats-tls.sh [--out DIR] [--host CN]
+# Starship OS — generate TLS material for NATS fleet
+# Usage: bash scripts/gen-nats-tls.sh [--out DIR] [--host CN] [--days N] [--mutual]
 # Writes: ca.pem, server-cert.pem, server-key.pem, client-cert.pem, client-key.pem
+#
+# H-024 P0-2: --mutual emits verify: true so a client must present a CA-signed
+# cert, not just a stolen token. Required for WAN deployment.
 set -euo pipefail
 
 OUT="${STARSHIP_NATS_TLS:-}"
 HOST="${STARSHIP_NATS_TLS_HOST:-starship-nats.local}"
 DAYS=825
+MUTUAL="${STARSHIP_NATS_TLS_MUTUAL:-0}"
+VERIFY=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --out) OUT="$2"; shift 2 ;;
     --host) HOST="$2"; shift 2 ;;
     --days) DAYS="$2"; shift 2 ;;
+    --mutual) MUTUAL=1; shift ;;
     -h|--help)
-      echo "Usage: $0 [--out DIR] [--host CN] [--days N]"
+      echo "Usage: $0 [--out DIR] [--host CN] [--days N] [--mutual]"
       exit 0
       ;;
     *) echo "unknown: $1" >&2; exit 2 ;;
   esac
 done
+
+case "$MUTUAL" in
+  1|true|yes|on) VERIFY=true ;;
+  0|false|no|off|"") VERIFY=false ;;
+  *) echo "invalid --mutual value: $MUTUAL" >&2; exit 2 ;;
+esac
 
 if [[ -z "$OUT" ]]; then
   if [[ "$(id -u)" == "0" ]]; then
@@ -33,12 +45,24 @@ mkdir -p "$OUT"
 chmod 700 "$OUT"
 
 if [[ -f "$OUT/server-cert.pem" && -f "$OUT/server-key.pem" && "${STARSHIP_NATS_TLS_FORCE:-}" != "1" ]]; then
-  echo "TLS already present in $OUT (set STARSHIP_NATS_TLS_FORCE=1 to regenerate)"
-  exit 0
+  # Re-issue the snippet if the requested mode differs from what is on disk,
+  # otherwise --mutual on an existing cell would silently no-op (H-024).
+  if [[ -f "$OUT/tls.conf.snippet" ]]; then
+    have_verify=false
+    grep -qE '^[[:space:]]*verify:[[:space:]]*true' "$OUT/tls.conf.snippet" && have_verify=true
+    if [[ "$have_verify" == "$VERIFY" ]]; then
+      echo "TLS already present in $OUT (verify: $VERIFY) — set STARSHIP_NATS_TLS_FORCE=1 to regenerate"
+      exit 0
+    fi
+    echo "TLS present in $OUT but mode differs (have verify: $have_verify, want verify: $VERIFY) — re-issuing snippet"
+  else
+    echo "TLS material present in $OUT but tls.conf.snippet missing — re-issuing snippet" >&2
+  fi
 fi
 
 command -v openssl >/dev/null || { echo "openssl required" >&2; exit 1; }
 
+if [[ ! -f "$OUT/server-cert.pem" || ! -f "$OUT/server-key.pem" ]]; then
 # CA
 openssl req -x509 -newkey rsa:4096 -sha256 -days "$DAYS" -nodes \
   -keyout "$OUT/ca-key.pem" -out "$OUT/ca.pem" \
@@ -60,14 +84,33 @@ openssl x509 -req -in "$OUT/client.csr" -CA "$OUT/ca.pem" -CAkey "$OUT/ca-key.pe
   -CAcreateserial -out "$OUT/client-cert.pem" -days "$DAYS" -sha256 2>/dev/null
 
 rm -f "$OUT/server.csr" "$OUT/client.csr" "$OUT/ca.srl"
+fi
 chmod 600 "$OUT"/*-key.pem
 chmod 644 "$OUT/ca.pem" "$OUT/server-cert.pem" "$OUT/client-cert.pem"
 chown -R nats:nats "$OUT" 2>/dev/null || true
 
 # Snippet to append to fleet-accounts / fleet-bus
-cat > "$OUT/tls.conf.snippet" <<EOF
+if [[ "$VERIFY" == "true" ]]; then
+  cat > "$OUT/tls.conf.snippet" <<EOF
 # Include from NATS conf: include ./tls/tls.conf.snippet
 # Or merge manually under top-level.
+# H-024 mutual TLS: clients must present a CA-signed certificate.
+# verify_and_map stays false — subject mapping is the authz layer's job.
+tls {
+  cert_file: "${OUT}/server-cert.pem"
+  key_file:  "${OUT}/server-key.pem"
+  ca_file:   "${OUT}/ca.pem"
+  verify: true
+  verify_and_map: false
+  timeout: 5
+}
+EOF
+else
+  cat > "$OUT/tls.conf.snippet" <<EOF
+# Include from NATS conf: include ./tls/tls.conf.snippet
+# Or merge manually under top-level.
+# Server-authenticated TLS only. Set --mutual (STARSHIP_NATS_TLS_MUTUAL=1)
+# to require client certificates — mandatory for WAN deployment (H-024).
 tls {
   cert_file: "${OUT}/server-cert.pem"
   key_file:  "${OUT}/server-key.pem"
@@ -76,6 +119,7 @@ tls {
   timeout: 5
 }
 EOF
+fi
 
 cat > "$OUT/client.env" <<EOF
 # Source for TLS clients (nats-py: tls=... or NATS_URL=tls://)
@@ -91,3 +135,8 @@ echo "TLS material: $OUT"
 echo "  ca.pem server-cert.pem server-key.pem client-*.pem"
 echo "  snippet: $OUT/tls.conf.snippet"
 echo "  client:  $OUT/client.env"
+if [[ "$VERIFY" == "true" ]]; then
+  echo "  mode:   mutual (verify: true) — clients must present a client cert"
+else
+  echo "  mode:   server-auth only (verify: false) — use --mutual for WAN"
+fi

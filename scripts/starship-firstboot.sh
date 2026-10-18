@@ -242,30 +242,79 @@ EOF
   if ! grep -q '^STARSHIP_SANDBOX_NATIVE=' /etc/starship/nats.env 2>/dev/null; then
     echo "STARSHIP_SANDBOX_NATIVE=1" >> /etc/starship/nats.env
   fi
-  # Optional TLS (STARSHIP_NATS_TLS=1)
-  if [[ "${STARSHIP_NATS_TLS:-}" == "1" || "${STARSHIP_NATS_TLS:-}" == "true" ]]; then
-    local tls_gen="$REPO_DIR/scripts/gen-nats-tls.sh"
-    if [[ -f "$tls_gen" ]]; then
-      bash "$tls_gen" --out /etc/starship/nats/tls --host "${STARSHIP_NATS_TLS_HOST:-$(hostname -f 2>/dev/null || echo localhost)}" || true
-    fi
-    if [[ -f /etc/starship/nats/tls/tls.conf.snippet && -f /etc/starship/nats/fleet-accounts.conf ]]; then
-      if ! grep -q '^tls {' /etc/starship/nats/fleet-accounts.conf; then
-        cat /etc/starship/nats/tls/tls.conf.snippet >> /etc/starship/nats/fleet-accounts.conf
-      fi
-      if [[ -f /etc/starship/nats/tls/client.env ]]; then
-        # merge TLS env into nats.env without clobbering user/pass
-        grep -E '^(STARSHIP_NATS_TLS|STARSHIP_NATS_CA|STARSHIP_NATS_CERT|STARSHIP_NATS_KEY)=' \
-          /etc/starship/nats/tls/client.env >> /etc/starship/nats.env 2>/dev/null || true
-        # rewrite NATS_URL scheme to tls://
-        sed -i 's|^NATS_URL=nats://|NATS_URL=tls://|' /etc/starship/nats.env 2>/dev/null || true
-      fi
-      echo "  TLS: enabled (/etc/starship/nats/tls)"
-    fi
-  fi
-
   chown nats:nats /var/lib/starship/nats 2>/dev/null || true
   echo "  active.conf → fleet-accounts (role=${role_env})"
 }
+
+# H-024 P0-2: TLS by default on ops/edge cells.
+#   explicit STARSHIP_NATS_TLS=0/off/false  → off   (escape hatch always wins)
+#   explicit STARSHIP_NATS_TLS=1/on/true    → on
+#   ops or edge profile                     → on    (default)
+#   anything else (server / local dev)      → off   (loopback agent-bus)
+_resolve_tls_mode() {
+  case "${STARSHIP_NATS_TLS:-}" in
+    0|false|off|no)  echo off; return ;;
+    1|true|on|yes)   echo on;  return ;;
+    "")               ;;
+    *) echo "warn: ignoring invalid STARSHIP_NATS_TLS='${STARSHIP_NATS_TLS}'" >&2 ;;
+  esac
+  case "$PROFILE" in
+    ops|edge) echo on ;;
+    *)        echo off ;;
+  esac
+}
+
+# Bus-agnostic TLS wiring: resolves whichever conf active.conf points at, so
+# every bus mode (accounts / fleet / agent) reaches the same TLS path.
+# Fails closed when TLS is required but material is unavailable (H-024).
+_enable_nats_tls() {
+  local tls_gen="$REPO_DIR/scripts/gen-nats-tls.sh"
+  local tls_dir="/etc/starship/nats/tls"
+  local tls_host="${STARSHIP_NATS_TLS_HOST:-$(hostname -f 2>/dev/null || echo localhost)}"
+  local gen_args=(--out "$tls_dir" --host "$tls_host")
+  case "${STARSHIP_NATS_TLS_MUTUAL:-}" in
+    1|true|on|yes) gen_args+=(--mutual) ;;
+  esac
+
+  if [[ -f "$tls_gen" ]]; then
+    if ! bash "$tls_gen" "${gen_args[@]}"; then
+      echo "TLS: generation failed (see output above)" >&2
+      return 1
+    fi
+  elif [[ ! -f "$tls_dir/server-cert.pem" ]]; then
+    echo "TLS: generator missing and no existing material in $tls_dir" >&2
+    return 1
+  fi
+
+  local active_conf
+  active_conf="$(readlink -f /etc/starship/nats/active.conf 2>/dev/null || true)"
+  if [[ -z "$active_conf" || ! -f "$active_conf" ]]; then
+    echo "TLS: active.conf does not resolve to a readable conf" >&2
+    return 1
+  fi
+
+  if [[ -f "$tls_dir/tls.conf.snippet" ]]; then
+    if ! grep -q '^tls {' "$active_conf"; then
+      cat "$tls_dir/tls.conf.snippet" >> "$active_conf"
+    fi
+  else
+    echo "TLS: snippet missing at $tls_dir/tls.conf.snippet" >&2
+    return 1
+  fi
+
+  if [[ -f "$tls_dir/client.env" ]]; then
+    # merge TLS env into nats.env without clobbering user/pass
+    grep -E '^(STARSHIP_NATS_TLS|STARSHIP_NATS_CA|STARSHIP_NATS_CERT|STARSHIP_NATS_KEY)=' \
+      "$tls_dir/client.env" >> /etc/starship/nats.env 2>/dev/null || true
+    # rewrite NATS_URL scheme to tls://
+    sed -i 's|^NATS_URL=nats://|NATS_URL=tls://|' /etc/starship/nats.env 2>/dev/null || true
+  fi
+  local mode="server-auth"
+  grep -qE '^[[:space:]]*verify:[[:space:]]*true' "$tls_dir/tls.conf.snippet" 2>/dev/null && mode="mutual"
+  echo "  TLS: enabled ($mode, $tls_dir)"
+}
+
+TLS_MODE="$(_resolve_tls_mode)"
 
 # Bus selection:
 #   STARSHIP_NATS_ACCOUNTS=1  → multi-tenant accounts/nkeys
@@ -282,6 +331,21 @@ elif [[ "$PROFILE" == "ops" || "$ENABLE_FLEET_BUS" == "1" || "$ENABLE_FLEET_BUS"
   fi
 else
   _enable_agent_bus
+fi
+
+# H-024 P0-2: TLS after bus selection — active.conf must already resolve.
+if [[ "$TLS_MODE" == "on" ]]; then
+  if ! _enable_nats_tls; then
+    if [[ "${STARSHIP_NATS_TLS_BEST_EFFORT:-}" == "1" || "${STARSHIP_NATS_TLS_BEST_EFFORT:-}" == "true" ]]; then
+      echo "WARN: NATS TLS required but unavailable — continuing UNENCRYPTED (STARSHIP_NATS_TLS_BEST_EFFORT=1). H-024 violation; do not commission this cell on a WAN link." >&2
+    else
+      echo "FATAL: NATS TLS required for profile '$PROFILE' but could not be established." >&2
+      echo "  Fix: ensure openssl is installed and $REPO_DIR/scripts/gen-nats-tls.sh is present." >&2
+      echo "  Commissioning-only override: STARSHIP_NATS_TLS_BEST_EFFORT=1 (leaves NATS unencrypted)." >&2
+      echo "  Permanent opt-out:        STARSHIP_NATS_TLS=0 in /etc/starship/firstboot.env" >&2
+      exit 1
+    fi
+  fi
 fi
 
 # ASP-373 / F-009: enforce mode 600 on NATS creds & secret paths (idempotent)

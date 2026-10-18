@@ -7,6 +7,30 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_DIR"
 
+# ─── Concurrency guard ─────────────────────────────────────────────
+# The checks below mutate shared state in this checkout: build-deb.sh
+# does `rm -rf "$PKG_ROOT"` before staging, and section 3 relinks the
+# C11 binaries under src/c/*/. Overlapping runs therefore break each
+# other and report the damage as check failures. Hold an exclusive
+# lock for the whole run so a second invocation refuses instead.
+#
+# flock(1) is a kernel lock on the open file description, so it is
+# released when this process exits for any reason, SIGKILL included —
+# no stale lock to reap. Exit 75 is EX_TEMPFAIL: a reserved code that
+# tells a scheduler to retry rather than recording a phantom
+# regression. It is distinct from the `exit "$FAIL"` convention below.
+#
+# The path is deliberately fixed rather than TMPDIR-scoped: agent
+# runs each get their own TMPDIR, so a TMPDIR-scoped lock would give
+# every run a private lock and guard nothing. This matches the
+# check()-scoped log path below, which is likewise a fixed /tmp file.
+LOCK_FILE="/tmp/starship-nightly.lock"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  echo "another nightly check already holds $LOCK_FILE — refusing to run concurrently" >&2
+  exit 75
+fi
+
 PASS=0
 FAIL=0
 TIMING_BEGIN=$(date +%s%N)
@@ -237,6 +261,17 @@ check "dashboard guards production pulls" bash -c 'grep -q "production mode requ
 check "install-starship does not swallow digest failures" bash -c 'grep -q "install-models.sh" packaging/install-starship.sh && ! grep -q "install-models.sh.*|| true" packaging/install-starship.sh'
 check "CI runs digest gate" bash -c 'grep -q "security-model-digests" .github/workflows/ci.yml && grep -q "test_model_digests.py" .github/workflows/ci.yml'
 check "model digest fixture tests" bash -c "'$PY' -m pytest tests/test_model_digests.py -q --tb=short 2>&1 | grep -E '[0-9]+ passed'"
+
+# ─── Section 23: NATS TLS by default (H-024) ──────────────────────
+echo -e "\n${YELLOW}── Section 23: NATS TLS by default (H-024) ──${NC}"
+check "TLS-by-default gate passes" bash -c 'bash scripts/check-nats-tls-default.sh'
+check "TLS-by-default gate self-test" bash -c 'bash scripts/check-nats-tls-default.sh --self-test'
+check "firstboot defaults ops/edge to TLS on" bash -c 'grep -q "_resolve_tls_mode" scripts/starship-firstboot.sh && grep -qE "ops\|edge\)[[:space:]]*echo on" scripts/starship-firstboot.sh'
+check "TLS applied after bus selection via active.conf" bash -c 'grep -q "readlink -f /etc/starship/nats/active.conf" scripts/starship-firstboot.sh'
+check "firstboot fails closed on missing TLS" bash -c 'grep -q "STARSHIP_NATS_TLS_BEST_EFFORT" scripts/starship-firstboot.sh'
+check "gen-nats-tls supports mutual TLS" bash -c 'grep -q -- "--mutual" scripts/gen-nats-tls.sh && grep -q "verify: true" scripts/gen-nats-tls.sh'
+check "no hardcoded verify:false in nats confs" bash -c '! grep -rnE "^[[:space:]]*verify:[[:space:]]*false" nats/'
+check "TLS-by-default fixture tests" bash -c "'$PY' -m pytest tests/test_nats_tls_default.py -q --tb=short 2>&1 | grep -E '[0-9]+ passed'"
 
 # ─── Summary ─────────────────────────────────────────────────
 TIMING_END=$(date +%s%N)

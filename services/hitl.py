@@ -16,6 +16,8 @@ Usage:
     python3 hitl.py config                    # show current HITL config
 """
 
+from __future__ import annotations
+
 import sys
 import os
 import json
@@ -517,13 +519,13 @@ class ApprovalRequest:
         return json.dumps(self.to_dict(), default=str)
 
     @classmethod
-    def from_dict(cls, data: dict) -> "ApprovalRequest":
+    def from_dict(cls, data: dict) -> ApprovalRequest:
         known = {f.name for f in cls.__dataclass_fields__.values()}
         filtered = {k: v for k, v in data.items() if k in known}
         return cls(**filtered)
 
     @classmethod
-    def from_row(cls, row: sqlite3.Row) -> "ApprovalRequest":
+    def from_row(cls, row: sqlite3.Row) -> ApprovalRequest:
         return cls(
             id=row["id"],
             tool=row["tool"],

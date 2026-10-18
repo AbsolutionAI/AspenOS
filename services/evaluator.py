@@ -13,6 +13,8 @@ Usage:
     python3 evaluator.py serve                           # start HTTP API
 """
 
+from __future__ import annotations
+
 import sys
 import os
 import json

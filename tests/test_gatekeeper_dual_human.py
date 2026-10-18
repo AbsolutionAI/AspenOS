@@ -63,6 +63,29 @@ def _clean_state():
     set_audit_publisher(None)
 
 
+@pytest.fixture(autouse=True)
+def _hitl_tmp_paths(tmp_path):
+    """Keep the physical-act vault path hermetic (edge.command is vault-gated).
+
+    ``aspen.edge.*.command`` is both safety-intercepted and a physical cell act,
+    so the dual-human interception tests below create a vault record. Point the
+    HITL DB + vault dir at a per-test tmp dir so no shared store is touched.
+    """
+    old_db = os.environ.get("HITL_DB")
+    old_vault = os.environ.get("HITL_VAULT_DIR")
+    os.environ["HITL_DB"] = str(tmp_path / "hitl.db")
+    os.environ["HITL_VAULT_DIR"] = str(tmp_path / "vault")
+    yield
+    if old_db is None:
+        os.environ.pop("HITL_DB", None)
+    else:
+        os.environ["HITL_DB"] = old_db
+    if old_vault is None:
+        os.environ.pop("HITL_VAULT_DIR", None)
+    else:
+        os.environ["HITL_VAULT_DIR"] = old_vault
+
+
 @pytest.fixture
 def fleet_safety_store():
     """Grant aspen-fleet-edge the intercepted safety capabilities."""

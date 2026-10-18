@@ -19,6 +19,8 @@ Usage:
     python3 planner.py serve                      # HTTP API server
 """
 
+from __future__ import annotations
+
 import sys
 import os
 import json
@@ -185,7 +187,7 @@ class PlanStep:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict) -> "PlanStep":
+    def from_dict(cls, data: dict) -> PlanStep:
         known = {f.name for f in cls.__dataclass_fields__.values()}
         return cls(**{k: v for k, v in data.items() if k in known})
 
@@ -226,7 +228,7 @@ class Plan:
         }
 
     @classmethod
-    def from_row(cls, row: sqlite3.Row) -> "Plan":
+    def from_row(cls, row: sqlite3.Row) -> Plan:
         steps_raw = json.loads(row["steps"])
         return cls(
             id=row["id"],
