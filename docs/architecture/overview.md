@@ -2,7 +2,7 @@
 
 **Canonical product SoR:** [`docs/sor/MASTER_SPEC.md`](../sor/MASTER_SPEC.md) (AspenGrove v4.0 — Three Organs).  
 **ADRs:** [`docs/adr/README.md`](../adr/README.md)  
-**Last architecture review:** [`docs/ops/WEEKLY_ARCHITECTURE_REVIEW_2026-10-12.md`](../ops/WEEKLY_ARCHITECTURE_REVIEW_2026-10-12.md) (ASP-773)
+**Last architecture review:** [`docs/ops/WEEKLY_ARCHITECTURE_REVIEW_2026-10-19.md`](../ops/WEEKLY_ARCHITECTURE_REVIEW_2026-10-19.md) (ASP-800)
 
 This monorepo is the **AspenOS / Starship Alpha** implementation tree. Product boundaries:
 
@@ -39,7 +39,7 @@ OS:           Ubuntu 24.04 · systemd · AppArmor · cgroups · optional C11 san
 - Cross-plant ACL: **plant-edge → plant-alpha denied** (H-021 / ASP-369); ops-initiated alpha→edge retained.
 - Tool anomaly (H-015): fail-open detector over audit events (`src/python/sentinel/tool_anomaly.py`). Live consumer publishes `aspen.sentinel.tools.anomaly` (`tool_anomaly_consumer.py`, ASP-687). Investigation lead, not a deny path.
 - Fleet bus: monorepo publishes **`aspen.fleet.*` alongside** legacy `starship.*`/`agnetic.*` dual (ASP-596); ADR-0011 sunset **not** filed.
-- Execution isolation (ADR-0013): Paperclip `isolated_workspace` + `git_worktree` is live. QA fail-closes unless `sourceIssueId` is the issue or its parent (ASP-736). The 2026-10-04 ASP-733 PASS remains void.
+- Execution isolation (ADR-0013): Paperclip `isolated_workspace` + `git_worktree` is live. The worker fail-closes unless `sourceIssueId` is the issue or its parent. ASP-736 is `in_review`, not closed (CHG-0034). The 2026-10-04 ASP-733 PASS remains void.
 
 ## Runtime paths (target)
 

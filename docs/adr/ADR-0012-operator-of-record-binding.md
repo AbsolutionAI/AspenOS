@@ -1,6 +1,6 @@
 # ADR-0012: Authenticated operator-of-record binding for DualHumanGate
 
-**Status:** Proposed — 2026-08-31. Reconfirmed Proposed by ASP-739 (2026-10-05) and ASP-773 (2026-10-12). Cell TLS templates (ASP-684) do not bind `human_id`. Do not Accept before a non-sim arm.  
+**Status:** Proposed — 2026-08-31. Reconfirmed Proposed by ASP-739 (2026-10-05), ASP-773 (2026-10-12), and ASP-800 (2026-10-19). Cell TLS templates (ASP-684) do not bind `human_id`. The unmerged sim_only D1 profile (PR 83) does not bind a principal. Do not Accept before a non-sim arm. Do not start ASP-777 from a weekly review.  
 **Paperclip:** ASP-534 · Parent ASP-530 (Weekly Architecture Review)  
 **Related:** ADR-0003 (fleet/edge safety contracts) · ADR-0007 (authz subjects) · ADR-0009 (capability gatekeepers) · H-016 / G8 DualHumanGate (`aspen-edge-rrm`)  
 **Trigger:** Before any non-sim arm (G9+)  
