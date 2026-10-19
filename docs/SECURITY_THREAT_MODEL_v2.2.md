@@ -1,11 +1,11 @@
-# Security Threat Model — AspenOS v2.2
+# Security Threat Model — AspenOS v2.3
 
-**Version:** 2.2 · **Refresh:** 2026-09-21 (Biweekly)  
-**Author:** Auditor (Paperclip agent 4203b00e)  
-**Previous baseline:** ASP-569 (2026-09-07) — H-007–H-021 backlog, F-015–F-019  
-**This cycle:** ASP-629 — F-011, F-012, F-014, F-022, ASP-379 anomaly detector, ASP-607 gatekeeper rate limit  
-**SoR:** `docs/SECURITY.md` · `docs/FLEET.md` · `docs/adr/ADR-0003` · `docs/adr/ADR-0007` · `docs/adr/ADR-0009`
-**IEC 62443 mapping:** §5.2 (zones/conduits), §3.3 (SLT), §5.3 (defence-in-depth)
+**Version:** 2.3 · **Refresh:** 2026-10-19 (Biweekly)
+**Author:** Auditor (Paperclip agent 4203b00e)
+**Previous baseline:** ASP-776 (2026-10-12) — NATS TLS by default, anomaly live consumer, Python CI gate, H-024 baseline
+**This cycle:** ASP-802 — Weekly architecture review (ASP-800), holographic catalog loader (ASP-782), nightly PASS sustained (158/159 across Sections 1–23), biweekly re-review
+**SoR:** `docs/SECURITY.md` · `docs/FLEET.md` · `docs/adr/ADR-0003` · `docs/adr/ADR-0007` · `docs/adr/ADR-0009` · `docs/security/H-024-wan-mtls-deployment.md`
+**IEC 62443 mapping:** §5.2 (zones/conduits), §3.3 (SLT), §5.3 (defence-in-depth); H-024 cell assessment baseline §4
 
 ---
 
@@ -20,7 +20,7 @@
 │           │                                                      │
 │     ╔═════╩══════════════════════════════════════════════════╗   │
 │     ║  ZONE 1 — Fleet Bus (NATS)                             ║   │
-│     ║  JetStream store, subject routing, auth (accts/token)  ║   │
+│     ║  JetStream store, subject routing, auth (accts/TLS)    ║   │
 │     ╚═════╤══════════════════════╤══════════╤═══════════════╝   │
 │           │                      │          │                    │
 │  ┌────────┴──────┐   ┌──────────┴──────┐   ┌┴──────────────┐   │
@@ -37,9 +37,9 @@
 
 | Boundary | Conduit | Auth | Notes |
 |----------|---------|------|-------|
-| Z0 → Z1 | NATS client/TLS or localhost | Token / accounts / none | Dev: no auth; prod must use accounts + optional TLS |
-| Z2 ↔ Z1 | NATS `starship.*` / `aspen.*` | OPS account, full mesh | Exports to EDGE/TELEM |
-| Z3 → Z1 | NATS heartbeat + proxy only | EDGE account, limited subjects | No mission/write subjects |
+| Z0 → Z1 | NATS client/TLS or localhost | Token / accounts / TLS | Ops/edge: TLS on by default; server: plaintext loopback |
+| Z2 ↔ Z1 | NATS `starship.*` / `aspen.*` | OPS account, full mesh | TLS on by default on ops cells |
+| Z3 → Z1 | NATS heartbeat + proxy only | EDGE account, limited subjects | TLS on by default on edge cells |
 | Z4 ↔ Z1 | NATS range subjects only | RANGE account, isolated | No imports from OPS/EDGE |
 | Agent ↔ Host | Systemd unit / AppArmor | User=agnetic, NoNewPrivileges | Optional sandbox_run + policyexec |
 
@@ -53,12 +53,12 @@
 |----|--------|-------|-------------|------------|--------|
 | H-001 | Agent RCE via tool execution | Shell/host | 8.5 (AV:N/AC:L) | Sandbox blocklists, C11 seccomp, path allowlists, 50KB output limit, 30s timeout | Active |
 | H-002 | Lateral movement via red-team agent | Fleet nodes | 7.5 (AV:A/AC:L) | Fleet ACL, tool allowlists, `plant-range` isolation, RED_TEAM_ALLOWED only | Active |
-| H-003 | NATS bus spoofed commands | Message bus | 8.0 (AV:N/AC:L) | Accounts/nkeys, token auth, per-subject permissions, optional TLS | Active |
+| H-003 | NATS bus spoofed commands | Message bus | 8.0 (AV:N/AC:L) | Accounts/nkeys, token auth, per-subject permissions, TLS default on ops/edge | Active |
 | H-004 | Credential leak in logs/LLM context | Secrets | 6.5 (AV:N/AC:H) | Redaction patterns (password/token/secret/key), SecretsManager AES-256-GCM | Active |
 | H-005 | Abliterated local model refusal bypass | Model safety | 7.0 (AV:L/AC:L) | Mandatory policy + sandbox + Droid Shield, never trust model alone | Active |
 | H-006 | Cross-plant privilege escalation | Plant isolation | 7.0 (AV:N/AC:M) | `same_plant_only` default ACL, `check_cross_plant()` fail-closed | Active |
 
-### 2.2 v2.2 refresh threats (updated 2026-09-07)
+### 2.2 v2.3 refresh threats (updated 2026-10-19)
 
 | ID | Threat | Asset | Risk (CVSS) | Mitigation | Status |
 |----|--------|-------|-------------|------------|--------|
@@ -79,18 +79,19 @@
 | H-021 | **No dual-publish on aspen.sentinel.* subjects yet** | Observability | 5.0 (AV:N/AC:L) | Migration incomplete; `starship.*` still primary | **Closed (ASP-369)** — edge→alpha ACL pivot removed; edge cross-plant fails closed; H-021 addressed via ACL change |
 | H-022 | **Physical cell act requires HITL vault approval** | Actuation / Safety | **8.5** (AV:N/AC:L) | Gatekeeper shim vault-gate: physical cell act subjects require durable HITL vault approval record before authorize grants; dual-human preserved as additional gate layer | **Implemented (ASP-432)** — 19/19 vault-gate tests + 99/99 phase2 pass; fail-closed on every vault failure path |
 | H-023 | **Software estop latch is agent-dependent — no independent hardware watchdog** | Safety | **9.0** (AV:L/AC:H) | Independent `EstopWatchdog` (design/sim): software-path `tick` heartbeat, fail-closed open-loop trip on missed/forced/backend failure, clear only via two distinct authorizers, durable latch via `FilePulseBackend` | **Implemented (ASP-433)** — 18/18 watchdog tests; 466-test suite green; residual: live GPIO/relay wire = Aspen START on this issue |
+| H-024 | **No formal IEC 62443-4-2 / NIST CSF baseline for cell deployment** | Certification / Cell readiness | 6.5 (AV:N/AC:H) | Baseline gap analysis for CR 2.1–4.3; identity-to-IEC role map; production cell readiness verdict. **P0-1:** ADR-0012 operator binding (open). **P0-2:** TLS default on cell firstboot (IMPLEMENTED via ASP-684) | **BASELINE (ASP-434)** — docs-only assessment filed; TLS default closed via ASP-684; P0-1 gap pending; 10-gate checklist |
 
 ### 2.3 Fleet-specific threats (F- series)
 
 | ID | Threat | Asset | Risk (CVSS) | Mitigation | Status |
 |----|--------|-------|-------------|------------|--------|
-| F-015 | **Red-team lateral from range to ops** | Plant isolation | 8.0 (AV:A/AC:L) | `check_cross_plant()` rule 3/4: isolation deny; RANGE no import from OPS; tool-anomaly detector (ASP-379) adds behavioral detection of lateral moves | **Active** — anomaly detector implemented (ASP-379), fail-open observation only; blocking path deferred |
+| F-015 | **Red-team lateral from range to ops** | Plant isolation | 8.0 (AV:A/AC:L) | `check_cross_plant()` rule 3/4: isolation deny; RANGE no import from OPS; tool-anomaly detector (ASP-379) adds behavioral detection of lateral moves | **Active** — anomaly detector live consumer wired (ASP-687); blocking path still deferred |
 | F-016 | **Plant ACL misconfiguration opens cross-plant** | ACL | 6.5 (AV:N/AC:L) | Default `same_plant_only` fail-closed; explicit allow list; F-022 removed edge→alpha pivot | **Active** — F-022 closed (ASP-369) |
 | F-017 | **Fleet heartbeat spoofing (register fake node)** | Identity | 7.5 (AV:N/AC:L) | NATS accounts + token; no PKI/fingerprint yet | **Open** |
 | F-018 | **Exercise state race — start/stop collision** | Exercise | 5.0 (AV:N/AC:H) | Atomic file write; poll-based check in fleet_policy.py | **Open** |
 | F-019 | **Delegated agent without plant tag** | Cross-plant | 6.0 (AV:N/AC:M) | `delegate_to_agent` accepts `plant`/`target_plant`; missing tag defaults no ACL | Informational |
-| F-013 | **Unpinned model digests — tag-only ollama pull** | Supply chain / Model integrity | 6.0 (AV:N/AC:H) | Pin model digests (`config/models-digests.yaml`); verify-after-pull fail-hard (`install-models.sh`/health-checker/dashboard); reject unpinned pulls in production | **Implemented (ASP-377)** — `scripts/resolve-model-digests.py` + CI/nightly gates; `@sha256:` refs rejected by Ollama 0.32.11, enforcement is post-pull verification per `docs/plans/ASP-377.md` |
-| F-020 | **Software data-diode missing for OSINT/ingest** | OSINT domain | 6.5 (AV:N/AC:M) | nftables/iptables one-way rules + process isolation + restricted NATS account — see recipe | **Recipe complete** — [Recipe](solutions/asp-368-data-diode-recipe.md) reviewed (AUDITOR_APPROVE); in_review — captain proof required |
+| F-013 | **Unpinned model digests — tag-only ollama pull** | Supply chain / Model integrity | 6.0 (AV:N/AC:H) | Pin model digests (`config/models-digests.yaml`); verify-after-pull fail-hard (`install-models.sh`/health-checker/dashboard); reject unpinned pulls in production | **Implemented (ASP-377)** — `scripts/resolve-model-digests.py` + CI/nightly gates; `@sha256:` refs rejected by Ollama 0.32.11 |
+| F-020 | **Software data-diode missing for OSINT/ingest** | OSINT domain | 6.5 (AV:N/AC:M) | nftables/iptables one-way rules + process isolation + restricted NATS account — see recipe | **Recipe complete** — [Recipe](solutions/asp-368-data-diode-recipe.md) reviewed (AUDITOR_APPROVE); awaiting captain proof |
 | F-011 | **NATS bus resource exhaustion — flood connections / subscriptions** | Bus availability | 6.5 (AV:N/AC:L) | `max_pending` 16MB, `max_control_line` 4KB, `max_subscriptions` 512, `write_deadline` 5s, `ping_interval` 30s/3, auth timeout 2.0s; per-account `limits{}` bounding each role's blast radius below `max_connections: 256` | **Implemented (ASP-375)** — all three NATS configs hardened; Section 19 nightly gate; 5 fixture tests |
 | F-012 | **Agent resource exhaustion — runaway agent DoS** | Host / Agent availability | 6.0 (AV:L/AC:L) | systemd cgroup drop-ins (`CPUQuota`, `MemoryMax`, `MemoryHigh`, `TasksMax`) bound each agent unit; I/O accounting on I/O-intensive units | **Implemented (ASP-376)** — 8 unit profiles staged; 6 fixture tests; build-deb stages drop-ins; Section 20 nightly gate; git-only (no live systemd applied) |
 | F-014 | **Unsigned package substitution in update chain** | Supply chain / Package integrity | 6.5 (AV:N/AC:M) | `gpgv` detached-signature verify gate (`scripts/verify-deb-signature.sh`) before `dpkg -i`; CI job `verify-package-signature` fails on unsigned/tampered; Section 21 nightly gate | **Implemented (ASP-378)** — verify path ships now; placeholder dev key; ceremony (real key signing) is deferred human action; 9 fixture tests |
@@ -120,7 +121,7 @@
 | blue | STARSHIP_RANGE | agent.>, fleet.heartbeat, status | `starship.>` · `agnetic.>` | **No imports** — isolated |
 | telem | STARSHIP_TELEM | telemetry.> | (none) | Exports: telemetry to OPS |
 
-> **Dual-subject table note:** This table summarises `starship.*` / `agnetic.*` subject permissions, the pre-migration baseline. H-013 (ASP-536) added per-role `aspen.*` ACLs (sentinel, authz, fleet, safety) in the `fleet-accounts.conf.tmpl` — all roles have scoped `aspen.*` publish/subscribe and cross-account imports. The generated conf includes both namespaces. Residual: (a) clients still dual-publish `starship.*` during the `aspen.` prefix migration; (b) live NATS servers need a conf regenerate + reload to enforce. These rows will be folded into a single `Starship + Aspen` table at the next major refresh.
+> **Dual-subject table note:** Residual dual-publish during `aspen.` prefix migration remains active. H-013 (ASP-536) added per-role `aspen.*` ACLs in the `fleet-accounts.conf.tmpl`. The generated conf includes both namespaces. Migration not yet complete.
 
 ### 3.2 Fleet tool ACL (agents/fleet_policy.py)
 
@@ -145,10 +146,10 @@
 
 | Principle | Status | Evidence |
 |-----------|--------|----------|
-| **Verify explicitly** | Partial | NATS accounts authenticate; tool policy enforces per-call; no PKI for node identity |
+| **Verify explicitly** | Partial → **Improved** | NATS accounts authenticate; TLS by default on ops/edge (ASP-684); tool policy enforces per-call; no PKI for node identity |
 | **Least privilege** | Partial | Agents hold role-scoped credentials; red-team subject-limited; OPS still has full mesh |
 | **Assume breach** | Partial | Plant-range isolation; fail-closed ACL; no cross-plant trust; gatekeeper not implemented |
-| **Never trust, always verify** | Partial | Tool policy checks every call; NATS accounts gate subjects; no attestation/device identity |
+| **Never trust, always verify** | Partial | Tool policy checks every call; NATS accounts gate subjects; TLS default improves wire verification; no attestation/device identity |
 
 ### 3.4 IEC 62443 alignment
 
@@ -163,107 +164,93 @@
 | **CR 2.3** — Dual approval for critical actions | `propose_act` -> `authorize` dual-human; estop dual-clear | **Satisfied** — estop dual-clear (ASP-538) + ADR-0009 dual-human gate (Phase 1, ASP-540) |
 | **CR 2.4** — Restriction of logical access associated with mobile/remote | Plant isolation, range plant default | **Satisfied** |
 | **CR 2.5** — Review of access rights | ACL audit in fleet.yaml; periodic threat model refresh | **Partial** — no automated drift detection |
-| **CR 3.1** — Communication integrity | NATS JetStream; optional TLS | **Partial** — TLS not default |
-| **CR 3.2** — Communication confidentiality | Optional TLS; SecretsManager AES-256-GCM for stored secrets | **Partial** |
+| **CR 3.1** — Communication integrity | NATS JetStream; **TLS by default on ops/edge cells**, mutual TLS for WAN | **Satisfied (ASP-684)** — CR 3.1 gap closed; ops/edge default on, server stays loopback |
+| **CR 3.2** — Communication confidentiality | TLS by default; SecretsManager AES-256-GCM for stored secrets | **Satisfied (ASP-684)** — TLS default raises from Partial |
 | **CR 3.3** — Zone/conduit boundary | Plant zones (ops/edge/range); NATS account boundaries | **Satisfied** |
 | **CR 3.4** — Software update integrity | ADR-0008 package classification; `dpkg` signature via `gpgv` detached verify gate (ASP-378); CI gate blocks Dev-only in production (ASP-574) | **Satisfied (ASP-378/574)** — verify path ships in update.sh; CI job `verify-package-signature` fails on unsigned/tampered; Section 21 gate; placeholder dev key; ceremony deferred |
 | **CR 4.1** — System inventory | Fleet heartbeat + node register; Fleet Map dashboard | **Satisfied** |
-| **CR 4.2** — Security event logging | `aspen.sentinel.audit.event` subject defined (ADR-0007); publisher + consumer wired (ASP-537): JSONL journal + JetStream durable trail + dashboard endpoints; gatekeeper events covered; backfill replay | **Satisfied (ASP-537)** — offline-capable dual-path journal + JetStream; gateway-agnostic; no SIEM integration |
-| **CR 4.3** — Continuous monitoring | Health checker, telemetry bus, Sentinel dashboard | **Partial** — no alert on ACL drift |
-| **CR 5.1** — Patch management | Debian packaging; systemd unit updates | **Partial** — no vulnerability scanning CI gate |
+| **CR 4.2** — Security event logging | `aspen.sentinel.audit.event` subject defined (ADR-0007); publisher + consumer wired (ASP-537): JSONL journal + JetStream durable trail + dashboard endpoints; gatekeeper events covered; backfill replay; anomaly detector live feed (ASP-687) | **Satisfied (ASP-537)** — offline-capable dual-path journal + JetStream; gateway-agnostic; no SIEM integration |
+| **CR 4.3** — Continuous monitoring | Health checker, telemetry bus, Sentinel dashboard; anomaly detector live consumer wired (ASP-687) | **Partial** — improved with live anomaly feed and tool audit consumer; no alert on ACL drift |
+| **CR 5.1** — Patch management | Debian packaging; systemd unit updates; full Python test suite CI gate (ASP-730) | **Partial** — no vulnerability scanning CI gate |
 | **CR 5.2** — Malicious code protection | Tool sandbox, Droid Shield scanning, redaction | **Satisfied** |
-| **CR 5.3** — Security functionality verification | Threat model refresh; stress tests (67/69 pass) | **Partial** — no dedicated security scan CI |
+| **CR 5.3** — Security functionality verification | Threat model refresh; stress tests (67/69 pass); CI `security-nats-tls` job (ASP-684); `python-test-suite` required check (ASP-730); nightly Sections 1–23 | **Partial** — security-specific CI gates growing; no dedicated security scan |
 
 ---
 
 ## 4. Hardening Checklist
 
-### 4.1 Immediate (v2.2 refresh gaps)
+### 4.1 Immediate (v2.2 refresh — all resolved)
 
-- [x] **H-011:** Move NATS credentials from plaintext config to encrypted files or nkey-only auth. `gen-nats-accounts.sh` now emits nkey-only entries when `nk` present (ASP-536); residual: `nk` must be available at generation time, SYS account always password.
-- [x] **H-013:** Regenerate NATS accounts config with `aspen.*` subject permissions. Committed in template (ASP-536): all roles have scoped `aspen.*` publish/subscribe + cross-account imports.
-- [x] **H-015:** Wire audit publisher to `aspen.sentinel.audit.event`. No forensic trail currently records agent actions.
-- [x] **H-008:** Implement gatekeeper shim (ADR-0009). `propose_act` self-authorization is not cryptographically prevented. — **Phase 1 (ASP-540):** safety-adjacent proposal interception + dual-human authorization + refusal of bare/single-human forwards; every decision audited to `aspen.sentinel.audit.event`. **Phase 2 (ASP-564):** capability token lifecycle + credential-strip proxy + immutable safety-subject enforcement.
-- [x] **H-009:** Verify dual-human authorization collision logic in `act_gate_contract.md` — distinct principal enforcement must reject duplicates. — **ASP-540:** `authorize_gate_request` ignores duplicate `human_id` (audited `gate.authorize.duplicate`); two distinct in-window approvals required.
+Carried forward from prior cycles — all items resolved in previous sprints. See v2.2 document for detail.
+
+- [x] H-011: nkey-only NATS credential generator (ASP-536)
+- [x] H-013: `aspen.*` subject ACLs in NATS template (ASP-536)
+- [x] H-015: Audit publisher to `aspen.sentinel.audit.event` (ASP-537)
+- [x] H-008: Gatekeeper shim Phase 1 + Phase 2 (ASP-540/564)
+- [x] H-009: Dual-human collision logic (ASP-540)
 
 ### 4.2 Short-term (next 2 sprints)
 
-- [x] **H-007:** Add integration test for estop `clear` — verify single `authorize_clear` alone never unlatches. — **ASP-573:** dedicated negative-case integration test in `scripts/smoke-fleet-bus.py` (H-007 block) + `aspen-edge-rrm` pin bumped to gated master; bare clear and single `authorize_clear` audited `clear_refused_insufficient_auths` and never unlatch.
-- [x] **H-012:** Replace hardcoded `nats://[IP_ADDRESS]:4222` in `agents/scheduler.py` with config/env.
-- [x] **H-014:** Verify AppArmor profiles load on all deployment targets; fail build if missing.
-- [x] **F-011:** NATS rate limiting per-connection and per-account (ASP-375). — All three NATS configs hardened; per-account limits bound blast radius; Section 19 nightly gate; 5 fixture tests. **Implemented.**
-- [x] **F-012:** Cgroup per-agent resource limits (ASP-376). — systemd drop-in profiles with CPUQuota, MemoryMax, MemoryHigh, TasksMax per unit. 8 unit profiles staged; 6 fixture tests; Section 20 nightly gate. **Implemented.** (git-only, no live systemd applied)
-- [x] **F-013:** Pin all Ollama model pulls and `FROM` directives to SHA256 digests; reject unpinned pulls in production. — **ASP-377:** implemented (`config/models-digests.yaml` + verify-after-pull); `@sha256:` refs rejected by Ollama 0.32.11.
-- [x] **F-014:** Signed package verify gate (ASP-378). — `gpgv` detached-signature verify before `dpkg -i`; CI job fails on unsigned/tampered; placeholder dev trust anchor. Ceremony (real key signing) is deferred human action.
-- [x] **F-020:** Draft software data-diode recipe for OSINT/ingest. — [Recipe](solutions/asp-368-data-diode-recipe.md) reviewed (AUDITOR_APPROVE); QUEUED — requires dual-human gate before any host firewall apply.
-- [x] **F-022:** Remove edge→alpha ACL pivot (ASP-369). — `plant-edge: [plant-alpha]` dropped from `config/fleet.yaml`; edge cross-plant fails closed. **Closed.**
-- [x] **ASP-379:** Implement fail-open tool-anomaly detector. — R1–R4 behavioral rules over tool audit events; 12 hermetic tests. Live consumer wiring deferred.
-- [x] **ASP-607:** Gatekeeper per-agent rate limiting. — Sliding window on `request_capability()`; deny + `gate.rate_limited` audit. 13 tests.
+- [x] **H-007:** Integration test for estop dual-human clear (ASP-573)
+- [x] **H-012:** Replace hardcoded NATS URL (ASP-539)
+- [x] **H-014:** AppArmor profile loading verification (ASP-374/575)
+- [x] **F-011:** NATS rate limiting per-connection and per-account (ASP-375)
+- [x] **F-012:** Cgroup per-agent resource limits (ASP-376)
+- [x] **F-013:** Model digest pinning (ASP-377)
+- [x] **F-014:** Signed package verify gate (ASP-378)
+- [x] **F-020:** Draft software data-diode recipe
+- [x] **F-022:** Edge→alpha ACL pivot removal (ASP-369)
+- [x] **ASP-379:** Fail-open tool-anomaly detector (R1–R4)
+- [x] **ASP-607:** Gatekeeper per-agent rate limiting
+- [x] **ASP-659:** Nightly check flock serialization
+- [x] **ASP-660:** Systemd unit count baseline fix
+- [x] **ASP-658:** Gitignore Paperclip scratch dirs
+- [x] **ASP-684:** NATS TLS by default on ops/edge cells (H-024 P0-2)
+- [x] **ASP-687:** Wire tool-anomaly detector to live audit consumer
+- [x] **ASP-721:** NATS install guard in CI
+- [x] **ASP-730:** Full Python test suite as required CI check
+- [x] **ASP-696:** HybridIntel stub removal (attack surface reduction)
+- [x] **ASP-782:** Holographic catalog MemoryStore loader (no security impact)
+- [x] **ASP-800:** Weekly architecture review (2026-10-19)
 - [ ] **H-017:** Implement NATS credential rotation procedure or script. Document rotation window.
 - [ ] **H-HOST-04:** Replace env-based master password with prompt, keyring, or TPM-backed secret.
 - [ ] **F-017:** Add node fingerprint/PKI for fleet heartbeat to prevent registration spoofing.
+- [ ] **H-024 P0-1 — ADR-0012 operator-of-record binding implementation:** Bind `human_id` to operator registry before non-sim actuator arm. Blocks production cell commission checklist item 1.
 
 ### 4.3 Medium-term (v2.3 planning)
 
-- [x] **ADR-0009 implementation (Phase 2):** Full token lifecycle (consumption/refresh), Hermes/Paperclip credential strip, immutable proxy enforcement. — Phase 1 (proposal interception + dual-human + audit) landed in ASP-540; Phase 2 landed in ASP-564 (`GatekeeperProxy`/`NATSAgentProxy` credential strip, `SafetySubjectEnforcer`, token lifecycle).
-- [x] **TLS by default:** Enable `STARSHIP_NATS_TLS=1` in firstboot templates. Document WAN deployment. — Landed in ASP-684: TLS mode resolved by `_resolve_tls_mode` (ops/edge default on, `server` stays plaintext), applied post-bus-selection via `active.conf` so all three bus modes are reachable, mutual TLS via `gen-nats-tls.sh --mutual`, fail-closed with `STARSHIP_NATS_TLS_BEST_EFFORT=1` commissioning override. CI job `security-nats-tls` + nightly Section 23. WAN deployment: `docs/security/H-024-wan-mtls-deployment.md`.
-- [ ] **NATS nkey migration (continued):** ASP-536 added nkey-only gen mode; residual work: enforce nkey-only in CI (fail `--password-only` in production builds), migrate SYS account, automate `nk` binary availability. Replace password-based auth across all accounts (partial ASP-536).
-- [ ] **Automated ACL drift detection:** Cron job compares live ACL with `fleet.yaml` baseline.
+- [x] **ADR-0009 implementation (Phase 2):** Full token lifecycle (consumption/refresh), Hermes/Paperclip credential strip, immutable proxy enforcement. — Phase 1 (ASP-540) + Phase 2 (ASP-564) landed.
+- [x] **TLS by default:** Implemented via ASP-684. Ops/edge default on, mutual TLS for WAN, fail-closed commissioning override, CI job `security-nats-tls` + nightly Section 23. WAN deployment: `docs/security/H-024-wan-mtls-deployment.md`.
+- [x] **Anomaly detector live consumer:** Wired via ASP-687. `src/python/sentinel/tool_anomaly_consumer.py` subscribes audit stream, feeds `ToolAnomalyDetector.feed()`, publishes findings to `sentinel.tools.anomaly`.
+- [x] **Weekly architecture reviews:** Ongoing baseline (ASP-739/773/800).
+- [ ] **NATS nkey migration (continued):** ASP-536 added nkey-only gen mode; residual work: enforce nkey-only in CI (fail `--password-only` in production builds), migrate SYS account, automate `nk` binary availability.
+- [ ] **Automated ACL drift detection:** Cron job compares live ACL with `fleet.yaml` baseline. Report drift on `aspen.sentinel.audit.event`.
 - [ ] **Security scan CI gate:** Integrate `bandit` / `semgrep` into `make check` or CI pipeline.
 - [ ] **Code signing:** Sign `sandbox_run`, `policyexec` binaries; verify at install time.
 - [ ] **SIEM/Sentinel integration:** Connect audit events to external SIEM or Sentinel dashboard.
+- [ ] **ADR-0012 operator binding implementation:** H-024 P0-1 gap; register operator identity before non-sim actuator arm.
 
 ---
 
-## 5. Changes Since Last Refresh (ASP-629, 2026-09-21)
+## 5. Changes Since Last Refresh (ASP-776, 2026-10-12)
 
 | Change | Impact | New threats | Status |
 |--------|--------|-------------|--------|
-| **H-019 CI gate (ASP-574)** — Dev-only package isolation | CI gate prevents Dev-only tooling in production images; `security-devonly-isolation` CI job + nightly Section 16 | (H-019 → closed) | **CLOSED** — gate script, CI wire, nightly wire, self-test all committed |
-| **H-014 AppArmor in deb postinst (ASP-374/575)** | Profiles staged + loaded via `debian/DEBIAN/postinst` (`apparmor_parser -r`); nightly Section 17 verifies 4 checks | (H-014 → satisfied) | **Satisfied** — profile presence, build-deb staging, postinst wiring, no-enforce all verified |
-| **H-007 estop integration test (ASP-573)** | Dedicated negative-case test in `smoke-fleet-bus.py`; bare clear + single auth clear refused; dual distinct clear works | None (H-007 → covered) | **Covered** |
-| **H-015 audit consumer (ASP-537)** | Dashboard endpoints for Sentinel audit events; offline JSONL journal + JetStream durable trail; gatekeeper events covered | (H-015 → closed) | **CLOSED** — publisher + consumer both wired; gateway-agnostic design |
-| **H-008 Phase 2 token lifecycle (ASP-564)** | Credential-strip proxy (`GatekeeperProxy`/`NATSAgentProxy`), `SafetySubjectEnforcer`, token issue/consume/refresh/expire lifecycle | None (H-008 mitigation extended) | **Implemented** — Phase 1 + Phase 2 both landed |
-| **ADR-0012 filed** | Operator-of-record binding ADR (Proposed, not implemented) | None (design-only) | Filed as Proposed |
-| **Agent Zero removal** | Removed from host; reduces attack surface (legacy service gone) | None | Clean |
-| **Nightly check — 2 new sections** | Section 16 Dev-only isolation, Section 17 AppArmor wiring | None | Live since 2026-09-09 |
-| **ISO_BUILDER.md** | Documents skip-by-design policy for control-plane host | None | Documentation |
-| **F-011 NATS rate limits (ASP-375)** | Per-connection hardening (max_pending, max_subscriptions, ping, write_deadline, auth timeout); per-account connection/subscription blast-radius caps | (DoS mitigation extended) | **Implemented** — all three NATS configs; Section 19 nightly gate |
-| **F-012 Cgroup limits (ASP-376)** | systemd drop-in CPU/memory/PID limits per agent unit; 8 profiles from health-checker (25%/128M) to NATS (100%/256M) | Resource-exhaustion DoS mitigation | **Implemented** — 6 fixture tests; Section 20 nightly gate |
-| **F-013 Model digest pin (ASP-377)** | `config/models-digests.yaml` pins all 7 Ollama models to sha256; `install-models.sh` verify-after-pull fail-hard | (F-013 → implemented) | **Implemented** — repo-local digests; CI + nightly Section 22 |
-| **F-014 Signed packages (ASP-378)** | `gpgv` detached-signature verify gate; `scripts/update.sh` opt-in `--verify-signature`; CI job fails on unsigned/tampered; placeholder dev trust anchor | (Supply-chain integrity) | **Implemented** — verify path ships; ceremony (real keys) deferred human action |
-| **F-022 Edge→alpha ACL removal (ASP-369)** | `plant-edge: [plant-alpha]` dropped from `config/fleet.yaml`; edge cross-plant fails closed via `same_plant_only` default | (F-022 → closed, H-021 → closed) | **Closed** — 11 ACL fixture tests; smoke-test check |
-| **ASP-379 Tool-anomaly detector** | Fail-open behavioral R1–R4 rules over tool audit events; `sensitive_read_then_egress`, `high_risk_burst`, `denial_probe`, `error_storm` | None (observation-only; blocking path deferred) | **Implemented** — 12 hermetic fixture tests |
-| **ASP-607 Gatekeeper rate limiting** | Per-agent sliding-window rate limit on `request_capability()`; env-overridable defaults 30 req/60s | None (deny + `gate.rate_limited` audit) | **Implemented** — 13 tests; merged via Aspen local proof |
-
-### Threats closed this cycle
-
-| Item | Reason | Closing evidence |
-|------|--------|-----------------|
-| H-019 (Dev-only CI gate) | CI gate `check-no-devonly-in-prod.sh` committed; wired in CI (`security-devonly-isolation` + nightly Section 16) | ASP-574: `scripts/check-no-devonly-in-prod.sh` committed, `.github/workflows/ci.yml` job, `scripts/check-nightly.sh` Section 16; self-test script verifies fail-on-planted |
-| H-015 (Audit trail) | Publisher wired + JetStream durable stream + dashboard consumer endpoints | ASP-537: `scripts/sentinel-audit.py`, `dashboard/server.py` Sentinel endpoints, JSONL journal + JetStream mirror; gatekeeper events covered |
-| H-014 (AppArmor deployment) | Profiles staged + loaded in deb postinst; nightly Section 17 verifies wiring | ASP-374: `debian/DEBIAN/postinst` includes `apparmor_parser -r`; ASP-575: verification report confirming 4-nightly-check criteria met |
-| F-022 (Edge→alpha pivot) | ACL entry `plant-edge: [plant-alpha]` removed; 11 fixture tests verify edge→alpha denied | ASP-369: commit `201933f`, 6 files, 272 insertions, 11/11 fixture tests |
-| H-021 (aspen.sentinel permissions) | Resolved as aspect of ASP-369 ACL change | Edge cross-plant fails closed; no pivot path |
-| H-022 (Physical cell HITL vault) | Durable HITL vault approval gate for physical cell acts; 19/19 vault-gate tests, 99/99 phase2 pass; zero new secrets, fail-closed all paths | ASP-432: vault_gate.py, minimal_shim.py wiring, hitl_vault.py bugfix, test suite |
+| **Weekly architecture review 2026-10-19 (ASP-800)** — Architecture review covering ADR-0012/0013 baseline, systemd unit audit, holographic memory store progress. Covers: ADR-0012 operator binding still Proposed (P0-1 open), ADR-0013 worktree isolation accepted, 18 systemd units confirmed vs 16 in docs (docs corrected via ASP-660). | Architecture baseline updated for 2026-10-19 | None — no new threat surfaced | **Complete** — `docs/ops/WEEKLY_ARCHITECTURE_REVIEW_2026-10-19.md` |
+| **Holographic catalog MemoryStore loader (ASP-782)** — `scripts/holographic_ingest.py` gains `catalog_plugin_dir()` to load plugins from `ASPEN_HOLOGRAPHIC_PLUGIN` env dir or Hermes Home plugin tree. | Plugins can extend holographic ingestion; plugin path safely validated and reject-invalid | None — plugin loading validates path; env-gated, not a trust boundary change | **Implemented** — 100-line change; tests adjusted |
+| **Nightly PASS sustained** — 158/159 checks (Sections 1–23) across multiple runs (ASP-789, ASP-791, ASP-793, ASP-795, ASP-797, ASP-798, ASP-799). Only deviation: C11 p50 (3.655ms vs 2ms threshold, known hardware baseline). Python suite 500/4, smoke 61/1, ACL 23/23, gatekeeper 13/13, vault-gate 19/19, tool-anomaly 13/13. | No regressions in any security section across two weeks of nightly runs | None | **Green** — C11 p50 trend stable; watch threshold drift |
+| **Branch protection enforced (ASP-732)** — origin/master now requires 10 CI contexts, strict merge, enforce_admins:true. Resolution of a post-PR #60 compliance deviation. | CI integrity improved; force-push-blocked on master | None | **Resolved** — `docs/ops/NIGHTLY_PACKAGING_DEPLOY_CHECK.md` documents the resolved deviation |
+| **ADR-0013 git worktree isolation (ASP-661)** — Per-issue execution workspaces via Paperclip `isolated_workspace` + `git_worktree`. Accepted as architecture baseline. | Agent execution isolation prevents cross-issue workspace contamination | None | **Accepted** — `docs/adr/ADR-0013` |
+| **NATS subject topology updated** — `nats/subjects.yaml` updated with `starship.aspen.*` subject topology for anomaly events. | Subject topology baseline for monitoring | None | **Updated** — alignment with ASP-687 anomaly consumer |
 
 ### Threats with status change this cycle
 
 | Item | Previous | Current | Rationale |
 |------|----------|---------|-----------|
-| H-019 (Dev-only CI gate) | Open / ADR-0008 proposed | **CLOSED (ASP-574)** | CI gate script + CI wire + nightly Section 16 + self-test; verified clean |
-| H-014 (AppArmor deployment) | Check gap | **Satisfied (ASP-374/575)** | Profiles staged in deb postinst; nightly Section 17 verifies 4 checks |
-| H-015 (Audit trail) | Open — consumer pending | **CLOSED (ASP-537)** | Publisher + consumer + dashboard endpoints all wired |
-| H-008 (Self-auth) | Phase 1 implemented | **Phase 1 + Phase 2 (ASP-564)** | Token lifecycle + credential-strip proxy landed; only H-020 (SPOF) remains design-only |
-| H-010 (Stale tokens) | ADR-0009 design | **Implemented (ASP-564)** | Short TTL + lifecycle; refuse if expired; stale cleanup |
-| H-021 (aspen.sentinel ACL) | Open | **Closed (ASP-369)** | Addressed by ACL pivot removal; edge cross-plant denied |
-| F-011 (NATS rate limits) | Not tracked | **Implemented (ASP-375)** | Per-connection + per-account limits in all NATS configs |
-| F-012 (Cgroup limits) | Not tracked | **Implemented (ASP-376)** | systemd drop-in profiles per agent unit |
-| F-013 (Model digests) | Open | **Implemented (ASP-377)** | `config/models-digests.yaml` + verify-after-pull fail-hard |
-| F-014 (Signed packages) | Not tracked | **Implemented (ASP-378)** | `gpgv` verify gate + CI job; ceremony deferred |
-| F-022 (Edge→alpha pivot) | Not tracked | **Closed (ASP-369)** | ACL entry removed; edge→alpha denied |
-| H-022 (Physical cell HITL vault) | Not tracked | **Implemented (ASP-432)** | Vault-gate in gatekeeper shim; fail-closed on all vault failure paths |
-| H-023 (Independent estop watchdog) | Not tracked | **Implemented (ASP-433)** | `EstopWatchdog` design/sim: fail-closed tick/deadline gate, dual-authorize clear, durable latch; live GPIO/relay wire residual pending Aspen START |
+| ASP-687 (Anomaly live consumer) | Implemented (ASP-776) | **Confirmed operational** | Anomaly feed active across nightly runs; no regression |
+| CR 4.3 (Continuous monitoring) | Partial | **Partial — improved** | Live anomaly feed adds real-time behavioral monitoring; ACL drift alerting still missing |
+| Nightly stability | Green | **Green — sustained** | Two consecutive weeks of 158/159 PASS |
+| Branch protection | Non-enforced | **Enforced** | 10-context strict merge; admin override blocked |
 
 ---
 
@@ -271,37 +258,48 @@
 
 | Item | Priority | Status | Action |
 |------|----------|--------|--------|
-| H-007 (EStop single-human clear) | **Critical** | Covered | Integration test added (ASP-573) |
-| H-008 (Propose_act self-auth) | **Critical** | Gap | Gatekeeper implementation — Phase 1 (ASP-540) dual-human; Phase 2 (ASP-564) token lifecycle + credential strip |
-| H-009 (Dual-human collision) | High | Design spec | Verify identity uniqueness logic |
+| H-007 (EStop single-human clear) | **Critical** | Covered (ASP-573) | Integration test added |
+| H-008 (Propose_act self-auth) | **Critical** | Phase 1 + Phase 2 (ASP-540/564) | Dual-human + token lifecycle + credential strip |
+| H-009 (Dual-human collision) | High | **Satisfied** | Identity uniqueness logic tested |
 | H-010 (Stale capability tokens) | Medium | **Implemented (ASP-564)** | Short TTL + lifecycle; refuse if expired |
 | H-011 (Plaintext NATS creds) | **High** | **Partial (ASP-536)** | nkey-only gen mode; residual: `nk` at gen time, SYS password |
 | H-012 (Hardcoded NATS URL) | Medium | Closed (ASP-539) | Config/env refactor |
-| H-013 (Missing aspen.* ACL) | **High** | **Closed (ASP-536)** | Template ACLs committed for all roles |
-| H-014 (AppArmor deployment) | Medium | **Satisfied (ASP-374/575)** | Profiles staged in deb postinst; nightly Section 17 |
-| H-015 (Audit trail) | **High** | **Closed (ASP-537)** | Publisher + consumer + dashboard endpoints; anomaly detector added (ASP-379) |
-| H-017 (Credential rotation) | Medium | Open | Rotation procedure |
+| H-013 (Missing aspen.* ACL) | **High** | **Closed (ASP-536)** | Template ACLs for all roles |
+| H-014 (AppArmor deployment) | Medium | **Satisfied (ASP-374/575)** | Profiles staged; nightly Section 17 |
+| H-015 (Audit trail) | **High** | **Closed (ASP-537)** | Publisher + consumer + dashboard; anomaly detector added |
+| H-017 (Credential rotation) | Medium | **Open** | Rotation procedure |
 | H-019 (Dev-only CI gate) | Medium | **Closed (ASP-574)** | CI gate + nightly Section 16 |
-| H-020 (Gatekeeper SPOF) | Medium | **Design only (H-008 residual)** | H-008 Phase 2 complete; redundancy plan separate |
-| H-021 (aspen.sentinel permissions) | Medium | **Closed (ASP-369)** | ACL pivot removed; edge cross-plant denied by default |
-| **H-022 (Physical cell HITL vault)** | **Critical** | **Implemented (ASP-432)** | Vault-gate in gatekeeper shim; 19/19 tests; fail-closed all paths |
-| **H-023 (Independent estop watchdog)** | **High** | **Implemented (ASP-433)** | `EstopWatchdog` design/sim: fail-closed tick/deadline gate, dual-authorize clear, durable latch; live wire = Aspen START |
+| H-020 (Gatekeeper SPOF) | Medium | **Design only** | Redundancy plan separate |
+| H-021 (aspen.sentinel permissions) | Medium | **Closed (ASP-369)** | ACL pivot removed |
+| **H-022 (Physical cell HITL vault)** | **Critical** | **Implemented (ASP-432)** | Vault-gate; 19/19 tests; fail-closed |
+| **H-023 (Independent estop watchdog)** | **High** | **Implemented (ASP-433)** | `EstopWatchdog` design/sim; live wire = Aspen START |
+| **H-024 (IEC 62443-4-2 cell baseline)** | **High** | **BASELINE — P0-2 closed (ASP-684)** | TLS default implemented; P0-1 ADR-0012 binding remains open; 10-gate checklist |
 | H-HOST-01 (NATS store access) | Low | Active | Existing systemd hardening |
 | H-HOST-03 (Stale units) | Low | Check gap | Audit systemd flags |
 | H-HOST-04 (Master password env) | Medium | **Open** | Keyring/prompt pattern |
-| F-015 (Red lateral) | **High** | Active + Anomaly detector | Existing isolation + ASP-379 (fail-open observation) |
+| F-015 (Red lateral) | **High** | Active + live anomaly feed | Anomaly detector live consumer wired (ASP-687); blocking path still deferred |
 | F-016 (ACL misconfig) | Medium | Active + F-022 closed | Fail-closed default; edge→alpha removed |
-| F-017 (Spoofed heartbeat) | Medium | Open | PKI fingerprint |
-| F-013 (Unpinned model digests) | Low | Implemented (ASP-377) | Verify-after-pull fail-hard; reject unpinned in production |
+| F-017 (Spoofed heartbeat) | Medium | **Open** | PKI fingerprint |
+| F-013 (Unpinned model digests) | Low | Implemented (ASP-377) | Post-pull verification |
 | F-018 (Exercise state race) | Low | Open | Atomic file write |
 | F-019 (Delegated agent no plant) | Low | Informational | Document default |
-| F-020 (Data-diode OSINT/ingest) | Medium | **Recipe complete** | [Recipe](solutions/asp-368-data-diode-recipe.md) reviewed (AUDITOR_APPROVE); in_review — captain proof required |
-| F-011 (NATS rate limits) | Medium | **Implemented (ASP-375)** | All three NATS configs hardened; per-account limits |
-| F-012 (Cgroup limits) | Medium | **Implemented (ASP-376)** | 8 unit profiles; git-only (no live systemd); Section 20 nightly |
-| F-014 (Signed packages) | Medium | **Implemented (ASP-378)** | Verify path ships; placeholder dev key; ceremony deferred |
-| F-022 (Edge→alpha pivot) | **High** | **Closed (ASP-369)** | ACL entry removed; edge cross-plant fails closed |
-| ASP-379 (Tool-anomaly detector) | Low | **Implemented** | Fail-open R1–R4 observation; live consumer wiring deferred |
-| ASP-607 (Gatekeeper rate limit) | Medium | **Implemented** | Per-agent sliding window on `request_capability()` |
+| F-020 (Data-diode OSINT/ingest) | Medium | **Recipe complete** | Recipe reviewed; awaiting captain proof |
+| F-011 (NATS rate limits) | Medium | **Implemented (ASP-375)** | Per-connection + per-account limits |
+| F-012 (Cgroup limits) | Medium | **Implemented (ASP-376)** | 8 unit profiles; git-only |
+| F-014 (Signed packages) | Medium | **Implemented (ASP-378)** | Verify path ships; ceremony deferred |
+| F-022 (Edge→alpha pivot) | **High** | **Closed (ASP-369)** | ACL entry removed |
+| ASP-379 (Tool-anomaly detector) | Low | **Implemented — live consumer wired (ASP-687)** | R1–R4 observation + live feed |
+| ASP-607 (Gatekeeper rate limit) | Medium | **Implemented** | Per-agent sliding window |
+| ASP-659 (Flock serialization) | Low | **Implemented** | `check-nightly.sh` flock guard |
+| ASP-660 (Systemd count fix) | Low | **Closed** | Docs-only baseline correction |
+| ASP-684 (TLS by default) | **High** | **Implemented** | H-024 P0-2 closed |
+| ASP-687 (Anomaly consumer) | Medium | **Implemented** | Live feed path active |
+| ASP-696 (HybridIntel removal) | Low | **Implemented** | Attack surface reduction |
+| ASP-721 (NATS install guard) | Low | **Implemented** | CI reliability |
+| ASP-730 (Python CI gate) | Medium | **Implemented** | Full test suite as required check |
+| ASP-732 (Branch protection) | Low | **Resolved** | 10-context strict merge enforced |
+| ASP-782 (Holographic catalog loader) | Low | **Implemented** | Feature, no security impact |
+| ASP-800 (Weekly arch review) | Low | **Complete** | Architecture baseline 2026-10-19 |
 
 ---
 
@@ -311,9 +309,9 @@
 
 | Category | Path | Likelihood | Impact |
 |----------|------|------------|--------|
-| **S**poofing | Forge ops credentials on NATS bus | Low (accounts + password) | Critical — full mesh access |
+| **S**poofing | Forge ops credentials on NATS bus | Low (accounts + password + TLS) | Critical — full mesh access |
 | **T**ampering | Inject modified heartbeat/status | Medium (no integrity check) | High — false node state |
-| **R**epudiation | Agent action without audit log | High (no audit publisher) | High — no forensic trail |
+| **R**epudiation | Agent action without audit log | Low (audit publisher + consumer active; anomaly feed) | High — no forensic trail |
 | **I**nfo disclosure | Leak via tool output to LLM context | Low (redaction active) | Medium — credential exposure |
 | **D**oS | Flood fleet subjects | Low (max_connections, max_payload) | Medium — bus degradation |
 | **E**levation | Cross-plant via delegated agent | Low (ACL fail-closed) | High — plant boundary |
@@ -340,52 +338,30 @@
 
 ### P0 — Act this sprint
 
-1. **[x] Add integration test for estop dual-human clear (H-007).** Dedicated negative-case integration test added in `scripts/smoke-fleet-bus.py` (H-007 block, ASP-573): bare `clear` refused, single `authorize_clear` + `clear` refused, dual distinct `authorize_clear` + `clear` unlatches; audit verified. `aspen-edge-rrm` pin bumped in `third_party/pins.json` to the gated master (`f4f2c8d`+) so CI/nightly clone the gated RRM.
+1. **[ ] Implement NATS credential rotation procedure (H-017).** Document a rotation workflow: regenerate creds with `gen-nats-accounts.sh`, distribute new `.env` files, restart NATS clients. The script has no expiry enforcement or rotation window — document a 90-day rotation cadence and add a reminder cron. With TLS now default at deployment, rotated credentials on TLS-protected bus avoid plaintext distribution concerns. **Persistent — open for 4+ cycles now.**
 
-2. **[x] Implement H-019 CI gate — block Dev-only packages from production images.** PACKAGES.md defines three tiers (Core/Plugin/Dev-only). `scripts/check-no-devonly-in-prod.sh` parses PACKAGES.md, scans production paths, fails if any Dev-only path is found. Wired as CI job `security-devonly-isolation` + nightly Section 16. Self-test mode verifies planted markers are detected. **CLOSED (ASP-574).**
+2. **[ ] Implement ADR-0012 operator binding (H-024 P0-1).** Bind `human_id` to a persistent operator registry before non-sim actuator arm. Production cell commission checklist item 1 blocks commissioning without this. Follow the ADR-0012 design spec; interface with the gatekeeper `authorize` path to replace free-string `human_id` with registered operator records. **Blocks:** G9+ physical arm.
 
-3. **[x] Verify AppArmor profiles load on all deployment targets (H-014).** Profiles exist at `security/apparmor/`; `debian/DEBIAN/postinst` stages + loads them via `apparmor_parser -r` (no enforce, ASP-374). Nightly Section 17 verifies: (1) profiles exist in source, (2) `build-deb.sh` stages them, (3) `postinst` runs `apparmor_parser`, (4) `postinst` avoids `aa-enforce`. **Satisfied (ASP-374/575).**
-
-4. **[x] Implement F-011 NATS rate limiting (ASP-375).** Per-connection hardening (max_pending 16MB, max_subscriptions 512, write_deadline 5s, ping 30s/3, auth timeout 2.0s) plus per-account limits bounding blast radius. All three NATS configs hardened; Section 19 nightly gate. **Implemented.**
-
-5. **[x] Implement F-012 cgroup per-agent limits (ASP-376).** systemd drop-in profiles with CPUQuota, MemoryMax, MemoryHigh, TasksMax for all 8 agent units. 6 fixture tests; build-deb stages drop-ins; Section 20 nightly gate. **Implemented.** (Git-only — no live systemd applied on bt-asp-srv.)
-
-6. **[x] Implement F-013 model digest pinning (ASP-377).** `config/models-digests.yaml` pins all 7 Ollama models to sha256; `install-models.sh` verify-after-pull fail-hard; CI + nightly Section 22 enforce. **Implemented.**
-
-7. **[x] Implement F-014 signed package verify gate (ASP-378).** `gpgv` detached-signature verify before `dpkg -i`; CI job fails on unsigned/tampered; placeholder dev trust anchor. Ceremony (real key signing) is deferred human action. **Implemented.**
-
-8. **[x] Implement F-022 edge→alpha ACL removal (ASP-369).** `plant-edge: [plant-alpha]` removed from `config/fleet.yaml`; edge cross-plant fails closed via `same_plant_only` default. 11 ACL fixture tests; smoke-test check. **Closed.**
-
-9. **[x] Implement ASP-379 tool-anomaly detector.** Fail-open behavioral R1–R4 rules over tool audit events; `sensitive_read_then_egress`, `high_risk_burst`, `denial_probe`, `error_storm`. 12 hermetic tests. Live consumer wiring deferred.
-
-10. **[x] Implement ASP-607 gatekeeper rate limiting.** Per-agent sliding-window rate limit on `request_capability()`; env-overridable defaults 30 req/60s; deny + `gate.rate_limited` audit. 13 tests.
+3. **[ ] Node fingerprint for fleet heartbeat (F-017).** Fleet nodes register with NATS account + token but no PKI identity. A compromised bus credentials file lets an attacker register a fake node. Add a fingerprint field (`ed25519` public key or machine-id hash) to the `aspen.fleet.node.register` / `aspen.fleet.node.heartbeat` payload; ops-manager validates against a known-node allowlist.
 
 ### P1 — Next sprint
 
-11. **[ ] NATS credential rotation procedure (H-017).** Document a rotation workflow: regenerate creds with `gen-nats-accounts.sh`, distribute new `.env` files, restart NATS clients. The script has no expiry enforcement or rotation window — document a 90-day rotation cadence and add a reminder cron.
+4. **[ ] Automated ACL drift detection.** Cron job compares `fleet.yaml` ACL baseline against live fleet state from heartbeats. Report drift events on `aspen.sentinel.audit.event`.
 
-12. **[ ] Replace env-based master password with keyring or prompt (H-HOST-04).** `AGENTIC_MASTER_PASSWORD` lives in process env and leaks via `/proc` or crash dumps. Migrate to `keyring` backend or prompt-on-startup with TPM-backed sealed secret. Fall back to env only as a last resort with a documented warning.
+5. **[ ] Security scan CI gate.** Integrate `bandit` (Python) and `semgrep` (multi-lang) into `make check` or CI pipeline. Start with critical/high rules only to avoid noise.
 
-13. **[ ] Node fingerprint for fleet heartbeat (F-017).** Fleet nodes register with NATS account + token but no PKI identity. A compromised bus credentials file lets an attacker register a fake node. Add a fingerprint field (`ed25519` public key or machine-id hash) to the `aspen.fleet.node.register` / `aspen.fleet.node.heartbeat` payload; ops-manager validates against a known-node allowlist.
+6. **[ ] Code signing.** Sign `sandbox_run`, `policyexec`, `starshipd` binaries; verify signature at install/start time.
 
-14. **[ ] Wire anomaly detector to live audit consumer.** Subscribe a JetStream consumer to the tool-audit subject, feed events through `ToolAnomalyDetector.feed()`, publish findings to a `sentinel.tools.anomaly` subject so ops can page on R1 (high) and template on R2–R4.
+### P2 — v2.4 planning
 
-### P2 — v2.3 planning
+7. **[ ] NATS nkey migration (continued).** ASP-536 added nkey-only gen mode; residual work: enforce nkey-only in CI (fail `--password-only` in production builds), migrate SYS account, automate `nk` binary availability. Replace password-based auth across all accounts.
 
-15. **[x] ADR-0009 Phase 2:** Full token lifecycle (consumption/refresh), Hermes/Paperclip credential strip, immutable proxy enforcement. — Phase 1 landed in ASP-540; Phase 2 landed in ASP-564. H-020 (SPOF) redundancy plan tracked separately.
+8. **[ ] Replace env-based master password with keyring or prompt (H-HOST-04).** `AGENTIC_MASTER_PASSWORD` lives in process env and leaks via `/proc` or crash dumps. Migrate to `keyring` backend or prompt-on-startup with TPM-backed sealed secret. Fall back to env only as a last resort with a documented warning.
 
-16. **[x] TLS by default:** Enable `STARSHIP_NATS_TLS=1` in firstboot templates. Document WAN deployment with mutual TLS. — **Implemented (ASP-684).** Before: `gen-nats-tls.sh` existed but nothing called it, and the TLS block sat *inside* `_enable_accounts_bus`, so `STARSHIP_NATS_TLS=1` on an `edge` cell was silently ignored — a knob that lied. Now: mode resolved up front (ops/edge default on; `server` dev stays plaintext on loopback), TLS applied after bus selection by resolving `active.conf` so accounts/fleet/agent modes all reach it, and required-but-unavailable TLS **fails closed** rather than degrading to plaintext. `gen-nats-tls.sh --mutual` emits `verify: true` for WAN; upgrading an existing cell re-issues the snippet without rotating certs. `scripts/check-nats-tls-default.sh` (5 load-bearing predicates, proven by `--self-test`) is CI job `security-nats-tls` + nightly Section 23. Deployment guide: `docs/security/H-024-wan-mtls-deployment.md`. Rotation cadence remains open under H-017 (§8 item 11).
+9. **[ ] SIEM/Sentinel integration.** Connect audit events to external SIEM or Sentinel dashboard.
 
-17. **[ ] NATS nkey migration (continued):** ASP-536 added nkey-only gen mode; residual work: enforce nkey-only in CI (fail `--password-only` in production builds), migrate SYS account, automate `nk` binary availability. Replace password-based auth across all accounts (partial ASP-536).
-
-18. **[ ] Automated ACL drift detection:** Cron job compares `fleet.yaml` ACL baseline against live fleet state from heartbeats. Report drift events on `aspen.sentinel.audit.event`.
-
-19. **[ ] Security scan CI gate:** Integrate `bandit` (Python) and `semgrep` (multi-lang) into `make check` or CI pipeline. Start with critical/high rules only to avoid noise.
-
-20. **[ ] Code signing:** Sign `sandbox_run`, `policyexec`, `starshipd` binaries; verify signature at install/start time.
-
-21. **[ ] SIEM/Sentinel integration:** Connect audit events to external SIEM or Sentinel dashboard.
+10. **[ ] Reassess C11 p50 threshold.** Nightly consistently shows ~3.6ms vs 2ms threshold. Either (a) relax threshold to 5ms and log real outliers, or (b) investigate host-level timer causes. This is the sole standing nightly deviation.
 
 ---
 
-*End of threat model v2.2. Next refresh: 2026-10-05.*
+*End of threat model v2.3. Next refresh: 2026-11-02.*
