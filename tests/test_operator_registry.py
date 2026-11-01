@@ -14,6 +14,11 @@ Covers:
 - List all operators (includes revoked)
 - Persistence across registry load
 - Empty registry loads cleanly
+- Corrupt file fail-closed (no write over corrupt data)
+- Schema errors fail-closed
+- Atomic persist with mode 0600
+- Case-fold rejection for human_id (including revoked)
+- Case-fold rejection for alias vs human_id and alias vs alias
 """
 
 import json
@@ -76,16 +81,6 @@ class TestEnroll:
             reg.enroll("op-001", "Alice Smith", aliases=["alice@plant"])
             with pytest.raises(ValueError, match="already bound"):
                 reg.enroll("op-002", "Bob Jones", aliases=["alice@plant"])
-
-    def test_enroll_revoked_then_re_enroll(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            path = os.path.join(tmp, "registry.json")
-            reg = OperatorRegistry(db_path=path)
-            reg.enroll("op-001", "Alice Smith")
-            reg.revoke("op-001")
-            op = reg.enroll("op-001", "Alice Smith v2")
-            assert op.status == "active"
-            assert op.display_name == "Alice Smith v2"
 
 
 class TestRevoke:
@@ -213,10 +208,86 @@ class TestPersistence:
             reg = OperatorRegistry(db_path=path)
             assert reg.list() == []
 
-    def test_corrupt_file_does_not_crash(self):
+    def test_corrupt_file_does_not_crash_load_but_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "registry.json")
             with open(path, "w") as f:
                 f.write("not json")
             reg = OperatorRegistry(db_path=path)
             assert reg.list() == []
+            with pytest.raises(RuntimeError, match="corrupt"):
+                reg.enroll("op-001", "Alice Smith")
+            with open(path) as f:
+                assert f.read() == "not json"
+
+    def test_schema_error_extra_key_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "registry.json")
+            with open(path, "w") as f:
+                json.dump([{"human_id": "op-001", "unknown_key": "nope"}], f)
+            reg = OperatorRegistry(db_path=path)
+            assert reg.list() == []
+            with pytest.raises(RuntimeError, match="corrupt"):
+                reg.enroll("op-002", "Bob Jones")
+
+    def test_schema_error_non_list_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "registry.json")
+            with open(path, "w") as f:
+                json.dump({"human_id": "op-001"}, f)
+            reg = OperatorRegistry(db_path=path)
+            assert reg.list() == []
+            with pytest.raises(RuntimeError, match="corrupt"):
+                reg.enroll("op-002", "Bob Jones")
+
+    def test_persist_atomic_with_mode_0600(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "registry.json")
+            reg = OperatorRegistry(db_path=path)
+            reg.enroll("op-001", "Alice Smith")
+            assert os.path.exists(path)
+            mode = os.stat(path).st_mode & 0o777
+            assert mode == 0o600, f"expected 0600, got {oct(mode)}"
+
+    def test_re_enroll_same_case_revoked_allowed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "registry.json")
+            reg = OperatorRegistry(db_path=path)
+            reg.enroll("op-001", "Alice Smith")
+            reg.revoke("op-001")
+            op = reg.enroll("op-001", "Alice Smith v2")
+            assert op.status == "active"
+            assert op.display_name == "Alice Smith v2"
+
+    def test_enroll_case_fold_human_id_raises(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "registry.json")
+            reg = OperatorRegistry(db_path=path)
+            reg.enroll("Op-001", "Alice Smith")
+            with pytest.raises(ValueError, match="case-fold"):
+                reg.enroll("op-001", "Alice Again")
+
+    def test_enroll_case_fold_human_id_revoked_raises(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "registry.json")
+            reg = OperatorRegistry(db_path=path)
+            reg.enroll("Op-001", "Alice Smith")
+            reg.revoke("Op-001")
+            with pytest.raises(ValueError, match="case-fold"):
+                reg.enroll("op-001", "Alice Again")
+
+    def test_enroll_alias_case_fold_vs_human_id_raises(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "registry.json")
+            reg = OperatorRegistry(db_path=path)
+            reg.enroll("Op-001", "Alice Smith")
+            with pytest.raises(ValueError, match="already bound"):
+                reg.enroll("op-002", "Bob Jones", aliases=["op-001"])
+
+    def test_enroll_alias_case_fold_vs_alias_raises(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "registry.json")
+            reg = OperatorRegistry(db_path=path)
+            reg.enroll("op-001", "Alice Smith", aliases=["ALICE@PLANT"])
+            with pytest.raises(ValueError, match="already bound"):
+                reg.enroll("op-002", "Bob Jones", aliases=["alice@plant"])

@@ -36,7 +36,7 @@ def cmd_enroll(args: argparse.Namespace) -> int:
             aliases=args.aliases,
             plant_id=args.plant_id or "",
         )
-    except ValueError as e:
+    except (ValueError, RuntimeError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
     print(json.dumps({
