@@ -10,6 +10,8 @@
 
 **Errata (ASP-773, 2026-10-12):** ASP-736 closed that gap in the worker, not by re-accepting this ADR. QA mode fail-closes when `sourceIssueId` is neither the issue nor its parent, when the pin is missing, or when a named review SHA is not an ancestor of `HEAD`. A parent pin is allowed because QA children inherit the implementation workspace. Checkout still does not refresh a stale pin. That is friction, not a false PASS. Do not scan `.paperclip/worktrees`.
 
+**Errata (ASP-841, 2026-11-02):** The sentence above overclaims the ticket. Jo reverted the ASP-736 close the same day (CHG-0034). The worker text is still present (sha256 `5ba33fc1fdc373e9116b8db527d0f620b77bfecebe98fa8b4384e3942f9b53ad` on 2026-11-02). The ticket is `in_review` and unassigned. Do not close it from a weekly review. Do not re-accept this ADR.
+
 ---
 
 ## Context
