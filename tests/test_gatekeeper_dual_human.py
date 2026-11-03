@@ -104,7 +104,7 @@ def _safety_request(capability=SAFETY_CAP):
         "aspen-fleet-edge",
         capability,
         "plant:chae-cell-01",
-        {"profile": "full-plant"},
+        {"profile": "light-cell"},
     )
 
 
@@ -197,7 +197,7 @@ class TestDualHumanThreshold:
         token = outcome["token"]
         assert "token_id" in token
         assert token["capability"] == SAFETY_CAP
-        assert token["scope"] == "full-plant"
+        assert token["scope"] == "light-cell"
         assert "expires" in token
         assert token["authorized_by"] == ["operator-1", "operator-2"]
         assert PROPOSALS[req_id]["state"] == "granted"
@@ -440,7 +440,7 @@ class TestNATSDecisionWiring:
         grant = json.loads(grant_pub[0][1].decode())
         assert grant["agent_id"] == "aspen-fleet-edge"
         assert grant["caps"] == [SAFETY_CAP]
-        assert grant["scope"] == "full-plant"
+        assert grant["scope"] == "light-cell"
 
         await client.close()
 
