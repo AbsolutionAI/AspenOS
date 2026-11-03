@@ -350,7 +350,7 @@ class TestGatekeeperProxy:
         result = proxy.request_capability(
             "aspen.safety.estop:execute",
             "plant:chae-cell-01",
-            profile="full-plant",
+            profile="light-cell",
         )
         assert result["decision"] == "propose_act"
         # propose_act returns no token_id to cache
@@ -829,7 +829,7 @@ class TestPhase2Integration:
         result = proxy.request_capability(
             "aspen.safety.estop:execute",
             "plant:chae-cell-01",
-            profile="full-plant",
+            profile="light-cell",
         )
         assert result["decision"] == "propose_act"
         req_id = result["request_id"]
