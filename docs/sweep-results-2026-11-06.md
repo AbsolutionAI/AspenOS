@@ -1,8 +1,9 @@
 # Daily Implementation Sweep — 2026-11-06
 
 **Ticket:** ASP-865
-**Status:** PR created, awaiting QA gate
+**Status:** PR created, QA gate child issue created (ASP-866), parent blocked
 **PR:** [#91](https://github.com/AbsolutionAI/AspenOS/pull/91)
+**QA Gate:** [ASP-866](http://bt-asp-srv.tailc07799.ts.net:3100/api/issues/0c8387ae-81e8-4799-a2cc-b32974d9cf62)
 
 ## Queue sweep
 
@@ -42,7 +43,7 @@ Commits on branch:
 ## Blockers
 
 - ~~**PR not created:** `gh` CLI not authenticated with a valid API token~~ **RESOLVED** — PR #91 created: `https://github.com/AbsolutionAI/AspenOS/pull/91`
-- **Paperclip API unreachable:** `PAPERCLIP_API_URL` contains `[IP_ADDRESS]` placeholder. Cannot create QA-gate child issue or invoke Aider programmatically.
+- ~~**Paperclip API unreachable:** `PAPERCLIP_API_URL` contains `[IP_ADDRESS]` placeholder.~~ **RESOLVED** — API reachable via MagicDNS `bt-asp-srv.tailc07799.ts.net:3100`. QA gate child issue [ASP-866](http://bt-asp-srv.tailc07799.ts.net:3100/api/issues/0c8387ae-81e8-4799-a2cc-b32974d9cf62) created, parent blocked.
 
 ## Backlog carried forward
 
@@ -56,3 +57,4 @@ Commits on branch:
 
 - `pytest` DeprecationWarning from `hermes/plugins/holographic/store.py` (same 2 warnings as baseline — `__package__ != __spec__.parent`) — hermetic, no action needed.
 - ASP-823 handoff doc archived at `.paperclip/todos/ASP-823-handoff.md`.
+- **Paperclip API workaround:** `PAPERCLIP_API_URL` has a placeholder `[IP_ADDRESS]` but the real API is reachable at `bt-asp-srv.tailc07799.ts.net:3100`. Set `PAPERCLIP_API_URL=http://bt-asp-srv.tailc07799.ts.net:3100` in future sessions. Write this to a memory for persistence.
