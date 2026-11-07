@@ -36,7 +36,7 @@ def test_explicit_db_env_writes_holographic(tmp_path, monkeypatch):
         ingest_dir=ingest,
     )
     assert path.exists()
-    sys.path.insert(0, "/home/tech/.hermes/hermes-agent")
+    sys.path.insert(0, str(hi.HERMES_AGENT_ROOT))
     try:
         from plugins.memory.holographic.store import MemoryStore
     except ImportError as exc:

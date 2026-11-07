@@ -11,9 +11,12 @@ Precedence, highest first:
 2. ``ASPEN_DATA_HOME`` / ``XDG_DATA_HOME`` for the Aspen data tree.
 3. The invoking user's home directory.
 
-The packaged deployment pins step 2 explicitly via
-``Environment=ASPEN_DATA_HOME`` in ``systemd/agnetic-agent@.service``, so a
-service running as a dedicated user does not depend on that user's home.
+The packaged systemd unit
+(``systemd/agnetic-agent@.service``) is *not* updated in this
+change — pinning the durable data root for a dedicated
+``User=agnetic`` is escalated to the Aspen Architect as a
+separate issue.  ``ASPEN_DATA_HOME`` exists as the knob that
+makes that follow-up a one-line ``Environment=`` addition.
 
 Refs: docs/plans/ASP-733.md
 """
@@ -27,7 +30,10 @@ from pathlib import Path
 def _env_path(name: str) -> Path | None:
     """Return ``$name`` as a Path, or None if unset/blank/not absolute-ish."""
     raw = os.environ.get(name, "").strip()
-    return Path(raw).expanduser() if raw else None
+    if not raw:
+        return None
+    resolved = Path(raw).expanduser()
+    return resolved if resolved.is_absolute() else None
 
 
 def _home() -> Path:

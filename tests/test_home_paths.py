@@ -108,6 +108,19 @@ def test_blank_override_is_ignored_not_treated_as_cwd(clean_env, tmp_path, monke
     assert P.data_home() == tmp_path / "home" / ".aspen"
 
 
+def test_relative_override_is_rejected(clean_env, tmp_path, monkeypatch):
+    clean_env.setenv("HOME", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    clean_env.setenv("HERMES_AGENT_ROOT", "relative/path")
+    assert P.hermes_agent_root() == tmp_path / ".hermes" / "hermes-agent"
+
+
+def test_expanduser_override_is_still_absolute(clean_env, tmp_path):
+    clean_env.setenv("HOME", str(tmp_path))
+    clean_env.setenv("ASPEN_HOLOGRAPHIC_DB", "~/relative")
+    assert P.holographic_db() == tmp_path / "relative"
+
+
 def test_override_is_expandusered(clean_env, tmp_path):
     clean_env.setenv("HOME", str(tmp_path))
     clean_env.setenv("ASPEN_DATA_HOME", "~/elsewhere")
