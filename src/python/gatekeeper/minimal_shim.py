@@ -693,6 +693,37 @@ def _vault_gate(proposal: Dict[str, Any]) -> Dict[str, Any]:
     return _grant_proposal(proposal)
 
 
+def _get_registry_path() -> str:
+    return os.environ.get("ASPEN_OPERATOR_REGISTRY", "/var/lib/aspen/operator-registry.json")
+
+
+def _check_operator_binding(human_id: str, profile: str) -> Optional[str]:
+    """Check that human_id is bound in the operator registry (non-sim only).
+
+    For ``light-cell`` (sim) profiles: always valid — free strings allowed.
+    For non-sim profiles: human_id must be enrolled and active in
+    OperatorRegistry. A corrupt or missing registry is fail-closed for
+    non-sim — the system refuses to authorize without proof of enrollment.
+
+    Returns None when the binding is valid, or a refusal reason string when
+    the binding check fails.
+    """
+    if profile == "light-cell":
+        return None
+    try:
+        from services.operator_registry import OperatorRegistry
+        path = _get_registry_path()
+        registry = OperatorRegistry(db_path=path)
+    except Exception as exc:
+        logger.error("Operator registry unavailable for binding check: %s", exc)
+        return "operator_registry_unavailable"
+    op = registry.get(human_id)
+    if op is None:
+        return "operator_not_registered"
+    if op.status != "active":
+        return "operator_not_active"
+    return None
+
 def authorize_gate_request(
     request_id: str,
     human_id: str,
@@ -733,6 +764,26 @@ def authorize_gate_request(
     if _is_expired(proposal):
         _mark_refused(proposal, "authorization_window_expired")
         return _refusal_dict(proposal)
+
+    binding_reason = _check_operator_binding(human_id, proposal.get("profile", "light-cell"))
+    if binding_reason is not None:
+        log_audit({
+            "type": "gate.operator_binding.refuse",
+            "actor": human_id,
+            "request_id": request_id,
+            "agent_id": proposal["agent_id"],
+            "capability": proposal["capability"],
+            "resource": proposal["resource"],
+            "profile": proposal.get("profile", "light-cell"),
+            "reason": binding_reason,
+        })
+        return {
+            "decision": "refuse",
+            "request_id": request_id,
+            "reason": binding_reason,
+            "humans": list(proposal["humans"]),
+            "humans_required": DUAL_HUMAN_REQUIRED,
+        }
 
     if human_id in proposal["humans"]:
         log_audit({

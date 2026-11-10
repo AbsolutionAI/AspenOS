@@ -41,8 +41,18 @@ PLAIN_CELL_CAP = "aspen.safety.estop:execute"  # safety but NOT a physical act
 def _hitl_tmp_paths(tmp_path):
     old_db = os.environ.get("HITL_DB")
     old_vault = os.environ.get("HITL_VAULT_DIR")
+    old_reg = os.environ.get("ASPEN_OPERATOR_REGISTRY")
     os.environ["HITL_DB"] = str(tmp_path / "hitl.db")
     os.environ["HITL_VAULT_DIR"] = str(tmp_path / "vault")
+    reg_path = str(tmp_path / "operators.json")
+    os.environ["ASPEN_OPERATOR_REGISTRY"] = reg_path
+    from services.operator_registry import OperatorRegistry
+    reg = OperatorRegistry(db_path=reg_path)
+    for hid in ("op-1", "op-2", "op-a", "op-b"):
+        try:
+            reg.enroll(hid, f"Test Operator {hid}")
+        except ValueError:
+            pass
     yield
     if old_db is None:
         os.environ.pop("HITL_DB", None)
@@ -52,6 +62,10 @@ def _hitl_tmp_paths(tmp_path):
         os.environ.pop("HITL_VAULT_DIR", None)
     else:
         os.environ["HITL_VAULT_DIR"] = old_vault
+    if old_reg is None:
+        os.environ.pop("ASPEN_OPERATOR_REGISTRY", None)
+    else:
+        os.environ["ASPEN_OPERATOR_REGISTRY"] = old_reg
 
 
 @pytest.fixture(autouse=True)
