@@ -19,8 +19,8 @@ if str(MCP_SRC) not in sys.path:
 try:
     from aspen_memory_mcp.server import _valid_types, build_server  # noqa: E402
 except ModuleNotFoundError as exc:
-    if "mcp.server" in str(exc):
-        pytest.skip("mcp.server module not installed (pip install mcp)", allow_module_level=True)
+    if exc.name == 'mcp':
+        pytest.skip("mcp package not installed (pip install mcp)", allow_module_level=True)
     raise
 
 EXPECTED_TOOLS = {
