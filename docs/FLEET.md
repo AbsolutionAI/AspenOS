@@ -47,6 +47,7 @@ Fleet is the **topology + exercise** control plane on top.
 | `aspen.safety.clear`                | execute clear after two distinct authorize_clear  | never unlatches alone |
 | `aspen.sentinel.fleet.overview`     | aggregate plants/nodes/status, degraded[]         | Sentinel dashboard (ADR-0007) |
 | `aspen.sentinel.audit.event`        | {event_id, actor, action, target, result, ts}     | durable JetStream |
+| `aspen.sentinel.tools.anomaly`      | fail-open finding; `action_required=investigate`  | audit consumer (ASP-687); not a deny |
 | `aspen.sentinel.osint.ingest`       | source, raw/ref, confidence, tags[]               | Sentinel OSINT |
 | `aspen.authz.gate.request`          | capability, resource, context, proposer_agent_id  | propose_act path (ADR-0009) |
 | `aspen.authz.gate.decision`         | request_id, decision, humans[], note?             | dual-human for RED/BLACK |

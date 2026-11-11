@@ -8,6 +8,8 @@
 
 **Errata (ASP-739, 2026-10-05):** The sentences below that say the flock is not on `origin/master`, that git identity is `Your Name`, and that the policy flip is still pending were true on 2026-09-26. They are not open preconditions. `3d88b1a` is an ancestor of `origin/master`. Repo-local identity is `packndeploy`. Project policy matches Decision §1. Do not re-accept this ADR. Open realization gap, not a reversal: a later issue can be pinned to another issue's workspace (ASP-733 workspace `54dc4532` is the ASP-728 tree). QA must fail closed on `sourceIssueId` mismatch. Tracked on ASP-736.
 
+**Errata (ASP-773, 2026-10-12):** ASP-736 closed that gap in the worker, not by re-accepting this ADR. QA mode fail-closes when `sourceIssueId` is neither the issue nor its parent, when the pin is missing, or when a named review SHA is not an ancestor of `HEAD`. A parent pin is allowed because QA children inherit the implementation workspace. Checkout still does not refresh a stale pin. That is friction, not a false PASS. Do not scan `.paperclip/worktrees`.
+
 ---
 
 ## Context
