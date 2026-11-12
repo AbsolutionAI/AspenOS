@@ -140,6 +140,10 @@ jobs:
           export PATH="$(go env GOPATH)/bin:$PATH"
           bash scripts/smoke-test.sh
           bash scripts/iso-firstboot-smoke.sh
+      - name: Sentinel tool-anomaly consumer vs live nats-server (ASP-780)
+        run: |
+          pip install pytest pytest-asyncio
+          python -m pytest tests/test_tool_anomaly_consumer_live.py -v -rs
 
   build-go:
     runs-on: ubuntu-latest

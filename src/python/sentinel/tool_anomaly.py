@@ -214,6 +214,8 @@ class ToolAnomalyDetector:
         error_min: int = 6,
         sensitive_read_egress_window_s: float | None = None,
         window_events_cap: int = 2000,
+        max_actors: int = 10_000,
+        evict_every: int = 256,
     ) -> None:
         self.window_s = float(window_s)
         self.burst_high_risk_min = burst_high_risk_min
@@ -223,7 +225,15 @@ class ToolAnomalyDetector:
             sensitive_read_egress_window_s or window_s
         )
         self._window_events_cap = int(window_events_cap)
-        # actor -> list[(ts_epoch, event)]
+        # Bounded actor map (ASP-780): idle actors are swept every
+        # ``evict_every`` feeds and the map never exceeds ``max_actors``
+        # (least-recently-seen actor dropped first), so forged/rotating actor
+        # names cannot grow memory without bound.
+        self._max_actors = max(1, int(max_actors))
+        self._evict_every = max(1, int(evict_every))
+        self._feeds_since_sweep = 0
+        self._newest_ts = float("-inf")
+        # actor -> list[(ts_epoch, event)]; insertion order = recency of use
         self._history: dict[str, list[tuple]] = {}
 
     # -- ingestion ----------------------------------------------------------
@@ -235,13 +245,40 @@ class ToolAnomalyDetector:
         actor = str(event.get("actor") or event.get("agent") or "unknown")
         ts = _ts_epoch(event.get("ts") or event.get("ts_epoch"))
         if ts != float("inf"):
-            history = self._history.setdefault(actor, [])
+            history = self._history.pop(actor, [])
+            self._history[actor] = history  # move to most-recently-seen
             history.append((ts, event))
             cutoff = ts - self.window_s
             history[:] = [(t, e) for t, e in history if t >= cutoff]
             if len(history) > self._window_events_cap:
                 self._history[actor] = history[-self._window_events_cap:]
+            if ts > self._newest_ts:
+                self._newest_ts = ts
+            self._bound_actors(keep=actor)
         return self._check_actor(actor)
+
+    @property
+    def actor_count(self) -> int:
+        """Number of actors currently tracked (bounded by ``max_actors``)."""
+        return len(self._history)
+
+    def _bound_actors(self, keep: str) -> None:
+        """Sweep idle actors periodically and enforce the hard actor cap."""
+        self._feeds_since_sweep += 1
+        if self._feeds_since_sweep >= self._evict_every:
+            self._feeds_since_sweep = 0
+            horizon = max(self.window_s, self.sensitive_read_egress_window_s)
+            cutoff = self._newest_ts - horizon
+            for name in [
+                a for a, h in self._history.items()
+                if a != keep and (not h or h[-1][0] < cutoff)
+            ]:
+                del self._history[name]
+        while len(self._history) > self._max_actors:
+            oldest = next(iter(self._history))
+            if oldest == keep:  # pragma: no cover - keep is always newest
+                break
+            del self._history[oldest]
 
     def scan(self, events: Iterable[dict]) -> list[Finding]:
         """Batch ingest: run a sliding detector over the given events.
