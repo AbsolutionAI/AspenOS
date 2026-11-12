@@ -1,7 +1,7 @@
 # Nightly Packaging & Deployment Check — 2026-11-12
 
-- **Timestamp:** 2026-11-12 09:08 UTC  
-- **Git SHA:** `91bb8ff` (HEAD of `master`)  
+- **Timestamp:** 2026-11-12 09:27 UTC  
+- **Git SHA:** `339254f` (HEAD of `ASP-899-nightly-packaging-deployment-check`)  
 - **Verdict:** PASS (with 1 known deviation)  
 - **check-nightly:** 158/159 pass  
 - **nats-server:** v2.14.5  
