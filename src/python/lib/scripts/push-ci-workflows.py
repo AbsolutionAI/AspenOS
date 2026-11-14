@@ -237,6 +237,6 @@ for repo in REPOS:
             try:
                 urllib.request.urlopen(req)
                 print(f"  ✓ Triggered {repo} (main)")
-            except:
+            except Exception:
                 pass
         # Branch might not exist, workflow may auto-trigger on push anyway

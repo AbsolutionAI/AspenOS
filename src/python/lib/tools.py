@@ -2123,7 +2123,7 @@ class SubAgentManager:
                             data["status"] = live.get("status", data.get("status", "unknown"))
                             data["current_task"] = live.get("current_task", data.get("current_task", ""))
                             registry.append({k: v for k, v in data.items() if k != "proc"})
-                    except:
+                    except Exception:
                         pass
                 # Include any from live that aren't in registry
                 for name, entry in self.agents.items():
@@ -2236,7 +2236,7 @@ class BacklogManager:
                 if assignee and data.get("assignee") != assignee: continue
                 if item_type and data.get("type") != item_type: continue
                 items.append(data)
-            except:
+            except Exception:
                 pass
         # sort by type hierarchy then status
         order = {"goal": 0, "project": 1, "task": 2, "subtask": 3}

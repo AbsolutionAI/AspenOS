@@ -963,7 +963,7 @@ async def handle_health(request):
         "agents_total": len(agent_status),
         "incidents_open": 0,
         "telemetry": tel,
-        "staragent_running": os.system("pgrep -x staragent > /dev/null 2>&1") == 0,
+        "staragent_running": subprocess.run(["pgrep", "-x", "staragent"], capture_output=True).returncode == 0,
         "model_connectivity": model_connectivity,
         "timestamp": datetime.now().isoformat(),
     })
@@ -1398,30 +1398,30 @@ def _skill_security_score(skill, category):
         "uncategorized": 65,
     }
     score = base.get(category, 65)
-    # Add some variation by hashing skill name
     var = (hash(skill) % 10) - 5
     return max(0, min(100, score + var))
+
+
+SKILL_SOURCES = [
+    {"id": "anthropics/skills", "owner": "anthropics", "repo": "skills", "label": "Anthropic", "description": "Official Anthropic skill library for Claude AI agents", "protocol": "SKILL.md (YAML frontmatter)", "url": "https://github.com/anthropics/skills"},
+    {"id": "vercel-labs/agent-skills", "owner": "vercel-labs", "repo": "agent-skills", "label": "Vercel", "description": "Vercel agent skills for deployment, analytics, and cloud functions", "protocol": "SKILL.md", "url": "https://github.com/vercel-labs/agent-skills"},
+    {"id": "vercel-labs/skills", "owner": "vercel-labs", "repo": "skills", "label": "Vercel Labs", "description": "General-purpose skill library from Vercel Labs", "protocol": "SKILL.md", "url": "https://github.com/vercel-labs/skills"},
+    {"id": "mattpocock/skills", "owner": "mattpocock", "repo": "skills", "label": "Matt Pocock", "description": "TypeScript-focused skills and developer tools", "protocol": "SKILL.md", "url": "https://github.com/mattpocock/skills"},
+    {"id": "microsoft/azure-skills", "owner": "microsoft", "repo": "azure-skills", "label": "Microsoft Azure", "description": "Azure cloud skills for infrastructure management", "protocol": "SKILL.md", "url": "https://github.com/microsoft/azure-skills"},
+    {"id": "firebase/agent-skills", "owner": "firebase", "repo": "agent-skills", "label": "Firebase", "description": "Firebase integration skills for auth, database, and hosting", "protocol": "SKILL.md", "url": "https://github.com/firebase/agent-skills"},
+    {"id": "supabase/agent-skills", "owner": "supabase", "repo": "agent-skills", "label": "Supabase", "description": "Supabase integration skills for PostgreSQL and auth", "protocol": "SKILL.md", "url": "https://github.com/supabase/agent-skills"},
+    {"id": "sentry-devtools/skills", "owner": "sentry-devtools", "repo": "skills", "label": "Sentry", "description": "Error tracking and performance monitoring skills", "protocol": "SKILL.md", "url": "https://github.com/sentry-devtools/skills"},
+    {"id": "shadcn/ui", "owner": "shadcn", "repo": "ui", "label": "shadcn/ui", "description": "UI component library skills for design systems", "protocol": "SKILL.md", "url": "https://github.com/shadcn/ui"},
+    {"id": "scrapegraphai/just-scrape", "owner": "scrapegraphai", "repo": "just-scrape", "label": "ScrapeGraphAI", "description": "Web scraping and data extraction skills", "protocol": "SKILL.md", "url": "https://github.com/scrapegraphai/just-scrape"},
+    {"id": "heygen-com/hyperframes", "owner": "heygen-com", "repo": "hyperframes", "label": "HeyGen", "description": "Video generation and avatar skills", "protocol": "SKILL.md", "url": "https://github.com/heygen-com/hyperframes"},
+    {"id": "remotion-dev/skills", "owner": "remotion-dev", "repo": "skills", "label": "Remotion", "description": "Programmatic video rendering skills", "protocol": "SKILL.md", "url": "https://github.com/remotion-dev/skills"},
+]
 
 
 async def handle_skills_marketplace(request):
     """Return available skill libraries and search results."""
     query = request.query.get("q", "").strip().lower()
     source = request.query.get("source", "").strip()
-
-    SKILL_SOURCES = [
-        {"id": "anthropics/skills", "owner": "anthropics", "repo": "skills", "label": "Anthropic", "description": "Official Anthropic skill library for Claude AI agents", "protocol": "SKILL.md (YAML frontmatter)", "url": "https://github.com/anthropics/skills"},
-        {"id": "vercel-labs/agent-skills", "owner": "vercel-labs", "repo": "agent-skills", "label": "Vercel", "description": "Vercel agent skills for deployment, analytics, and cloud functions", "protocol": "SKILL.md", "url": "https://github.com/vercel-labs/agent-skills"},
-        {"id": "vercel-labs/skills", "owner": "vercel-labs", "repo": "skills", "label": "Vercel Labs", "description": "General-purpose skill library from Vercel Labs", "protocol": "SKILL.md", "url": "https://github.com/vercel-labs/skills"},
-        {"id": "mattpocock/skills", "owner": "mattpocock", "repo": "skills", "label": "Matt Pocock", "description": "TypeScript-focused skills and developer tools", "protocol": "SKILL.md", "url": "https://github.com/mattpocock/skills"},
-        {"id": "microsoft/azure-skills", "owner": "microsoft", "repo": "azure-skills", "label": "Microsoft Azure", "description": "Azure cloud skills for infrastructure management", "protocol": "SKILL.md", "url": "https://github.com/microsoft/azure-skills"},
-        {"id": "firebase/agent-skills", "owner": "firebase", "repo": "agent-skills", "label": "Firebase", "description": "Firebase integration skills for auth, database, and hosting", "protocol": "SKILL.md", "url": "https://github.com/firebase/agent-skills"},
-        {"id": "supabase/agent-skills", "owner": "supabase", "repo": "agent-skills", "label": "Supabase", "description": "Supabase integration skills for PostgreSQL and auth", "protocol": "SKILL.md", "url": "https://github.com/supabase/agent-skills"},
-        {"id": "sentry-devtools/skills", "owner": "sentry-devtools", "repo": "skills", "label": "Sentry", "description": "Error tracking and performance monitoring skills", "protocol": "SKILL.md", "url": "https://github.com/sentry-devtools/skills"},
-        {"id": "shadcn/ui", "owner": "shadcn", "repo": "ui", "label": "shadcn/ui", "description": "UI component library skills for design systems", "protocol": "SKILL.md", "url": "https://github.com/shadcn/ui"},
-        {"id": "scrapegraphai/just-scrape", "owner": "scrapegraphai", "repo": "just-scrape", "label": "ScrapeGraphAI", "description": "Web scraping and data extraction skills", "protocol": "SKILL.md", "url": "https://github.com/scrapegraphai/just-scrape"},
-        {"id": "heygen-com/hyperframes", "owner": "heygen-com", "repo": "hyperframes", "label": "HeyGen", "description": "Video generation and avatar skills", "protocol": "SKILL.md", "url": "https://github.com/heygen-com/hyperframes"},
-        {"id": "remotion-dev/skills", "owner": "remotion-dev", "repo": "skills", "label": "Remotion", "description": "Programmatic video rendering skills", "protocol": "SKILL.md", "url": "https://github.com/remotion-dev/skills"},
-    ]
 
     if not query and not source:
         return web.json_response({

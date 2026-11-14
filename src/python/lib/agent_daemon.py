@@ -590,7 +590,7 @@ async def process_command(agent_name, config, subject, payload, telemetry=None, 
                             d["status"] = "in_progress"
                             d["updated"] = datetime.now(timezone.utc).isoformat()
                             await mgr.store("backlog", MemoryType.PROCEDURAL, json.dumps(d), metadata={"backlog_id": d.get("id"), "assignee": agent_name, "status": "in_progress"}, importance=0.8)
-                    except: pass
+                    except Exception: pass
     except Exception:
         pass
     return response
