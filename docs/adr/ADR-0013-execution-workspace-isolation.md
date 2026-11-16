@@ -8,7 +8,9 @@
 
 **Errata (ASP-739, 2026-10-05):** The sentences below that say the flock is not on `origin/master`, that git identity is `Your Name`, and that the policy flip is still pending were true on 2026-09-26. They are not open preconditions. `3d88b1a` is an ancestor of `origin/master`. Repo-local identity is `packndeploy`. Project policy matches Decision §1. Do not re-accept this ADR. Open realization gap, not a reversal: a later issue can be pinned to another issue's workspace (ASP-733 workspace `54dc4532` is the ASP-728 tree). QA must fail closed on `sourceIssueId` mismatch. Tracked on ASP-736.
 
-**Errata (ASP-773, 2026-10-12):** ASP-736 closed that gap in the worker, not by re-accepting this ADR. QA mode fail-closes when `sourceIssueId` is neither the issue nor its parent, when the pin is missing, or when a named review SHA is not an ancestor of `HEAD`. A parent pin is allowed because QA children inherit the implementation workspace. Checkout still does not refresh a stale pin. That is friction, not a false PASS. Do not scan `.paperclip/worktrees`.
+**Errata (ASP-773, 2026-10-12):** The worker text fail-closes a cross-issue pin. It does not re-accept this ADR. QA mode fail-closes when `sourceIssueId` is neither the issue nor its parent, when the pin is missing, or when a named review SHA is not an ancestor of `HEAD`. A parent pin is allowed because QA children inherit the implementation workspace. Checkout still does not refresh a stale pin. That is friction, not a false PASS. Do not scan `.paperclip/worktrees`.
+
+**Errata (ASP-872, 2026-11-09):** The ASP-773 sentence that treated ASP-736 as closed was the overclaim. Jo reverted that close (CHG-0034). This wake: ASP-736 is still `in_review`, unassigned. Worker sha256 is still `5ba33fc1fdc373e9116b8db527d0f620b77bfecebe98fa8b4384e3942f9b53ad`. Do not re-accept. Do not close the ticket from a review.
 
 ---
 
