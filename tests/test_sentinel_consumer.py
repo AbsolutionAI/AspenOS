@@ -407,9 +407,9 @@ class TestDashboardRoutes:
         routes = mod.app.router
         # Collect registered GET route paths
         paths = []
-        for route in routes._routes:
+        for route in routes.routes():
             if hasattr(route, "method") and route.method == "GET":
-                paths.append(route.path)
+                paths.append(route.resource.canonical)
 
         assert "/api/sentinel/audit" in paths
         assert "/api/sentinel/audit/stats" in paths
