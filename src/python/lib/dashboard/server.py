@@ -730,7 +730,7 @@ async def handle_health(request):
         "agents_total": len(agent_status),
         "incidents_open": 0,
         "telemetry": tel,
-        "staragent_running": os.system("pgrep -x staragent > /dev/null 2>&1") == 0,
+        "staragent_running": subprocess.run(["pgrep", "-x", "staragent"], capture_output=True, check=False).returncode == 0,
         "timestamp": datetime.now().isoformat(),
     })
 
