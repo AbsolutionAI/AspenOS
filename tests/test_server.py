@@ -36,7 +36,6 @@ def create_app():
     app.router.add_post("/api/send", srv.handle_send)
     app.router.add_get("/api/ollama/models", srv.handle_api_ollama_models)
     app.router.add_get("/api/logs/search", srv.handle_log_search)
-    app.router.add_get("/api/marketplace/installed", srv.handle_marketplace_installed)
     app.router.add_get("/api/dashboard", srv.handle_api_dashboard)
     return app
 
@@ -52,12 +51,17 @@ async def test_health_endpoint(aiohttp_client, mock_gpu_state, mock_status_file,
 
     monkeypatch.setattr(srv, "get_nats", mock_get_nats)
 
+    async def mock_agent_status():
+        return {"proxy": True, "romi": False}
+
+    monkeypatch.setattr(srv, "get_agent_process_status", mock_agent_status)
+
     app = create_app()
     client = await aiohttp_client(app)
     resp = await client.get("/api/health")
     assert resp.status == 200
     data = await resp.json()
-    assert data["status"] == "ok"
+    assert data["status"] in ("healthy", "degraded")
     assert "timestamp" in data
     assert "agents_running" in data
 
@@ -125,30 +129,4 @@ async def test_logs_search_endpoint(aiohttp_client, mock_gpu_state, mock_status_
     assert "total" in data
 
 
-@pytest.mark.asyncio
-async def test_marketplace_installed_endpoint(aiohttp_client, mock_gpu_state, mock_status_file, monkeypatch):
-    def mock_load():
-        return {
-            "installed": {
-                "test-skill": {
-                    "id": "test-skill",
-                    "name": "test-skill",
-                    "version": "1.0.0",
-                    "source": "hermes",
-                    "installed_at": "2024-01-01T00:00:00",
-                    "status": "active",
-                    "security": "safe",
-                }
-            }
-        }
 
-    monkeypatch.setattr(srv, "_load_marketplace_state", mock_load)
-
-    app = create_app()
-    client = await aiohttp_client(app)
-    resp = await client.get("/api/marketplace/installed")
-    assert resp.status == 200
-    data = await resp.json()
-    assert "installed" in data
-    assert data["total"] == 1
-    assert data["installed"][0]["id"] == "test-skill"

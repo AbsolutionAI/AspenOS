@@ -4,10 +4,16 @@
 import base64
 import json
 import os
+import re
+import subprocess
 import sys
 import urllib.request
 
-TOKEN = os.popen("cd /home/tech/agnetic-os && git remote get-url origin | sed 's|.*://[^:]*:\\([^@]*\\)@.*|\\1|'").read().strip()
+result = subprocess.run(
+    ["git", "remote", "get-url", "origin"],
+    capture_output=True, text=True, cwd="/home/tech/agnetic-os",
+)
+TOKEN = re.sub(r'.*://[^:]*:([^@]*)@.*', r'\1', result.stdout).strip()
 
 HEADERS = {
     "Authorization": f"token {TOKEN}",
@@ -237,6 +243,6 @@ for repo in REPOS:
             try:
                 urllib.request.urlopen(req)
                 print(f"  ✓ Triggered {repo} (main)")
-            except:
+            except Exception:
                 pass
         # Branch might not exist, workflow may auto-trigger on push anyway
