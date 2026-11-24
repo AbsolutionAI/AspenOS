@@ -73,7 +73,9 @@ check "iso-boot smoke script" test -f scripts/iso-boot-smoke.sh
 check "iso-boot smoke runs" bash -c 'bash scripts/iso-boot-smoke.sh >/dev/null'
 check "bench-sandbox script" test -x scripts/bench-sandbox.sh -o -f scripts/bench-sandbox.sh
 check "sandbox_native import" bash -c 'PYTHONPATH=agents python3 -c "from sandbox_native import sandbox_binary,native_enabled; assert sandbox_binary()"'
-check "C11 p50 under 2ms" bash -c 'bash scripts/bench-sandbox.sh 100 >/dev/null 2>&1'
+# Keep bench stdout/stderr. The gate is still exit status; swallowing the
+# table hid the CI p50/p95 that a threshold change must cite (ASP-807).
+check "C11 p50 gate" bash scripts/bench-sandbox.sh 100
 check "profiles.yaml present" test -f config/profiles.yaml
 check "fleet.yaml present" test -f config/fleet.yaml
 check "pins.json present" test -f third_party/pins.json

@@ -13,7 +13,7 @@
 2. **Toolchain**: ensure `nats-server` is on PATH:
    `export PATH="$HOME/go/bin:$HOME/.local/bin:$PATH"`.
 3. **Smoke suites** (record pass/fail counts):
-   - `bash scripts/check-nightly.sh` (159 checks across 23 sections — C11 p50 is a known hardware-dependent failure)
+   - `bash scripts/check-nightly.sh` (159 checks across 23 sections — the pre-ASP-807 C11 absolute-2ms miss is retired; see Known deviations)
    - `make iso-smoke` (32 checks, embedded in section 4 as the iso-firstboot smoke)
 4. **Static inventory**:
    - systemd unit count (`*.service`/`*.timer`/`*.socket` across `systemd/`, `dist/pkgroot/lib/systemd/system/`, `deploy/`, `config/`)
@@ -129,8 +129,8 @@ Only the nightly script participates in the lock. A directly invoked `make smoke
 
 | Check | Baseline |
 | --- | --- |
-| `scripts/check-nightly.sh` total | **159 checks across 23 sections** (**158 pass, 1 known failure** = C11 p50 benchmark deviation, hardware-dependent) |
-| Of which: smoke test suite | 61 passed, 1 failed (C11 p50 benchmark), 62 total |
+| `scripts/check-nightly.sh` total | **159 checks across 23 sections**. Before ASP-807 the recorded baseline was 158 pass / 1 known fail (C11 absolute 2ms). After ASP-807 that miss is not a known failure; a new fail is a regression. |
+| Of which: smoke test suite | 62 checks. Before ASP-807: 61 passed, 1 failed (C11 absolute 2ms). |
 | Python test suite | 500 passed, 4 skipped, 0 failures. All 4 skips are absent optional dependencies, not defects: `aiohttp` (`test_server.py`), `mcp.server` (`test_memory_mcp.py`), `nats-py` (`test_sentinel_consumer.py`), and the Hermes holographic plugin absent (`test_holographic_ingest.py` skips with "read-back NOT verified") |
 | nats-server | v2.14.5 |
 | systemd unit files | 16 (8 `*.service` in `systemd/`, the same 8 in `dist/pkgroot/lib/systemd/system/`) |
@@ -174,17 +174,11 @@ the number of units, and is reported on its own row rather than folded into the 
 
 ## Known deviations
 
-### C11 sandbox p50 benchmark (`make smoke` check 53 of 61)
+### C11 sandbox p50 benchmark — retired as a known failure (ASP-807)
 
-The ADR 0001 criterion requires `c11_internal p50 < 2ms`. On this control-plane host,
-the measured p50 is ~3.2–3.7ms (e.g. 3.181 ms on 2026-09-21, 3.428 ms on 2026-09-19,
-3.651 ms on 2026-09-26).
-This is a hardware-dependent
-benchmark: the threshold may be met on dedicated CI runners with newer processors or lower
-latency profiles.
+Before ASP-807 the ADR 0001 line in `scripts/bench-sandbox.sh` required `c11_internal p50 < 2ms`. On this control-plane host the measured p50 was ~3.2–3.7ms (e.g. 3.181 ms on 2026-09-21, 3.428 ms on 2026-09-19, 3.651 ms on 2026-09-26), so nightly recorded one known failure.
 
-**Not actionable** unless the sandbox is moved to a different host or optimized. The
-nightly check records this as a single known failure (1 of 62 smoke tests).
+That absolute wall is not a stable SLO on the `ubuntu-latest` runners that execute required `smoke`. Two jobs on the same commit split 1.723ms (pass) and 2.263ms (fail) while overhead versus Python stayed 0.338ms. The gate is now that overhead `< 2ms` plus a 5ms absolute ceiling. Measurements and the reason 5ms is still a useful gate are in `docs/adr/0001-c11-agent-runtime.md` (Gate retune, ASP-807). Do not treat a green C11 line as a waiver of a new smoke failure. Historical nightly files that list the absolute-2ms miss are records of the old gate, not the current baseline.
 
 ### CI now runs the full Python suite (ASP-730) — the gap that let ASP-706 through is closed
 
