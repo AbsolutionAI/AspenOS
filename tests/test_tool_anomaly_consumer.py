@@ -22,7 +22,10 @@ from sentinel.audit import SUBJECT_AUDIT_EVENT
 from sentinel.tool_anomaly_consumer import (
     SUBJECT_TOOL_ANOMALY,
     ToolAnomalyConsumer,
+    _subject_matches,
+    finding_id_for,
 )
+from sentinel.tool_anomaly import Finding
 
 # Fixed epoch base for deterministic windows (2026-09-20T00:00:00Z)
 BASE_TS = 1789948800.0
@@ -127,6 +130,7 @@ async def test_envelope_fields_and_paging_flag(tmp_path):
     assert finding["action_required"] == "investigate"
     assert finding["notify"] is True  # R1 is high -> page
     assert len(finding["finding_id"]) == 32
+    assert all(c in "0123456789abcdef" for c in finding["finding_id"])
 
 
 @pytest.mark.asyncio
@@ -177,6 +181,7 @@ def mock_nats():
     mock_js = MagicMock()
     mock_js.add_stream = AsyncMock()
     mock_js.publish = AsyncMock()
+    mock_js.stream_info = AsyncMock()
     mock_conn.jetstream = MagicMock(return_value=mock_js)
 
     mock_sub = MagicMock()
@@ -196,9 +201,13 @@ async def test_start_offline_no_url(tmp_path):
 
 @pytest.mark.asyncio
 async def test_start_subscribes_to_audit_subject(tmp_path, mock_nats):
-    mock_mod, mock_conn, _, _ = mock_nats
-    consumer = _consumer(tmp_path, nats_url="nats://localhost:4222")
-    with patch.dict("sys.modules", {"nats": mock_mod}):
+    mock_mod, mock_conn, mock_js, _ = mock_nats
+    mock_js.stream_info = AsyncMock(return_value=MagicMock(
+        config=MagicMock(subjects=["aspen.sentinel.>"])
+    ))
+    consumer = _consumer(tmp_path, nats_url="nats://localhost:4222", create_stream=True)
+    with patch.dict("sys.modules", {"nats": mock_mod}), \
+         patch("sentinel.tool_anomaly_consumer._load_nats_helper", return_value=None):
         assert await consumer.start() is True
     assert consumer.is_online is True
     subjects = [c.args[0] for c in mock_conn.subscribe.call_args_list]
@@ -209,6 +218,9 @@ async def test_start_subscribes_to_audit_subject(tmp_path, mock_nats):
 @pytest.mark.asyncio
 async def test_live_message_feed_and_publish(tmp_path, mock_nats):
     mock_mod, mock_conn, mock_js, _ = mock_nats
+    mock_js.stream_info = AsyncMock(return_value=MagicMock(
+        config=MagicMock(subjects=["aspen.sentinel.>"])
+    ))
 
     captured: dict = {}
 
@@ -218,8 +230,9 @@ async def test_live_message_feed_and_publish(tmp_path, mock_nats):
 
     mock_conn.subscribe = _capture_sub
 
-    consumer = _consumer(tmp_path, nats_url="nats://localhost:4222")
-    with patch.dict("sys.modules", {"nats": mock_mod}):
+    consumer = _consumer(tmp_path, nats_url="nats://localhost:4222", create_stream=True)
+    with patch.dict("sys.modules", {"nats": mock_mod}), \
+         patch("sentinel.tool_anomaly_consumer._load_nats_helper", return_value=None):
         await consumer.start()
 
     cb = captured[SUBJECT_AUDIT_EVENT]
@@ -241,6 +254,9 @@ async def test_live_message_feed_and_publish(tmp_path, mock_nats):
 @pytest.mark.asyncio
 async def test_invalid_json_message_ignored(tmp_path, mock_nats):
     mock_mod, mock_conn, mock_js, _ = mock_nats
+    mock_js.stream_info = AsyncMock(return_value=MagicMock(
+        config=MagicMock(subjects=["aspen.sentinel.>"])
+    ))
 
     captured: dict = {}
 
@@ -249,8 +265,9 @@ async def test_invalid_json_message_ignored(tmp_path, mock_nats):
         return MagicMock(unsubscribe=AsyncMock())
 
     mock_conn.subscribe = _capture_sub
-    consumer = _consumer(tmp_path, nats_url="nats://localhost:4222")
-    with patch.dict("sys.modules", {"nats": mock_mod}):
+    consumer = _consumer(tmp_path, nats_url="nats://localhost:4222", create_stream=True)
+    with patch.dict("sys.modules", {"nats": mock_mod}), \
+         patch("sentinel.tool_anomaly_consumer._load_nats_helper", return_value=None):
         await consumer.start()
 
     msg = MagicMock()
@@ -264,10 +281,14 @@ async def test_invalid_json_message_ignored(tmp_path, mock_nats):
 @pytest.mark.asyncio
 async def test_publish_failure_still_journals(tmp_path, mock_nats):
     mock_mod, mock_conn, mock_js, _ = mock_nats
+    mock_js.stream_info = AsyncMock(return_value=MagicMock(
+        config=MagicMock(subjects=["aspen.sentinel.>"])
+    ))
     mock_js.publish = AsyncMock(side_effect=RuntimeError("broker down"))
 
-    consumer = _consumer(tmp_path, nats_url="nats://localhost:4222")
-    with patch.dict("sys.modules", {"nats": mock_mod}):
+    consumer = _consumer(tmp_path, nats_url="nats://localhost:4222", create_stream=True)
+    with patch.dict("sys.modules", {"nats": mock_mod}), \
+         patch("sentinel.tool_anomaly_consumer._load_nats_helper", return_value=None):
         await consumer.start()
 
     emitted = []

@@ -174,6 +174,47 @@ def test_findings_are_fail_open_log_only():
         assert "deny" not in payload["action_required"]  # never a blocking verdict
 
 
+# ---------------------------------------------------------------------------
+# Bounded actor map
+# ---------------------------------------------------------------------------
+
+
+def test_actor_idle_eviction():
+    """Actors idle beyond idle_timeout_s are evicted on the next feed."""
+    det = ToolAnomalyDetector(window_s=300, idle_timeout_s=10)
+    det.feed(_event("alice", "tool.shell", target="ls", ts=100))
+    det.feed(_event("bob", "tool.shell", target="ls", ts=110))
+    assert "alice" in det._history
+    assert "bob" in det._history
+    det.feed(_event("bob", "tool.shell", target="ls", ts=120))
+    assert "alice" not in det._history
+    assert "bob" in det._history
+
+
+def test_actor_cap_evicts_lru():
+    """When over max_actors, the least-recently-used actor is evicted."""
+    det = ToolAnomalyDetector(max_actors=3, idle_timeout_s=99999)
+    det.feed(_event("a", "tool.read_file", target="/etc/shadow", ts=1))
+    det.feed(_event("b", "tool.read_file", target="/etc/shadow", ts=2))
+    det.feed(_event("c", "tool.read_file", target="/etc/shadow", ts=3))
+    assert set(det._history) == {"a", "b", "c"}
+    det.feed(_event("d", "tool.read_file", target="/etc/shadow", ts=4))
+    assert "a" not in det._history
+    assert set(det._history) == {"b", "c", "d"}
+
+
+def test_actor_cap_touch_moves_to_end():
+    """Feeding an existing actor marks it recently used (LRU protection)."""
+    det = ToolAnomalyDetector(max_actors=2, idle_timeout_s=99999)
+    det.feed(_event("a", "tool.shell", target="ls", ts=1))
+    det.feed(_event("b", "tool.shell", target="ls", ts=2))
+    det.feed(_event("a", "tool.shell", target="ls", ts=3))  # touch a
+    det.feed(_event("c", "tool.shell", target="ls", ts=4))  # should evict b
+    assert "a" in det._history
+    assert "b" not in det._history
+    assert "c" in det._history
+
+
 def test_scan_is_time_order_independent():
     """The batch API sorts events, so shuffled input matches ordered input."""
     ordered = [

@@ -42,6 +42,8 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
+from collections import OrderedDict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -214,6 +216,8 @@ class ToolAnomalyDetector:
         error_min: int = 6,
         sensitive_read_egress_window_s: float | None = None,
         window_events_cap: int = 2000,
+        max_actors: int = 1024,
+        idle_timeout_s: float = 3600.0,
     ) -> None:
         self.window_s = float(window_s)
         self.burst_high_risk_min = burst_high_risk_min
@@ -223,8 +227,10 @@ class ToolAnomalyDetector:
             sensitive_read_egress_window_s or window_s
         )
         self._window_events_cap = int(window_events_cap)
-        # actor -> list[(ts_epoch, event)]
-        self._history: dict[str, list[tuple]] = {}
+        self._max_actors = int(max_actors)
+        self._idle_timeout_s = float(idle_timeout_s)
+        # actor -> list[(ts_epoch, event)] — OrderedDict for LRU eviction
+        self._history: OrderedDict[str, list[tuple]] = OrderedDict()
 
     # -- ingestion ----------------------------------------------------------
 
@@ -236,12 +242,31 @@ class ToolAnomalyDetector:
         ts = _ts_epoch(event.get("ts") or event.get("ts_epoch"))
         if ts != float("inf"):
             history = self._history.setdefault(actor, [])
+            self._history.move_to_end(actor)
             history.append((ts, event))
             cutoff = ts - self.window_s
             history[:] = [(t, e) for t, e in history if t >= cutoff]
             if len(history) > self._window_events_cap:
                 self._history[actor] = history[-self._window_events_cap:]
+        self._evict_idle(ts)
+        self._enforce_actor_cap()
         return self._check_actor(actor)
+
+    def _evict_idle(self, now: float) -> None:
+        """Remove actors whose most recent event is older than idle_timeout_s."""
+        if now == float("inf"):
+            return
+        idle = [
+            a for a, h in self._history.items()
+            if not h or (now - h[-1][0]) > self._idle_timeout_s
+        ]
+        for a in idle:
+            del self._history[a]
+
+    def _enforce_actor_cap(self) -> None:
+        """Evict least-recently-used actors when over the cap."""
+        while len(self._history) > self._max_actors:
+            self._history.popitem(last=False)
 
     def scan(self, events: Iterable[dict]) -> list[Finding]:
         """Batch ingest: run a sliding detector over the given events.
