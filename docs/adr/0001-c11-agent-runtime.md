@@ -75,15 +75,16 @@ The July absolute reading (`c11_internal p50 < 2ms`) is not a stable SLO on the 
 
 | Run | Runner | c11_internal p50 | c11_internal p95 | py_exec p50 | overhead |
 |-----|--------|------------------|------------------|-------------|----------|
-| [smoke job 138864085830](https://github.com/AbsolutionAI/AspenOS/actions/runs/45512669584) | ubuntu-latest (in-suite) | 1.723 | 1.756 | 1.385 | 0.338 |
+| [smoke job 138864085830](https://github.com/AbsolutionAI/AspenOS/actions/runs/45512669584) | ubuntu-latest (in-suite, old absolute gate) | 1.723 | 1.756 | 1.385 | 0.338 |
 | [bench job 138864085841](https://github.com/AbsolutionAI/AspenOS/actions/runs/45512669757) | ubuntu-latest, AMD EPYC 9V74, kernel 7.0.0-1020-azure | 2.263 | 2.361 | 1.925 | 0.338 |
+| [smoke job 138867018133](https://github.com/AbsolutionAI/AspenOS/actions/runs/45513530327) | ubuntu-latest (in-suite, retuned gate, `e912e36`) | 2.436 | 2.543 | 2.078 | 0.358 |
 
-The slow SKU's minimum sample was 2.203ms, so every sample missed an absolute 2ms wall. Seccomp accounts for ~0.32ms of that wall (`--no-seccomp` p50 2.011; bare fork+exec p50 1.956, p95 2.032). Stripping seccomp cannot put p95 under 2ms. Warmup and a retry cannot either: the miss is the whole distribution, not a tail.
+The slow isolated SKU's minimum sample was 2.203ms, so every sample missed an absolute 2ms wall. The retuned in-suite smoke job measured p50 2.436ms (p95 2.543ms) and would have failed that wall too; it passed the new gate. Seccomp accounts for ~0.32ms of the isolated wall (`--no-seccomp` p50 2.011; bare fork+exec p50 1.956, p95 2.032). Stripping seccomp cannot put p95 under 2ms. Warmup and a retry cannot either: the miss is the whole distribution, not a tail.
 
-Overhead versus the same-run Python `subprocess` baseline is 0.338ms on both SKUs. That is the ADR criterion ("overhead p50 < 2ms … vs Python baseline"). The smoke gate now fails unless both of these hold:
+Overhead versus the same-run Python `subprocess` baseline is 0.338–0.358ms across these runs. That is the ADR criterion ("overhead p50 < 2ms … vs Python baseline"). The smoke gate now fails unless both of these hold:
 
-1. `c11_internal p50 - py_exec p50 < 2ms` (unchanged 2ms overhead budget; measured 0.338ms, so a sandbox that adds 2ms over echo still fails).
-2. `c11_internal p50 < 5ms` absolute ceiling. 5ms is about 2.1× the slow-SKU p95 (2.361ms) and above the control-plane host's historical max (~3.7ms). A doubled wall on the slow SKU still fails. SKU spread of ~0.54ms cannot.
+1. `c11_internal p50 - py_exec p50 < 2ms` (unchanged 2ms overhead budget; measured ~0.35ms, so a sandbox that adds 2ms over echo still fails).
+2. `c11_internal p50 < 5ms` absolute ceiling. 5ms is about 2.0× the slower in-suite p95 (2.543ms on the retuned smoke job) and about 2.1× the isolated slow-SKU p95 (2.361ms), and above the control-plane host's historical max (~3.7ms). A doubled wall on the slow SKU still fails. Observed SKU spread cannot.
 
 Host nightly numbers were not used to pick the ceiling. They only confirm the ceiling is above a known slower machine so the required check is not pinned to one Azure SKU.
 
