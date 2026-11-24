@@ -177,6 +177,10 @@ def mock_nats():
     mock_js = MagicMock()
     mock_js.add_stream = AsyncMock()
     mock_js.publish = AsyncMock()
+    # ASP-780: the consumer verifies (never creates) the operator's stream.
+    stream_info = MagicMock()
+    stream_info.config.subjects = ["aspen.sentinel.>"]
+    mock_js.stream_info = AsyncMock(return_value=stream_info)
     mock_conn.jetstream = MagicMock(return_value=mock_js)
 
     mock_sub = MagicMock()
@@ -338,3 +342,200 @@ def test_cli_watch_once_replays_journal(tmp_path):
     assert "sensitive_read_then_egress" in proc.stdout
     assert "PAGE" in proc.stdout
     assert anomaly.exists()
+
+
+# ---------------------------------------------------------------------------
+# ASP-780 hardening (PR #76 follow-ups)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_start_does_not_create_stream(tmp_path, mock_nats):
+    """Item 2: production consumer checks the stream; it never add_stream()s."""
+    mock_mod, _, mock_js, _ = mock_nats
+    consumer = _consumer(tmp_path, nats_url="nats://localhost:4222")
+    with patch.dict("sys.modules", {"nats": mock_mod}):
+        assert await consumer.start() is True
+    mock_js.stream_info.assert_awaited()
+    mock_js.add_stream.assert_not_awaited()
+    assert consumer.stream_ok is True
+    await consumer.close()
+
+
+@pytest.mark.asyncio
+async def test_missing_stream_is_loud_and_journal_only(tmp_path, mock_nats, caplog):
+    mock_mod, _, mock_js, _ = mock_nats
+    mock_js.stream_info = AsyncMock(side_effect=RuntimeError("stream not found"))
+    consumer = _consumer(tmp_path, nats_url="nats://localhost:4222")
+    with caplog.at_level("ERROR", logger="sentinel.tool_anomaly_consumer"), \
+            patch.dict("sys.modules", {"nats": mock_mod}):
+        assert await consumer.start() is True
+    assert consumer.stream_ok is False
+    assert any("not found" in r.getMessage() for r in caplog.records
+               if r.levelname == "ERROR")
+    for event in _sensitive_then_egress():
+        await consumer.handle_event(event)
+    mock_js.publish.assert_not_awaited()  # journal-only
+    mock_js.add_stream.assert_not_awaited()
+    assert len(_read_journal(consumer)) == 1
+    await consumer.close()
+
+
+@pytest.mark.asyncio
+async def test_stream_not_binding_subject_is_journal_only(tmp_path, mock_nats):
+    mock_mod, _, mock_js, _ = mock_nats
+    info = MagicMock()
+    info.config.subjects = ["aspen.other.>"]
+    mock_js.stream_info = AsyncMock(return_value=info)
+    consumer = _consumer(tmp_path, nats_url="nats://localhost:4222")
+    with patch.dict("sys.modules", {"nats": mock_mod}):
+        await consumer.start()
+    assert consumer.stream_ok is False
+    await consumer.close()
+
+
+@pytest.mark.asyncio
+async def test_create_stream_opt_in_for_dev(tmp_path, mock_nats):
+    mock_mod, _, mock_js, _ = mock_nats
+    mock_js.stream_info = AsyncMock(side_effect=RuntimeError("stream not found"))
+    consumer = _consumer(tmp_path, nats_url="nats://localhost:4222",
+                         create_stream=True)
+    with patch.dict("sys.modules", {"nats": mock_mod}):
+        await consumer.start()
+    mock_js.add_stream.assert_awaited_once()
+    assert consumer.stream_ok is True
+    await consumer.close()
+
+
+def test_connect_options_reuse_shared_helper(monkeypatch):
+    """Item 1: env creds + TLS flow through agents/nats_connect.py."""
+    from sentinel.tool_anomaly_consumer import nats_connect_options
+
+    monkeypatch.setenv("NATS_USER", "sentinel")
+    monkeypatch.setenv("NATS_PASSWORD", "s3cret")
+    monkeypatch.setenv("STARSHIP_NATS_TLS", "1")
+    monkeypatch.delenv("STARSHIP_NATS_CA", raising=False)
+    monkeypatch.delenv("STARSHIP_NATS_NKEY_SEED", raising=False)
+    monkeypatch.delenv("STARSHIP_NATS_NKEY_SEED_FILE", raising=False)
+    url, kwargs, redacted = nats_connect_options("nats://bus.example:4222")
+    assert url == "tls://sentinel:s3cret@bus.example:4222"
+    assert kwargs.get("tls") is not None
+    assert "s3cret" not in redacted
+
+
+def test_connect_options_creds_file(monkeypatch, tmp_path):
+    from sentinel.tool_anomaly_consumer import nats_connect_options
+
+    for var in ("NATS_USER", "NATS_PASSWORD", "STARSHIP_NATS_TOKEN",
+                "STARSHIP_NATS_TLS", "STARSHIP_NATS_NKEY_SEED",
+                "STARSHIP_NATS_NKEY_SEED_FILE"):
+        monkeypatch.delenv(var, raising=False)
+    creds = tmp_path / "sentinel.creds"
+    creds.write_text("placeholder")
+    monkeypatch.setenv("ASPEN_NATS_CREDS", str(creds))
+    _, kwargs, _ = nats_connect_options("nats://127.0.0.1:4222")
+    assert kwargs["user_credentials"] == str(creds)
+
+
+@pytest.mark.asyncio
+async def test_journal_fsync_runs_off_event_loop(tmp_path):
+    """Item 3: the blocking append+fsync happens in a worker thread."""
+    import threading
+
+    consumer = _consumer(tmp_path)
+    loop_thread = threading.get_ident()
+    seen = []
+    real = consumer._append_journal
+
+    def _spy(payload):
+        seen.append(threading.get_ident())
+        real(payload)
+
+    consumer._append_journal = _spy
+    for event in _sensitive_then_egress():
+        await consumer.handle_event(event)
+    assert seen and all(t != loop_thread for t in seen)
+
+
+@pytest.mark.asyncio
+async def test_journal_oserror_still_publishes(tmp_path, mock_nats):
+    """Item 6: a failed journal write no longer skips the JetStream publish."""
+    mock_mod, _, mock_js, _ = mock_nats
+    consumer = _consumer(tmp_path, nats_url="nats://localhost:4222")
+    with patch.dict("sys.modules", {"nats": mock_mod}):
+        await consumer.start()
+
+    def _boom(payload):
+        raise OSError("disk full")
+
+    consumer._append_journal = _boom
+    emitted = []
+    for event in _sensitive_then_egress():
+        emitted.extend(await consumer.handle_event(event))
+    assert len(emitted) == 1
+    assert mock_js.publish.await_count == 1
+    await consumer.close()
+
+
+def test_finding_id_is_deterministic():
+    """Item 5: same rule/actor/events -> same id, independent of event order."""
+    from sentinel.tool_anomaly import Finding
+    from sentinel.tool_anomaly_consumer import finding_id_for
+
+    a, b = _sensitive_then_egress()
+    f1 = Finding(rule="sensitive_read_then_egress", severity="high",
+                 actor="proxy", message="m", window_s=120, events=[a, b])
+    f2 = Finding(rule="sensitive_read_then_egress", severity="high",
+                 actor="proxy", message="other text", window_s=120, events=[b, a])
+    f3 = Finding(rule="sensitive_read_then_egress", severity="high",
+                 actor="other", message="m", window_s=120, events=[a, b])
+    assert finding_id_for(f1) == finding_id_for(f2)
+    assert finding_id_for(f1) != finding_id_for(f3)
+    assert len(finding_id_for(f1)) == 32
+
+
+@pytest.mark.asyncio
+async def test_replay_dedupes_findings(tmp_path):
+    """Item 5: replaying the same journal does not re-emit/re-page."""
+    audit = tmp_path / "sentinel" / "audit.jsonl"
+    audit.parent.mkdir(parents=True, exist_ok=True)
+    audit.write_text(
+        "".join(json.dumps(e) + "\n" for e in _sensitive_then_egress()),
+        encoding="utf-8",
+    )
+    first = await _consumer(tmp_path, audit_log=str(audit)).ingest_journal()
+    assert len(first) == 1
+    # Fresh process (new consumer + detector) over the same journals.
+    second = await _consumer(tmp_path, audit_log=str(audit)).ingest_journal()
+    assert second == []
+    assert len(_read_journal(_consumer(tmp_path))) == 1
+
+
+@pytest.mark.asyncio
+async def test_repeated_r1_hit_not_reemitted(tmp_path):
+    """R1 re-evaluates on every event in the window; same pair = one finding."""
+    consumer = _consumer(tmp_path)
+    emitted = []
+    events = _sensitive_then_egress() + [
+        _event("proxy", "tool.list_dir", target="/tmp", ts=BASE_TS + 3),
+    ]
+    for event in events:
+        emitted.extend(await consumer.handle_event(event))
+    assert [f["rule"] for f in emitted] == ["sensitive_read_then_egress"]
+
+
+def test_tail_bounded_and_skips_garbage(tmp_path):
+    consumer = _consumer(tmp_path)
+    path = consumer.anomaly_log_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [json.dumps({"finding_id": str(i)}) for i in range(1000)]
+    lines.insert(500, "not json")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    assert [t["finding_id"] for t in consumer.tail(3)] == ["999", "998", "997"]
+    assert consumer.tail(0) == []
+
+
+def test_unused_env_int_helper_removed():
+    import sentinel.tool_anomaly_consumer as mod
+
+    assert not hasattr(mod, "_env_int")
