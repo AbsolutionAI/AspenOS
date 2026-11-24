@@ -1,0 +1,22 @@
+name: C11 bench measure
+
+# Not a required check. Measures ADR-0001 p50/p95 on the same
+# ubuntu-latest runners that execute the smoke job (ASP-807).
+on:
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install C11 build deps
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libseccomp-dev gcc pkg-config
+      - name: Build sandbox_run
+        run: make -C src/c/sandbox_spike all
+      - name: Isolated mode breakdown (N=100)
+        run: bash scripts/c11-bench-modes.sh 100
+      - name: Gate script (same invocation as smoke, output kept)
+        run: bash scripts/bench-sandbox.sh 100 || true
