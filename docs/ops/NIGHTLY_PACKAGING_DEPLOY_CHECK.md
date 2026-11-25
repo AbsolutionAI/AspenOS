@@ -129,9 +129,9 @@ Only the nightly script participates in the lock. A directly invoked `make smoke
 
 | Check | Baseline |
 | --- | --- |
-| `scripts/check-nightly.sh` total | **159 checks across 23 sections**. Before ASP-807 the recorded baseline was 158 pass / 1 known fail (C11 absolute 2ms). After ASP-807 that miss is not a known failure; a new fail is a regression. |
-| Of which: smoke test suite | 62 checks. Before ASP-807: 61 passed, 1 failed (C11 absolute 2ms). |
-| Python test suite | 500 passed, 4 skipped, 0 failures. All 4 skips are absent optional dependencies, not defects: `aiohttp` (`test_server.py`), `mcp.server` (`test_memory_mcp.py`), `nats-py` (`test_sentinel_consumer.py`), and the Hermes holographic plugin absent (`test_holographic_ingest.py` skips with "read-back NOT verified") |
+| `scripts/check-nightly.sh` total | **160 checks across 23 sections** — C11 p50 gate confirmed retired as of ASP-967 (overhead 0.489 ms, absolute 2.744 ms). Zero known failures. |
+| Of which: smoke test suite | 62 checks — 62 passed, 0 failed (C11 p50 gate passes on both overhead and absolute). |
+| Python test suite | 576 passed, 0 failures. All optional-dependency skips are absent dependencies, not defects: `aiohttp` (`test_server.py`), `mcp.server` (`test_memory_mcp.py`), `nats-py` (`test_sentinel_consumer.py`), and the Hermes holographic plugin absent (`test_holographic_ingest.py` skips with "read-back NOT verified") |
 | nats-server | v2.14.5 |
 | systemd unit files | 16 (8 `*.service` in `systemd/`, the same 8 in `dist/pkgroot/lib/systemd/system/`) |
 | systemd cgroup drop-in dirs | 8 `systemd/<unit>.service.d/` dirs in `systemd/`, the same 8 in `dist/pkgroot/lib/systemd/system/` |
@@ -142,7 +142,7 @@ Only the nightly script participates in the lock. A directly invoked `make smoke
 | Gatekeeper module | `src/python/gatekeeper/minimal_shim.py` present, valid Python syntax |
 | ISO build structure | 3 autoinstall profiles (edge/server/ops YAMLs), chroot hooks present, package lists present |
 | Dashboard static assets | 8 files present (style.css, ui.js, dashboard.js, agents.js, chat.js, panels.js, incidents.js, boot.js) |
-| Shell syntax coverage | 45 scripts (44 in `scripts/`, 1 in `packaging/`), all pass `bash -n` |
+| Shell syntax coverage | 46 scripts (45 in `scripts/`, 1 in `packaging/`), all pass `bash -n` |
 | NATS secret paths (ASP-373/F-009) | section 18 checks pass (600 modes via `fix-nats-secret-modes.sh`, no 640/644, staragent.yaml 600, 3 fixture tests) |
 | NATS rate limits & connection caps (ASP-375/F-011) | section 19 checks pass (hardening keys in agent/fleet configs, auth timeout 2.0, per-account limits, 5 fixture tests) |
 | cgroup per-agent resource limits (ASP-376/F-012) | section 20 checks pass (drop-ins exist for 8 units with CPU/Memory/Tasks keys, build-deb stages `.service.d`, install-systemd installs to `/etc`, 5 fixture tests) |
