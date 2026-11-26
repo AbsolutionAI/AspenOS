@@ -214,6 +214,8 @@ class ToolAnomalyDetector:
         error_min: int = 6,
         sensitive_read_egress_window_s: float | None = None,
         window_events_cap: int = 2000,
+        max_actors: int = 1000,
+        idle_seconds: float = 600.0,
     ) -> None:
         self.window_s = float(window_s)
         self.burst_high_risk_min = burst_high_risk_min
@@ -223,6 +225,9 @@ class ToolAnomalyDetector:
             sensitive_read_egress_window_s or window_s
         )
         self._window_events_cap = int(window_events_cap)
+        self._max_actors = max_actors
+        self._idle_seconds = idle_seconds
+        self._evict_counter = 0
         # actor -> list[(ts_epoch, event)]
         self._history: dict[str, list[tuple]] = {}
 
@@ -241,7 +246,29 @@ class ToolAnomalyDetector:
             history[:] = [(t, e) for t, e in history if t >= cutoff]
             if len(history) > self._window_events_cap:
                 self._history[actor] = history[-self._window_events_cap:]
+            self._evict_counter += 1
+            if self._evict_counter % 100 == 0:
+                self._evict_idle(ts)
         return self._check_actor(actor)
+
+    def _evict_idle(self, now: float) -> None:
+        """Remove actors whose last event is older than the idle threshold."""
+        cutoff = now - self._idle_seconds
+        stale = [
+            a for a, h in self._history.items()
+            if not h or h[-1][0] < cutoff
+        ]
+        for a in stale:
+            del self._history[a]
+        # enforce hard actor cap
+        if len(self._history) > self._max_actors:
+            sorted_actors = sorted(
+                self._history.keys(),
+                key=lambda a: self._history[a][-1][0] if self._history[a] else 0,
+                reverse=True,
+            )
+            for a in sorted_actors[self._max_actors:]:
+                del self._history[a]
 
     def scan(self, events: Iterable[dict]) -> list[Finding]:
         """Batch ingest: run a sliding detector over the given events.

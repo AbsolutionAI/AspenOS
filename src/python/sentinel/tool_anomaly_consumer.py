@@ -8,7 +8,7 @@ ops can **page on R1 (high)** and template the rest (R2–R4).
 
 Write topology (mirrors :mod:`sentinel.audit` and :mod:`sentinel.fleet_overview`):
 
-* **JSONL journal (always)** — append + flush + fsync at
+* **JSONL journal (always)** — append + flush + async fsync at
   ``/var/lib/aspen/sentinel/tool-anomaly.jsonl``. Findings are durable even
   fully offline.
 * **JetStream (best-effort)** — the same finding envelope is published to
@@ -42,12 +42,13 @@ CLI: ``scripts/tool-anomaly.py watch [--once]``.
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import json
 import logging
 import os
-import uuid
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from sentinel.audit import (
     DEFAULT_STREAM_NAME,
@@ -99,6 +100,13 @@ class ToolAnomalyConsumer:
         page_severity: Severity at/above which ``notify`` is true (default
             ``high``).
         max_age_seconds: Stream retention window (default 30 days).
+        nats_user_credentials: Optional ``user:password`` string for NATS
+            authentication. Falls back to ``ASPEN_NATS_CREDS``.
+        nats_token: Optional NATS token for auth-token authentication.
+            Falls back to ``ASPEN_NATS_TOKEN``.
+        nats_tls: Optional TLS config (bool or dict with ``cert_file``,
+            ``key_file``, ``ca_file``). Falls back to ``ASPEN_NATS_TLS``
+            (parsed as JSON bool or dict). Defaults to ``False``.
     """
 
     def __init__(
@@ -114,6 +122,9 @@ class ToolAnomalyConsumer:
         window_s: float = 120.0,
         page_severity: str = DEFAULT_PAGE_SEVERITY,
         max_age_seconds: int = 30 * 24 * 3600,
+        nats_user_credentials: Optional[str] = None,
+        nats_token: Optional[str] = None,
+        nats_tls: Any = None,
     ) -> None:
         self._nats_url = nats_url or os.environ.get("ASPEN_NATS_URL", "")
         env_audit = os.environ.get("ASPEN_AUDIT_LOG", "")
@@ -148,6 +159,44 @@ class ToolAnomalyConsumer:
         self._connected = False
         self._subs: List[Any] = []
         self._findings_emitted = 0
+        self._fsync_pending = False
+
+        # NATS auth / TLS
+        self._nats_user_credentials = (
+            nats_user_credentials or os.environ.get("ASPEN_NATS_CREDS") or ""
+        )
+        self._nats_token = (
+            nats_token or os.environ.get("ASPEN_NATS_TOKEN") or ""
+        )
+        if nats_tls is not None:
+            self._nats_tls = nats_tls
+        else:
+            raw = os.environ.get("ASPEN_NATS_TLS", "")
+            if raw:
+                try:
+                    self._nats_tls = json.loads(raw)
+                except (json.JSONDecodeError, TypeError):
+                    self._nats_tls = raw.lower() in ("true", "1", "yes")
+            else:
+                self._nats_tls = False
+
+    def _build_nats_connect_kwargs(self) -> dict:
+        """Build NATS connect keyword arguments with optional auth and TLS."""
+        kwargs: dict = dict(
+            max_reconnect_attempts=3,
+            reconnect_time_wait=2,
+            name="aspen-sentinel-tool-anomaly",
+            ping_interval=20,
+            max_outstanding_pings=5,
+            connect_timeout=5,
+        )
+        if self._nats_user_credentials:
+            kwargs["user_credentials"] = self._nats_user_credentials
+        if self._nats_token:
+            kwargs["token"] = self._nats_token
+        if self._nats_tls:
+            kwargs["tls"] = self._nats_tls
+        return kwargs
 
     # ---- introspection ---------------------------------------------------
 
@@ -196,12 +245,7 @@ class ToolAnomalyConsumer:
 
             self._nc = await nats.connect(
                 self._nats_url,
-                max_reconnect_attempts=3,
-                reconnect_time_wait=2,
-                name="aspen-sentinel-tool-anomaly",
-                ping_interval=20,
-                max_outstanding_pings=5,
-                connect_timeout=5,
+                **self._build_nats_connect_kwargs(),
             )
             self._connected = True
             self._js = self._nc.jetstream()
@@ -240,20 +284,26 @@ class ToolAnomalyConsumer:
         self._connected = False
 
     async def _ensure_stream(self) -> None:
-        """Idempotently create the durable sentinel stream."""
+        """Verify the durable sentinel stream exists; fail loudly if misconfigured."""
         if self._js is None:
             return
         try:
-            await self._js.add_stream(
-                name=self._stream,
-                subjects=self._stream_subjects,
-                storage="file",
-                max_age=self._max_age_seconds,
-                duplicate_window=600,
-            )
+            info = await self._js.stream_info(self._stream)
+            configured_subs = set(self._stream_subjects)
+            existing_subs = set(getattr(info, "subjects", []))
+            if not configured_subs.intersection(existing_subs):
+                logger.warning(
+                    "Stream %s exists but subjects %s do not overlap — "
+                    "findings may not be bound",
+                    self._stream,
+                    self._stream_subjects,
+                )
         except Exception as exc:
-            logger.debug(
-                "Stream %s may already exist (%s) — continuing", self._stream, exc
+            logger.error(
+                "Stream %s is missing or unreachable — consumer cannot "
+                "publish findings via JetStream: %s",
+                self._stream,
+                exc,
             )
 
     async def _subscribe(self) -> None:
@@ -312,26 +362,49 @@ class ToolAnomalyConsumer:
 
     # ---- emit ------------------------------------------------------------
 
+    def _finding_id(self, finding: Finding) -> str:
+        """Deterministic finding_id from (rule, actor, source event id).
+
+        Replaces random uuid so replays produce identical ``Nats-Msg-Id``
+        headers and JetStream deduplication suppresses duplicate pages.
+        """
+        source_eid = (
+            finding.events[0].get("event_id", "")
+            if finding.events
+            else ""
+        )
+        raw = f"{finding.rule}|{finding.actor}|{source_eid}"
+        return hashlib.sha256(raw.encode()).hexdigest()[:32]
+
     def _envelope(self, finding: Finding) -> Dict[str, Any]:
         payload = finding.to_dict()
-        payload["finding_id"] = uuid.uuid4().hex
+        payload["finding_id"] = self._finding_id(finding)
         payload["ts"] = utc_now()
         payload["source"] = "sentinel.tool_anomaly_consumer"
         payload["notify"] = self._is_page(str(finding.severity))
         return payload
 
-    def _append_journal(self, payload: Dict[str, Any]) -> None:
+    async def _append_journal(self, payload: Dict[str, Any]) -> None:
+        """Append a finding to the JSONL journal. Runs fsync in an executor."""
         self._anomaly_log_path.parent.mkdir(parents=True, exist_ok=True)
         line = json.dumps(payload, ensure_ascii=False, default=str) + "\n"
-        with open(self._anomaly_log_path, "a", encoding="utf-8") as fh:
-            fh.write(line)
-            fh.flush()
-            os.fsync(fh.fileno())
+        loop = asyncio.get_running_loop()
+        path = self._anomaly_log_path
+        try:
+            await loop.run_in_executor(
+                None, _write_and_fsync, str(path), line
+            )
+        except OSError as exc:
+            logger.warning(
+                "Journal write failed for finding %s: %s",
+                payload.get("finding_id", "unknown"),
+                exc,
+            )
 
     async def _emit_finding(self, finding: Finding) -> Dict[str, Any]:
         """Journal a finding (always) then mirror it to JetStream (best-effort)."""
         payload = self._envelope(finding)
-        self._append_journal(payload)
+        await self._append_journal(payload)
         self._findings_emitted += 1
         if self.is_online and self._js is not None:
             body = json.dumps(payload, ensure_ascii=False, default=str).encode()
@@ -374,3 +447,11 @@ class ToolAnomalyConsumer:
         except OSError:
             return []
         return list(reversed(findings[-max(0, n):]))
+
+
+def _write_and_fsync(path: str, line: str) -> None:
+    """Synchronous journal append with fsync. Runs in executor thread."""
+    with open(path, "a", encoding="utf-8") as fh:
+        fh.write(line)
+        fh.flush()
+        os.fsync(fh.fileno())
