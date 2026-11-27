@@ -3,9 +3,7 @@
 
 import base64
 import json
-import os
 import subprocess
-import sys
 import urllib.request
 
 TOKEN = subprocess.run(
